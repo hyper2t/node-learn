@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Svg, { Path, type SvgProps } from 'react-native-svg';
 
 /** Minimal line-icon set (24px grid, 1.75 stroke) so we don't ship a font. */
@@ -21,9 +22,19 @@ const PATHS = {
 } as const;
 export type IconName = keyof typeof PATHS;
 
+/**
+ * Icons are decorative by default; the surrounding Pressable/Text carries the label.
+ * react-native-svg's web renderer forwards unknown props straight to the DOM <svg>, so the
+ * React Native accessibility props must not reach it (React DOM warns "does not recognize the
+ * `accessibilityElementsHidden` prop"). Use ARIA on web, RN props on native.
+ */
+const DECORATIVE: Partial<SvgProps> = Platform.OS === 'web'
+  ? { 'aria-hidden': true, focusable: false }
+  : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' };
+
 export function Icon({ name, size = 20, color = 'currentColor', ...rest }: SvgProps & { name: IconName; size?: number; color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" accessibilityElementsHidden {...rest}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" {...DECORATIVE} {...rest}>
       <Path d={PATHS[name]} />
     </Svg>
   );
