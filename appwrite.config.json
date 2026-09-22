@@ -5,11 +5,17 @@
   "settings": {
     "services": {
       "account": true,
+      "avatars": true,
       "databases": true,
+      "locale": true,
+      "health": true,
       "storage": true,
       "teams": true,
       "users": true,
-      "functions": true
+      "functions": true,
+      "sites": true,
+      "graphql": true,
+      "messaging": true
     },
     "auth": {
       "methods": {
@@ -88,6 +94,10 @@
         {
           "key": "APPWRITE_AVATAR_BUCKET_ID",
           "value": "avatars"
+        },
+        {
+          "key": "APPWRITE_ADMIN_TEAM_ID",
+          "value": "admins"
         },
         {
           "key": "CORS_ORIGINS",

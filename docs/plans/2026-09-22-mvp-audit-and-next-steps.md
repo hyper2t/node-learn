@@ -33,7 +33,7 @@ MVP 闭环（注册/登录 → 年龄门 → 角色 → 档案 → 找老师/请
 | domain_events / audit_events | 🟡 | 只写表，**无消费者**（无通知、无投影解耦） |
 | 测试 | ❌ | 仅 4 个测试（health/envelope/idempotency）；无 repository/权限/状态机测试 |
 | Admin / moderation 处理 | ❌ | reports 只写入，无审核接口（`APPWRITE_ADMIN_TEAM_ID` 未使用） |
-| 部署（Function push、staging、回滚） | ❌ | 有 build 脚本，未真正部署过 Function |
+| 部署（Function push、staging、回滚） | ✅ | 2026-09-22 已通过 CLI 部署到 `6ab25202000c575857b2.appwrite.network`；Function 变量须用 `npm run api:push-vars`（CLI 27.3 的 `push --with-variables` 无效），详见 Phase E 计划 |
 
 ### 2.2 前端（`src/`，85 个文件）
 
@@ -59,8 +59,8 @@ MVP 闭环（注册/登录 → 年龄门 → 角色 → 档案 → 找老师/请
 |---|---|
 | 根/后端 npm scripts 对齐 proto-store | ✅ |
 | `.env.example` 两份 | ✅ |
-| CI（GitHub Actions 跑 `npm run check`） | ❌ |
-| `eas.json`、bundle id、图标、splash | ❌（`app.json` 仍为模板） |
+| CI（GitHub Actions 跑 `npm run check`） | ✅（C4，`.github/workflows/ci.yml`） |
+| `eas.json`、bundle id、图标、splash | ✅ 代码侧（D1）；`extra.eas.projectId` 待 `eas init`（Phase E8） |
 | 契约漂移检查 | ✅ |
 | 观测：latency / error rate / projection lag | ❌ |
 
@@ -143,12 +143,12 @@ MVP 闭环（注册/登录 → 年龄门 → 角色 → 档案 → 找老师/请
 
 ### Phase D — 发布准备（第 4 迭代）✅ 代码侧已完成 2026-09-22（控制台侧操作见 `docs/runbooks/deploy-api.md`）
 
-> 实现记录：D1 `app.json` → name Node Learn / slug node-learn / scheme `node-learn` / iOS `com.hyperter96.nodelearn` + 权限文案 / Android package + App Link intent filter / expo-image-picker 插件；新增 `eas.json`（development/preview/production，`EXPO_PUBLIC_*` 按 profile 注入，Function 域名占位待替换）；`oauthReturnUrl()` 在独立构建下返回 `nodelearn://auth/oauth-return`（Expo Go 仍用 exp://），需在 Console 注册的三条 redirect 已写入注释与 runbook。D2 `npm run deploy:api`（esbuild → `appwrite push functions`），Function 适配器加兜底 500 envelope；runbook 含变量清单、验证、回滚。D3 `backend/scripts/check-schema.ts`（`db/schema.ts` ⇄ `appwrite.config.json` 双向一致 + createdAt/updatedAt + 桶存在），并入 `npm run api:typecheck`。D4 `/legal/privacy`、`/legal/terms`（`src/content/legal.ts` 单一数据源，web+native 同渲染，路由守卫放行；年龄门与设置页均有入口），`docs/legal/data-retention.md` 保留期表；删号同时清理 notifications。D5 `middleware/access-log.ts` 每请求一行 `{route,status,latencyMs,requestId,userId}`（5xx=error），`/readyz` 真查 TablesDB（10s 缓存，失败 503），`health.test.ts`；后端测试 17 个。D6 `confirm()`/`DialogHost` 统一替换 4 处 `window.confirm`/`Alert.alert`（web/native 同一可访问对话框，Esc/Enter），`Skeleton/SkeletonCard/SkeletonList`（教师、通知、消息列表），`OfflineBanner`（onlineManager；native 由 expo-network 喂状态），Load more 已在各列表存在。验证：全部门禁绿；`expo export` 产出 `dist/legal/*.html`；`build:function` 成功；本地 `/readyz` 200 且带 `checks.tablesDb.latencyMs`。
+> 实现记录：D1 `app.json` → name Node Learn / slug node-learn / scheme `nodelearn` / iOS `com.hyperter96.nodelearn` + 权限文案 / Android package + App Link intent filter / expo-image-picker 插件；新增 `eas.json`（development/preview/production，`EXPO_PUBLIC_*` 按 profile 注入，Function 域名占位待替换）；`oauthReturnUrl()` 在独立构建下返回 `nodelearn://auth/oauth-return`（Expo Go 仍用 exp://），需在 Console 注册的三条 redirect 已写入注释与 runbook。D2 `npm run deploy:api`（esbuild → `appwrite push functions`），Function 适配器加兜底 500 envelope；runbook 含变量清单、验证、回滚。D3 `backend/scripts/check-schema.ts`（`db/schema.ts` ⇄ `appwrite.config.json` 双向一致 + createdAt/updatedAt + 桶存在），并入 `npm run api:typecheck`。D4 `/legal/privacy`、`/legal/terms`（`src/content/legal.ts` 单一数据源，web+native 同渲染，路由守卫放行；年龄门与设置页均有入口），`docs/legal/data-retention.md` 保留期表；删号同时清理 notifications。D5 `middleware/access-log.ts` 每请求一行 `{route,status,latencyMs,requestId,userId}`（5xx=error），`/readyz` 真查 TablesDB（10s 缓存，失败 503），`health.test.ts`；后端测试 17 个。D6 `confirm()`/`DialogHost` 统一替换 4 处 `window.confirm`/`Alert.alert`（web/native 同一可访问对话框，Esc/Enter），`Skeleton/SkeletonCard/SkeletonList`（教师、通知、消息列表），`OfflineBanner`（onlineManager；native 由 expo-network 喂状态），Load more 已在各列表存在。验证：全部门禁绿；`expo export` 产出 `dist/legal/*.html`；`build:function` 成功；本地 `/readyz` 200 且带 `checks.tablesDb.latencyMs`。
 >
 > 仍需人工（无法从代码侧完成）：Console 注册平台与 OAuth redirect；创建 Function 环境变量并 `npm run deploy:api`；把 Function 域名填回 `eas.json`/web env；`eas init` 填 `extra.eas.projectId`；`purge-deleted` 定时 Function（保留期执行）；法务审阅文案；真实 Appwrite 集成测试与 Playwright 关键流（C4 遗留）。
 
 
-- **D1. 应用配置**：`app.json` → name `Node Learn`、slug `node-learn`、scheme `node-learn`、bundle id `com.hyperter96.nodelearn`（对齐 `EXPO_PUBLIC_APPWRITE_PLATFORM`）、图标/splash；`eas.json` preview/production；Appwrite Console 注册平台与 OAuth redirect：`nodelearn://auth/oauth-return`、`https://<web>/auth/oauth-return`。
+- **D1. 应用配置**：`app.json` → name `Node Learn`、slug `node-learn`、scheme `nodelearn`、bundle id `com.hyperter96.nodelearn`（对齐 `EXPO_PUBLIC_APPWRITE_PLATFORM`）、图标/splash；`eas.json` preview/production；Appwrite Console 注册平台与 OAuth redirect：`nodelearn://auth/oauth-return`、`https://<web>/auth/oauth-return`。
 - **D2. 部署后端 Function**：`npm --prefix backend run build:function` → `appwrite push functions`；Function 环境变量；staging smoke 用 Function URL 作为 `SMOKE_BASE_URL`；写回滚步骤（重新 push 上一 tag）。
 - **D3. `appwrite.config.json` 写入 tables 定义**：从 `db/schema.ts` 生成，让 `appwrite push` 与 `tables:ensure` 等价。
 - **D4. 法务/合规页**：`/legal/privacy`、`/legal/terms` 静态路由（web + app 内 WebView），年龄门链接指向它；数据保留期与删除策略写入 `docs/`。

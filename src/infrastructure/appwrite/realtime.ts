@@ -11,7 +11,7 @@ export type RealtimeHint = { conversationId: string; kind: 'message' | 'conversa
 type Listener = (h: RealtimeHint) => void;
 type RealtimeStatus = 'idle' | 'connected' | 'degraded';
 
-const DB = 'main';
+const DB = env.appwriteDatabaseId;
 const listeners = new Map<string, Set<Listener>>(); // conversationId → listeners
 const statusListeners = new Set<(s: RealtimeStatus) => void>();
 let unsubscribe: (() => void) | null = null;

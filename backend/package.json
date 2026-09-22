@@ -20,7 +20,9 @@
     "backfill:permissions": "tsx scripts/backfill-permissions.ts",
     "smoke:uploads": "tsx scripts/upload-smoke.ts",
     "schema:check": "tsx scripts/check-schema.ts",
-    "deploy:function": "node scripts/build-function.mjs && cd .. && appwrite push function --function-id node-learn-api --with-variables --force"
+    "push-vars": "node scripts/push-vars.mjs",
+    "verify:deploy": "node scripts/verify-deploy.mjs",
+    "deploy:function": "node scripts/build-function.mjs && cd .. && appwrite push function --function-id node-learn-api --force && cd backend && node scripts/verify-deploy.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

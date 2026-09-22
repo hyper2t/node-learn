@@ -38,7 +38,8 @@ jobs:
         env:
           EXPO_PUBLIC_APPWRITE_ENDPOINT: https://example.invalid/v1
           EXPO_PUBLIC_APPWRITE_PROJECT_ID: ci
-          EXPO_PUBLIC_APPWRITE_PLATFORM: com.nodelearn.app
+          EXPO_PUBLIC_APPWRITE_PLATFORM: com.hyperter96.nodelearn
+          EXPO_PUBLIC_APPWRITE_DATABASE_ID: main
           EXPO_PUBLIC_API_BASE_URL: http://localhost:8070
           EXPO_PUBLIC_WEB_URL: http://localhost:8071
           CI: 1

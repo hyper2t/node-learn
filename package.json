@@ -74,9 +74,12 @@
     "api:smoke": "npm --prefix backend run smoke",
     "api:tables": "npm --prefix backend run tables:ensure -- --all",
     "api:make-dev-user": "npm --prefix backend run make-dev-user",
+    "api:push-vars": "npm --prefix backend run push-vars",
+    "api:verify-deploy": "npm --prefix backend run verify:deploy",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test && npm run api:typecheck && npm run api:test",
-    "deploy:api": "npm --prefix backend run deploy:function"
+    "deploy:api": "npm --prefix backend run deploy:function",
+    "appwrite:email-templates": "powershell -NoProfile -ExecutionPolicy Bypass -File appwrite/push-email-templates.ps1"
   },
   "private": true
 }
