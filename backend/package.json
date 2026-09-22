@@ -1,0 +1,31 @@
+{
+  "name": "knownode-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KnowNode REST API (v1). Hono core + Node / Appwrite Function adapters, Appwrite TablesDB as the data layer.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "smoke": "tsx scripts/smoke.ts",
+    "seed": "tsx scripts/seed.ts",
+    "tables:ensure": "tsx scripts/ensure-tables.ts",
+    "build:function": "node scripts/build-function.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "hono": "^4.6.14",
+    "node-appwrite": "^29.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.2",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

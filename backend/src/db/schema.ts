@@ -1,0 +1,27 @@
+/** Table IDs — must match appwrite.config.json. */
+export const TABLES = {
+  profiles: 'profiles',
+  roleMemberships: 'role_memberships',
+  studentProfiles: 'student_profiles',
+  teacherProfiles: 'teacher_profiles',
+  learningRequests: 'learning_requests',
+  learningRelations: 'learning_relations',
+  learningGoals: 'learning_goals',
+  learningTasks: 'learning_tasks',
+  evidenceItems: 'evidence_items',
+  feedbackEntries: 'feedback_entries',
+  proofRecords: 'proof_records',
+  conversations: 'conversations',
+  conversationMembers: 'conversation_members',
+  messages: 'messages',
+  connectionRequests: 'connection_requests',
+  contacts: 'contacts',
+  blocks: 'blocks',
+  reports: 'reports',
+  idempotencyKeys: 'idempotency_keys',
+  domainEvents: 'domain_events',
+  auditEvents: 'audit_events',
+  uploadIntents: 'upload_intents',
+} as const;
+
+export type TableId = (typeof TABLES)[keyof typeof TABLES];
