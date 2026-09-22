@@ -1,6 +1,6 @@
 import '../global.css';
 import { useEffect, useMemo } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ export { ErrorBoundary } from 'expo-router';
 function Gate({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const segments = useSegments() as string[];
+  const pathname = usePathname();
   const router = useRouter();
   const authed = auth.status === 'authenticated';
   const me = useMe(authed);
@@ -47,9 +48,11 @@ function Gate({ children }: { children: React.ReactNode }) {
     return null;
   }, [ready, passThrough, authed, inAuth, me.data, top, segments]);
 
+  // pathname is a dependency so a redirect that loses the race with a concurrent
+  // navigation is re-attempted on the next route change instead of stranding the user.
   useEffect(() => {
     if (target) router.replace(target as never);
-  }, [target, router]);
+  }, [target, router, pathname]);
 
   if (!ready) return <Loading />;
   return <>{children}</>;
