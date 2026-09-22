@@ -1,39 +1,44 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Platform, Pressable, ScrollView, View, useWindowDimensions,
+  Animated, Platform, Pressable, ScrollView, View, useWindowDimensions,
   type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ViewStyle,
 } from 'react-native';
 import { Stack } from 'expo-router';
 import type { LegalDoc } from '@/content/legal';
 import { Screen, PageHeader } from '@/shared/layout/screen';
-import { useBreakpoint } from '@/shared/hooks/use-breakpoint';
 import { MarkdownView, parseMarkdown, type TocEntry } from '@/shared/markdown';
 import { cn } from '@/shared/lib/cn';
 import { t } from '@/shared/i18n';
+import { Icon } from '@/shared/ui/icon';
 import { Text } from './text';
 
 const ASIDE_WIDTH = 200;
-/** Window width below which the TOC becomes a compact card above the article. */
+/** Window width at and above which the TOC becomes a permanent right-hand column (web and native). */
 const ASIDE_MIN_WINDOW_WIDTH = 800;
+const DRAWER_WIDTH = 280;
 const SCROLL_MARGIN = 16;
 /** `position: sticky` exists only on the web; RN's ViewStyle type does not know it. */
 const STICKY_ASIDE = Platform.OS === 'web' ? ({ position: 'sticky', top: 24 } as unknown as ViewStyle) : undefined;
 
 /**
- * Legal page: Markdown body + table of contents. On wide web layouts the TOC sits to the right
- * of the article and follows the scroll position; elsewhere it is a compact card above the text.
- * Heading offsets are measured with onLayout (row → article → heading), so `scrollTo` and the
- * scroll-spy work identically on web and native.
+ * Legal page: Markdown body + table of contents, on every platform.
+ * - Wide layouts (web and native, window >= 800): sticky TOC column to the right of the article.
+ * - Narrow layouts (phones): a floating button on the right edge opens a right-hand TOC drawer.
+ * Both variants share the scroll-spy: the entry for the section in view is highlighted, and
+ * selecting an entry scrolls the article. Web measures heading offsets against the live DOM;
+ * native uses onLayout offsets. `#hash` deep links work on web.
  */
 export function LegalDocView({ doc }: { doc: LegalDoc }) {
   const { blocks, toc } = useMemo(() => parseMarkdown(doc.markdown), [doc.markdown]);
-  const bp = useBreakpoint();
+  const { width: winWidth } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const pos = useRef({ row: null as number | null, article: null as number | null, headings: {} as Record<string, number> });
   const scrollY = useRef(0);
   const frame = useRef<number | null>(null);
   const hashHandled = useRef(false);
   const [activeId, setActiveId] = useState<string | null>(toc[0]?.id ?? null);
+  const [tocOpen, setTocOpen] = useState(false);
+  const [slide] = useState(() => new Animated.Value(0));
 
   /** Live top offset of a heading inside the scroll container (web measures the DOM directly). */
   const offsetOf = useCallback((id: string): number | null => {
@@ -75,6 +80,15 @@ export function LegalDocView({ doc }: { doc: LegalDoc }) {
     return true;
   }, [offsetOf]);
 
+  const useNativeDriver = Platform.OS !== 'web';
+  const openToc = useCallback(() => {
+    setTocOpen(true);
+    Animated.timing(slide, { toValue: 1, duration: 200, useNativeDriver }).start();
+  }, [slide, useNativeDriver]);
+  const closeToc = useCallback(() => {
+    Animated.timing(slide, { toValue: 0, duration: 160, useNativeDriver }).start(() => setTocOpen(false));
+  }, [slide, useNativeDriver]);
+
   // Runs once per frame after a burst of onLayout callbacks (mount, resize, font load):
   // honours a web deep link (/legal/privacy#your-rights) once, then refreshes the active entry.
   const onLayoutSettled = useCallback(() => {
@@ -114,22 +128,72 @@ export function LegalDocView({ doc }: { doc: LegalDoc }) {
   }, [bump]);
 
   const hasToc = toc.length > 0;
-  const { width: winWidth } = useWindowDimensions();
-  const showAside = hasToc && Platform.OS === 'web' && bp !== 'phone' && winWidth >= ASIDE_MIN_WINDOW_WIDTH;
+  const showAside = hasToc && winWidth >= ASIDE_MIN_WINDOW_WIDTH;
+  const selectFromToc = useCallback((id: string) => {
+    scrollToId(id);
+    if (!showAside) closeToc();
+  }, [scrollToId, closeToc, showAside]);
 
   return (
-    <Screen width="article" scrollRef={scrollRef} onScroll={hasToc ? onScroll : undefined} scrollEventThrottle={32}>
+    <Screen width="article" scroll={false}>
       <Stack.Screen options={{ title: doc.title }} />
-      <PageHeader title={doc.title} body={t('legal.lastUpdated', { date: doc.updated })} />
-      {doc.intro ? <Text variant="body" tone="secondary" className="pb-6">{doc.intro}</Text> : null}
-      <View onLayout={onRowLayout} className={cn('pb-10', showAside ? 'flex-row items-start gap-10' : 'gap-6')}>
-        {hasToc && !showAside ? <TableOfContents entries={toc} activeId={activeId} onSelect={scrollToId} compact /> : null}
-        <View onLayout={onArticleLayout} className={cn('min-w-0', showAside && 'flex-1')} style={showAside ? { maxWidth: 680 } : undefined}>
-          <MarkdownView blocks={blocks} onHeadingLayout={onHeadingLayout} />
-        </View>
-        {showAside ? (
-          <View style={[{ width: ASIDE_WIDTH }, STICKY_ASIDE]}>
-            <TableOfContents entries={toc} activeId={activeId} onSelect={scrollToId} />
+      <View className="flex-1">
+        <ScrollView
+          ref={scrollRef}
+          onScroll={hasToc ? onScroll : undefined}
+          scrollEventThrottle={32}
+          className="flex-1"
+          contentContainerClassName="pb-16"
+          keyboardShouldPersistTaps="handled"
+        >
+          <PageHeader title={doc.title} body={t('legal.lastUpdated', { date: doc.updated })} />
+          {doc.intro ? <Text variant="body" tone="secondary" className="pb-6">{doc.intro}</Text> : null}
+          <View onLayout={onRowLayout} className={cn('pb-10', showAside ? 'flex-row items-start gap-10' : 'gap-6')}>
+            <View onLayout={onArticleLayout} className={cn('min-w-0', showAside && 'flex-1')} style={showAside ? { maxWidth: 680 } : undefined}>
+              <MarkdownView blocks={blocks} onHeadingLayout={onHeadingLayout} />
+            </View>
+            {showAside ? (
+              <View style={[{ width: ASIDE_WIDTH }, STICKY_ASIDE]}>
+                <TableOfContents entries={toc} activeId={activeId} onSelect={selectFromToc} />
+              </View>
+            ) : null}
+          </View>
+        </ScrollView>
+
+        {hasToc && !showAside ? (
+          <View pointerEvents="box-none" className="absolute inset-0">
+            {tocOpen ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+                onPress={closeToc}
+                className="absolute inset-0 bg-overlay"
+              />
+            ) : null}
+            {tocOpen ? (
+              <Animated.View
+                accessibilityViewIsModal
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, right: 0, width: DRAWER_WIDTH,
+                  shadowColor: '#0B1220', shadowOpacity: 0.18, shadowRadius: 16, elevation: 8,
+                  transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [DRAWER_WIDTH, 0] }) }],
+                }}
+              >
+                {/* NativeWind classes live on a plain View: Animated.* skips the className transform. */}
+                <View className="flex-1 border-l border-border bg-surface px-4 py-5">
+                  <TableOfContents entries={toc} activeId={activeId} onSelect={selectFromToc} />
+                </View>
+              </Animated.View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('legal.onThisPage')}
+                onPress={openToc}
+                className="absolute right-3 top-24 h-11 w-11 items-center justify-center rounded-full border border-border bg-surface shadow-card"
+              >
+                <Icon name="menu" size={20} color="#5F6570" />
+              </Pressable>
+            )}
           </View>
         ) : null}
       </View>
@@ -137,11 +201,11 @@ export function LegalDocView({ doc }: { doc: LegalDoc }) {
   );
 }
 
-function TableOfContents({ entries, activeId, onSelect, compact = false }: {
-  entries: TocEntry[]; activeId: string | null; onSelect: (id: string) => void; compact?: boolean;
+function TableOfContents({ entries, activeId, onSelect }: {
+  entries: TocEntry[]; activeId: string | null; onSelect: (id: string) => void;
 }) {
   return (
-    <View role="navigation" aria-label={t('legal.onThisPage')} className={cn(compact && 'rounded-md border border-border bg-surface px-4 py-3')}>
+    <View role="navigation" aria-label={t('legal.onThisPage')}>
       <Text variant="caption" tone="tertiary" className="pb-2 uppercase tracking-wide">{t('legal.onThisPage')}</Text>
       <View>
         {entries.map((e) => {
@@ -152,7 +216,7 @@ function TableOfContents({ entries, activeId, onSelect, compact = false }: {
               accessibilityRole="link"
               accessibilityState={{ selected: active }}
               onPress={() => onSelect(e.id)}
-              className={cn('border-l-2 py-1 pr-2', active ? 'border-primary' : 'border-border', e.depth > 0 ? 'pl-6' : 'pl-3')}
+              className={cn('border-l-2 py-1.5 pr-2', active ? 'border-primary' : 'border-border', e.depth > 0 ? 'pl-6' : 'pl-3')}
             >
               <Text variant={active ? 'small-strong' : 'small'} tone={active ? 'primary' : 'secondary'} numberOfLines={2}>{e.text}</Text>
             </Pressable>
