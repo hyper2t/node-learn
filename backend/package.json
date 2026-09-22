@@ -10,10 +10,11 @@
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "smoke": "tsx scripts/smoke.ts",
     "seed": "tsx scripts/seed.ts",
-    "tables:ensure": "tsx scripts/ensure-tables.ts",
-    "build:function": "node scripts/build-function.mjs"
+    "smoke": "tsx scripts/smoke.ts",
+    "build:function": "node scripts/build-function.mjs",
+    "make-dev-user": "tsx scripts/make-dev-user.ts",
+    "tables:ensure": "tsx scripts/ensure-tables.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

@@ -50,19 +50,26 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web --port 8071",
+    "start": "ELECTRON_DISABLE_SANDBOX=1 expo start --tunnel --port 8071",
+    "android": "EXPO_UNSTABLE_HEADLESS=1 expo start --android --port 8071",
+    "ios": "EXPO_UNSTABLE_HEADLESS=1 expo start --ios --port 8071",
+    "web": "EXPO_UNSTABLE_HEADLESS=1 expo start --web --port 8071",
+    "build:android": "eas build --platform android --profile preview",
+    "build:ios": "eas build --platform ios --profile preview",
+    "build:all": "eas build --platform all --profile preview",
+    "build:android:prod": "eas build --platform android --profile production",
+    "build:ios:prod": "eas build --platform ios --profile production",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
-    "contract:check": "node scripts/check-contract.mjs",
-    "backend:dev": "npm --prefix backend run dev",
-    "backend:typecheck": "npm --prefix backend run typecheck",
-    "backend:test": "npm --prefix backend run test",
-    "backend:smoke": "npm --prefix backend run smoke",
-    "backend:tables": "npm --prefix backend run tables:ensure -- --all",
-    "check": "npm run typecheck && npm run lint && npm run contract:check && npm run backend:typecheck && npm run backend:test"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "export:web": "expo export --platform web",
+    "dev:api": "npm --prefix backend run dev",
+    "start:api": "npm --prefix backend start",
+    "api:typecheck": "node scripts/check-contract.mjs && npm --prefix backend run typecheck",
+    "api:test": "npm --prefix backend test",
+    "api:seed": "npm --prefix backend run seed",
+    "api:smoke": "npm --prefix backend run smoke",
+    "api:tables": "npm --prefix backend run tables:ensure -- --all",
+    "api:make-dev-user": "npm --prefix backend run make-dev-user"
   },
   "private": true
 }
