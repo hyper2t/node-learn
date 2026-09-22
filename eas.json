@@ -1,0 +1,34 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_BASE_URL": "http://localhost:8070", "EXPO_PUBLIC_WEB_URL": "http://localhost:8071" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://sfo.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6ab149e4001d09a18de3",
+        "EXPO_PUBLIC_APPWRITE_PLATFORM": "com.hyperter96.nodelearn",
+        "EXPO_PUBLIC_API_BASE_URL": "https://6ab25202000c575857b2.appwrite.network",
+        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.example"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://sfo.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6ab149e4001d09a18de3",
+        "EXPO_PUBLIC_APPWRITE_PLATFORM": "com.hyperter96.nodelearn",
+        "EXPO_PUBLIC_API_BASE_URL": "https://6ab25202000c575857b2.appwrite.network",
+        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.example"
+      }
+    }
+  },
+  "submit": { "production": {} }
+}

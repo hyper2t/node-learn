@@ -9,7 +9,7 @@ export function RelationCard({ r, role }: { r: LearningRelation; role: Role }) {
   const other = role === 'student' ? r.teacher : r.student;
   return (
     <PressableCard onPress={() => router.push(`/(app)/relations/${r.id}`)} className="flex-row items-center gap-3">
-      <Avatar name={other.displayName} size={44} />
+      <Avatar name={other.displayName} fileId={other.avatarFileId} size={44} />
       <View className="flex-1 gap-0.5">
         <Text variant="body-strong" numberOfLines={1}>{other.displayName}</Text>
         <Text variant="small" tone="secondary" numberOfLines={1}>
@@ -27,7 +27,7 @@ export function RequestCard({ r, onPress }: { r: LearningRequest; onPress?: () =
   return (
     <PressableCard onPress={onPress} className="gap-2">
       <View className="flex-row items-center gap-3">
-        <Avatar name={r.counterpart.displayName} size={36} />
+        <Avatar name={r.counterpart.displayName} fileId={r.counterpart.avatarFileId} size={36} />
         <View className="flex-1">
           <Text variant="body-strong" numberOfLines={1}>{r.counterpart.displayName}</Text>
           <Text variant="caption" tone="tertiary">{r.kind === 'learning_request' ? t('requests.fromStudent') : t('requests.fromTeacher')} · {fmt.relative(r.createdAt)}</Text>

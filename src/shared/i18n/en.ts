@@ -1,6 +1,6 @@
 /** English locale. All user-visible strings live here; components call t('key'). */
 export const en = {
-  app: { name: 'KnowNode', tagline: 'Learn with someone who notices how you think.' },
+  app: { name: 'Node Learn', tagline: 'Learn with someone who notices how you think.' },
   common: {
     continue: 'Continue', cancel: 'Cancel', save: 'Save', send: 'Send', done: 'Done', back: 'Back', retry: 'Try again', close: 'Close',
     loading: 'Loading…', offline: 'You are offline. Showing what we have.', empty: 'Nothing here yet.', accept: 'Accept', decline: 'Decline',
@@ -14,7 +14,7 @@ export const en = {
     duplicate_request: 'There is already an open request between you.', blocked: 'You cannot interact with this person.', handle_taken: 'That handle is taken.',
   },
   auth: {
-    welcomeTitle: 'Welcome to KnowNode', welcomeBody: 'Set a learning goal, find a teacher, and build understanding through real work and feedback.',
+    welcomeTitle: 'Welcome to Node Learn', welcomeBody: 'Set a learning goal, find a teacher, and build understanding through real work and feedback.',
     signIn: 'Sign in', signUp: 'Create account', email: 'Email', password: 'Password', name: 'Your name', forgot: 'Forgot password?',
     noAccount: 'New here?', haveAccount: 'Already have an account?', continueWith: 'Continue with {provider}', google: 'Google', notion: 'Notion',
     notionNote: 'We only use Notion to confirm who you are. We never read your pages.', finishing: 'Finishing sign-in…', oauthFailed: 'Sign-in did not complete. Try again.',
@@ -31,9 +31,9 @@ export const en = {
     },
   },
   gate: {
-    ageTitle: 'A few things first', ageBody: 'KnowNode is for people aged 16 and over. Tell us which group you are in — we do not store your birthday.',
-    under16: 'Under 16', b16_17: '16–17', b18: '18 or over', privacy: 'I have read the privacy notice and agree to how KnowNode uses my data.',
-    tooYoung: 'KnowNode is not available for your age group yet.', privacyLink: 'Privacy notice',
+    ageTitle: 'A few things first', ageBody: 'Node Learn is for people aged 16 and over. Tell us which group you are in — we do not store your birthday.',
+    under16: 'Under 16', b16_17: '16–17', b18: '18 or over', privacy: 'I have read the privacy notice and agree to how Node Learn uses my data.',
+    tooYoung: 'Node Learn is not available for your age group yet.', privacyLink: 'Privacy notice', termsLink: 'Terms of use',
   },
   role: {
     chooseTitle: 'How do you want to start?', chooseBody: 'You can add the other role any time.', student: 'Learn', studentBody: 'Set a goal, work with a teacher, and build evidence of what changed.',
@@ -41,7 +41,7 @@ export const en = {
   },
   onboarding: {
     studentTitle: 'What do you want to understand better?', studentBody: 'One sentence is enough. You can refine it with your teacher.', goalLabel: 'Learning goal', goalPlaceholder: 'e.g. Reason about recursion without tracing every call',
-    interests: 'Topics', interestsHint: 'Comma separated, up to 10', teacherTitle: 'Tell learners how you teach', teacherBody: 'This is your own description. KnowNode does not verify credentials — trust builds from your work and feedback.',
+    interests: 'Topics', interestsHint: 'Comma separated, up to 10', teacherTitle: 'Tell learners how you teach', teacherBody: 'This is your own description. Node Learn does not verify credentials — trust builds from your work and feedback.',
     headline: 'Headline', headlinePlaceholder: 'e.g. Systems thinking for self-taught programmers', bio: 'About', subjects: 'Subjects', approach: 'How you work with learners', accepting: 'Accepting new learners',
     handle: 'Handle', handleHint: 'People can find you only by exact handle.',
     skip: 'Skip for now', skipHint: 'You can add or change this any time from your Profile.',
@@ -57,6 +57,7 @@ export const en = {
     title: 'Find a teacher', search: 'Search by name, handle or subject', empty: 'No teachers match yet.', selfDeclared: 'Self-described profile', verifiedEmail: 'Verified email',
     activeRelations: '{n} active learners', request: 'Send learning request', requestTitle: 'What do you want to work on?', goalTitle: 'Goal', message: 'A short note', sent: 'Request sent.',
     accepting: 'Accepting learners', notAccepting: 'Not accepting right now', memberSince: 'Member since {date}', approach: 'Approach',
+    filters: 'Filters', subject: 'Subject', subjectPlaceholder: 'e.g. algebra', onlyAccepting: 'Only teachers accepting learners', sort: 'Sort', sortRelevance: 'Recommended', sortNewest: 'Newest', sortReviewed: 'Most feedback given', reviewed: '{n} pieces of feedback',
   },
   requests: {
     title: 'Requests', incoming: 'Received', outgoing: 'Sent', pending: 'Pending', accepted: 'Accepted', declined: 'Declined', cancelled: 'Cancelled', expired: 'Expired',
@@ -67,7 +68,8 @@ export const en = {
     giveFeedback: 'Give feedback', markAchieved: 'Mark achieved', openTasks: '{n} open tasks', evidenceCount: '{n} pieces of evidence', status: { active: 'Active', paused: 'Paused', ended: 'Ended' },
     taskStatus: { open: 'Open', submitted: 'Submitted', reviewed: 'Reviewed', done: 'Done', dropped: 'Dropped' }, goalStatus: { active: 'Active', achieved: 'Achieved', dropped: 'Dropped' },
     evidenceTitle: 'Title', evidenceBody: 'What did you do, and what do you now understand differently?', forTask: 'For task', feedbackBody: 'What did you notice?', nextStep: 'Suggested next step',
-    markDone: 'Mark task done', noGoals: 'No goals yet.', noTasks: 'No tasks yet.', noEvidence: 'No evidence yet.', due: 'Due {date}', pause: 'Pause', resume: 'Resume', end: 'End relation',
+    markDone: 'Mark task done', attachments: 'Attachments', addAttachment: 'Add file', addImage: 'Add image', attachmentHint: 'Up to 5 files. Images, PDF, ZIP, text or Markdown, 25 MB each.',
+    uploading: 'Uploading…', uploadFailed: 'Upload failed. Tap to remove and try again.', open: 'Open', download: 'Download', noGoals: 'No goals yet.', noTasks: 'No tasks yet.', noEvidence: 'No evidence yet.', due: 'Due {date}', pause: 'Pause', resume: 'Resume', end: 'End relation',
     endConfirm: 'End this learning relation? Evidence and feedback stay visible to both of you.', tasksDone: 'Tasks done', submitted: 'Submitted', feedback: 'Feedback', revisions: 'Revisions',
     milestones: 'Milestones', noProof: 'Progress appears once there is evidence and feedback.', source: 'Every number here links to something you did.',
   },
@@ -75,6 +77,16 @@ export const en = {
     title: 'Messages', empty: 'No conversations yet.', emptyBody: 'Conversations start when a learning relation or connection is made.', placeholder: 'Write a message',
     sending: 'Sending…', failed: 'Not sent. Tap to retry.', queued: 'Waiting for connection', system: 'System', goalCreated: 'New goal: {title}', taskAssigned: 'Task assigned: {title}',
     evidenceSubmitted: 'Evidence submitted: {title}', feedbackAdded: 'Feedback added', milestone: 'Milestone reached: {title}', open: 'Open',
+  },
+  notifications: {
+    title: 'Notifications', all: 'All', unread: 'Unread', markAllRead: 'Mark all read', empty: 'You are all caught up.',
+    emptyBody: 'Requests, tasks, evidence and feedback will show up here.',
+  },
+  admin: {
+    title: 'Moderation', reports: 'Reports', reportsBody: 'Review reports from members. Suspending disables the account and ends its active learning relations.',
+    open: 'Open', resolved: 'Resolved', empty: 'No reports here.', reportedBy: 'Reported by {name}', note: 'Note to the member (optional)',
+    actions: { dismiss: 'Dismiss', warn: 'Warn', suspend: 'Suspend' }, suspend: 'Suspend account', suspendConfirm: 'Suspend this account? They will be signed out and all their active learning relations will end.',
+    resolvedAs: 'Resolved: {action}',
   },
   contacts: {
     title: 'Contacts', find: 'Find by handle', handle: 'Handle', lookup: 'Look up', notFound: 'No one with that handle.', connect: 'Send connection request', message: 'Why you want to connect',
@@ -84,7 +96,8 @@ export const en = {
   profile: {
     title: 'Profile', settings: 'Settings', privacy: 'Privacy & data', visibility: 'Who can see your profile', vis: { public: 'Everyone', contacts: 'Contacts', relations: 'Learning relations', private: 'Only you' },
     export: 'Export my data', delete: 'Delete account', deleteConfirm: 'Delete your account? Shared evidence and feedback are anonymised; your profile and private data are removed.', deleted: 'Account deleted.',
-    displayName: 'Display name', handle: 'Handle', email: 'Email', roles: 'Roles', about: 'About',
+    changeAvatar: 'Change photo', avatarHint: 'JPG, PNG or WebP up to 2 MB.', avatarUpdated: 'Photo updated.',
+    displayName: 'Display name', handle: 'Handle', email: 'Email', roles: 'Roles', about: 'About', legal: 'Legal', privacyNotice: 'Privacy notice', terms: 'Terms of use',
   },
 } as const;
 

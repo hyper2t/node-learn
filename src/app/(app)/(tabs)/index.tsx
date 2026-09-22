@@ -4,7 +4,7 @@ import { useMe, useStudentProfile } from '@/features/identity/api';
 import { useRelations, useWorkspace } from '@/features/learning/api';
 import { useRequests } from '@/features/requests/api';
 import { ProofSummary, RelationCard, RequestCard } from '@/features/learning/components';
-import { Screen, PageHeader, Section } from '@/shared/layout/screen';
+import { Screen, PageHeader, Section, TwoColumn } from '@/shared/layout/screen';
 import { Button, Card, Empty, ErrorState, Loading, Text } from '@/shared/ui';
 import { t } from '@/shared/i18n';
 
@@ -28,9 +28,29 @@ export default function HomeScreen() {
   const pending = requests.data?.items ?? [];
   const isTeacher = role === 'teacher';
   return (
-    <Screen>
+    <Screen width="wide">
       <PageHeader title={isTeacher ? t('home.teacherTitle') : t('home.studentTitle')} body={me.data ? me.data.displayName : undefined}
         right={!isTeacher ? <Button size="sm" variant="secondary" title={t('home.findTeacher')} onPress={() => router.push('/(app)/teachers')} /> : undefined} />
+      <TwoColumn
+        asideFirst
+        main={<View>
+      {relations.isError ? <ErrorState error={relations.error} onRetry={() => relations.refetch()} /> : null}
+      {active.length === 0 && !relations.isLoading ? (
+        <Empty title={isTeacher ? t('home.noStudents') : t('home.noRelation')} body={isTeacher ? t('home.noStudentsBody') : t('home.noRelationBody')}
+          action={!isTeacher ? { title: t('home.findTeacher'), onPress: () => router.push('/(app)/teachers') } : undefined} />
+      ) : null}
+      {active.length ? (
+        <Section title={isTeacher ? t('home.activeStudents') : t('relation.title')}>
+          <View className="gap-2">{active.map((r) => <RelationCard key={r.id} r={r} role={role} />)}</View>
+        </Section>
+      ) : null}
+      {pending.length ? (
+        <Section title={isTeacher ? t('home.needsAttention') : t('home.pending')} right={<Button size="sm" variant="ghost" title={t('requests.title')} onPress={() => router.push('/(app)/requests')} />}>
+          <View className="gap-2">{pending.slice(0, 5).map((r) => <RequestCard key={r.id} r={r} onPress={() => router.push(`/(app)/requests/${r.id}`)} />)}</View>
+        </Section>
+      ) : null}
+        </View>}
+        aside={<View>
       {!me.data?.emailVerified ? (
         <Card className="mb-3 bg-warning-subtle">
           <Text variant="small">{t('auth.verifyBody', { email: me.data?.email ?? '' })}</Text>
@@ -44,22 +64,9 @@ export default function HomeScreen() {
           <Button size="sm" variant="secondary" className="mt-1 self-start" title={t('common.edit')} onPress={() => router.push('/(app)/settings/student-profile')} />
         </Card>
       ) : null}
-      {relations.isError ? <ErrorState error={relations.error} onRetry={() => relations.refetch()} /> : null}
-      {active.length === 0 && !relations.isLoading ? (
-        <Empty title={isTeacher ? t('home.noStudents') : t('home.noRelation')} body={isTeacher ? t('home.noStudentsBody') : t('home.noRelationBody')}
-          action={!isTeacher ? { title: t('home.findTeacher'), onPress: () => router.push('/(app)/teachers') } : undefined} />
-      ) : null}
       {!isTeacher && active[0] ? <Section title={t('home.currentFocus')}><CurrentRelationProof relationId={active[0].id} /></Section> : null}
-      {active.length ? (
-        <Section title={isTeacher ? t('home.activeStudents') : t('relation.title')}>
-          <View className="gap-2">{active.map((r) => <RelationCard key={r.id} r={r} role={role} />)}</View>
-        </Section>
-      ) : null}
-      {pending.length ? (
-        <Section title={isTeacher ? t('home.needsAttention') : t('home.pending')} right={<Button size="sm" variant="ghost" title={t('requests.title')} onPress={() => router.push('/(app)/requests')} />}>
-          <View className="gap-2">{pending.slice(0, 5).map((r) => <RequestCard key={r.id} r={r} onPress={() => router.push(`/(app)/requests/${r.id}`)} />)}</View>
-        </Section>
-      ) : null}
+        </View>}
+      />
     </Screen>
   );
 }

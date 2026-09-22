@@ -4,7 +4,7 @@
 
 ---
 
-你是一名资深 React Native / Expo 跨端架构师。请为 `E:\node-learn-en` 制定 `KnowNode` 全球英语版的前端开发规划。目标是用一个 React Native 代码库支持 iOS、Android 和 Web，同时实现学生端与老师端，保持极简、可访问、可离线恢复，并与 TypeScript + Appwrite 混合 BFF 后端协作。
+你是一名资深 React Native / Expo 跨端架构师。请为 `E:\node-learn-en` 制定 `Node Learn` 全球英语版的前端开发规划。目标是用一个 React Native 代码库支持 iOS、Android 和 Web，同时实现学生端与老师端，保持极简、可访问、可离线恢复，并与 TypeScript + Appwrite 混合 BFF 后端协作。
 
 ## 1. 先做真实基线审计
 

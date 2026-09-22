@@ -6,6 +6,7 @@ import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound } from '../errors';
 import { toLearningRequest } from '../mappers/learning';
 import { emitEvent } from './events';
+import { notify } from './notifications';
 import { appendMessage, getOrCreateConversation } from './messaging';
 import { personRefs } from './profiles';
 import { assertNotBlocked } from './safety';
@@ -32,6 +33,7 @@ export async function createLearningRequest(student: Models.User, input: { teach
     goalTitle: input.goalTitle, message: input.message, status: 'pending', relationId: null, pairKey: pairKey(student.$id, input.teacherId), respondedAt: null,
   });
   await emitEvent({ eventType: 'request.created', aggregateType: 'learning_request', aggregateId: row.$id, actorId: student.$id, payload: { kind: row.kind }, requestId });
+  await notify({ userId: input.teacherId, type: 'request.received', title: 'New learning request', body: input.goalTitle, href: `/requests/${row.$id}`, refType: 'learning_request', refId: row.$id, actorId: student.$id, dedupeKey: `request.received:${row.$id}` });
   return hydrate(row, student.$id);
 }
 
@@ -46,6 +48,7 @@ export async function createTeacherInvitation(teacher: Models.User, input: { stu
     goalTitle: input.goalTitle, message: input.message, status: 'pending', relationId: null, pairKey: pairKey(input.studentId, teacher.$id), respondedAt: null,
   });
   await emitEvent({ eventType: 'request.created', aggregateType: 'learning_request', aggregateId: row.$id, actorId: teacher.$id, payload: { kind: row.kind }, requestId });
+  await notify({ userId: input.studentId, type: 'request.received', title: 'A teacher invited you to learn together', body: input.goalTitle, href: `/requests/${row.$id}`, refType: 'learning_request', refId: row.$id, actorId: teacher.$id, dedupeKey: `request.received:${row.$id}` });
   return hydrate(row, teacher.$id);
 }
 
@@ -101,6 +104,7 @@ export async function acceptRequest(id: string, actor: Models.User, requestId?: 
   const updated = await updateRow<LearningRequestRow>(TABLES.learningRequests, row.$id, { status: 'accepted', relationId: relation.$id, respondedAt: new Date().toISOString() });
   await appendMessage({ conversationId: conv.$id, senderId: actor.$id, type: 'system', payload: { type: 'system', text: 'Learning relation started.' }, requestId });
   await emitEvent({ eventType: 'relation.created', aggregateType: 'learning_relation', aggregateId: relation.$id, actorId: actor.$id, payload: { sourceRequestId: row.$id }, requestId });
+  await notify({ userId: row.initiatorId, type: 'request.accepted', title: 'Your request was accepted', body: row.goalTitle, href: `/relations/${relation.$id}`, refType: 'learning_relation', refId: relation.$id, actorId: actor.$id, dedupeKey: `request.accepted:${row.$id}` });
   return hydrate(updated, actor.$id);
 }
 
@@ -114,5 +118,6 @@ export async function respondRequest(id: string, actor: Models.User, action: 'de
   const status = action === 'decline' ? 'declined' : 'cancelled';
   const updated = await updateRow<LearningRequestRow>(TABLES.learningRequests, row.$id, { status, respondedAt: new Date().toISOString() });
   await emitEvent({ eventType: `request.${status}`, aggregateType: 'learning_request', aggregateId: row.$id, actorId: actor.$id, payload: {}, requestId });
+  if (status === 'declined') await notify({ userId: row.initiatorId, type: 'request.declined', title: 'Your request was declined', body: row.goalTitle, href: `/requests/${row.$id}`, refType: 'learning_request', refId: row.$id, actorId: actor.$id, dedupeKey: `request.declined:${row.$id}` });
   return hydrate(updated, actor.$id);
 }

@@ -19,6 +19,7 @@ export type ErrorCode =
   | 'duplicate_request'
   | 'request_in_progress'
   | 'validation'
+  | 'payload_too_large'
   | 'rate_limited'
   | 'service_unavailable'
   | 'internal';
@@ -51,6 +52,7 @@ export const conflict = (
   message: string,
   details?: unknown,
 ): HttpError => new HttpError(409, code, message, { details });
+export const payloadTooLarge = (limitBytes: number): HttpError => new HttpError(413, 'payload_too_large', `Request body exceeds ${limitBytes} bytes.`);
 export const validation = (message: string, fields?: ValidationField[]): HttpError =>
   new HttpError(422, 'validation', message, fields ? { details: { fields } } : {});
 export const rateLimited = (retryAfterSeconds: number): HttpError =>

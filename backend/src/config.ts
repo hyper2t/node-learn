@@ -9,7 +9,8 @@ const envSchema = z.object({
 
   APPWRITE_ENDPOINT: z.string().url(),
   APPWRITE_PROJECT_ID: z.string().min(1),
-  APPWRITE_API_KEY: z.string().min(1),
+  /** Optional in the Function runtime: the adapter injects the per-execution dynamic key (x-appwrite-key). */
+  APPWRITE_API_KEY: z.string().default(''),
   APPWRITE_DATABASE_ID: z.string().min(1).default('main'),
   APPWRITE_ADMIN_TEAM_ID: z.string().default(''),
   APPWRITE_EVIDENCE_BUCKET_ID: z.string().default('evidence'),
@@ -72,6 +73,10 @@ let cached: Config | null = null;
 export function getConfig(): Config {
   if (cached) return cached;
   loadDotEnv();
+  // Inside an Appwrite Function the runtime already tells us where we are.
+  process.env.APPWRITE_ENDPOINT ||= process.env.APPWRITE_FUNCTION_API_ENDPOINT;
+  process.env.APPWRITE_PROJECT_ID ||= process.env.APPWRITE_FUNCTION_PROJECT_ID;
+  if (process.env.APPWRITE_FUNCTION_ID && !process.env.NODE_ENV) process.env.NODE_ENV = 'production';
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');

@@ -1,5 +1,6 @@
 import { Query } from 'node-appwrite';
 import type { Conversation, LearningMessage, MessagePayload, MessageType } from '../contracts/api';
+import { Permission, Role } from 'node-appwrite';
 import { createRow, findOne, getRow, incrementColumn, listRows, updateRow } from '../db/repo';
 import { isConflict, pairKey, type ConversationMemberRow, type ConversationRow, type MessageRow } from '../db/rows';
 import { TABLES } from '../db/schema';
@@ -18,7 +19,7 @@ export async function getOrCreateConversation(a: string, b: string, relationId: 
   }
   let conv: ConversationRow;
   try {
-    conv = await createRow<ConversationRow>(TABLES.conversations, { relationId, memberIds: [a, b], pairKey: key, lastSequence: 0, lastMessageAt: null });
+    conv = await createRow<ConversationRow>(TABLES.conversations, { relationId, memberIds: [a, b], pairKey: key, lastSequence: 0, lastMessageAt: null }, undefined, memberReadPermissions([a, b]));
   } catch (err) {
     if (!isConflict(err)) throw err;
     return (await findOne<ConversationRow>(TABLES.conversations, [Query.equal('pairKey', key)]))!;
@@ -97,6 +98,14 @@ export async function listMessages(conversationId: string, userId: string, p: { 
  * (conversationId, sequence) index guards against duplicates. Dedupe by
  * (conversationId, senderId, clientMessageId).
  */
+/**
+ * Row-level read permissions for conversation members. Business tables are
+ * otherwise closed to clients; this is the minimal grant that lets the app
+ * subscribe to Appwrite Realtime for low-latency hints. Correctness still
+ * comes from the /messages?afterSequence incremental API.
+ */
+export const memberReadPermissions = (memberIds: string[]): string[] => memberIds.map((id) => Permission.read(Role.user(id)));
+
 export async function appendMessage(input: {
   conversationId: string; senderId: string; type: MessageType; payload: MessagePayload; clientMessageId?: string | null; requestId?: string;
 }): Promise<LearningMessage> {
@@ -112,7 +121,7 @@ export async function appendMessage(input: {
     row = await createRow<MessageRow>(TABLES.messages, {
       conversationId: input.conversationId, sequence, senderId: input.senderId, type: input.type, payloadVersion: 1,
       payloadJson: JSON.stringify(input.payload), clientMessageId: input.clientMessageId ?? null, dedupeKey, removedAt: null,
-    });
+    }, undefined, memberReadPermissions(conv.memberIds));
   } catch (err) {
     if (isConflict(err) && dedupeKey) {
       const dup = await findOne<MessageRow>(TABLES.messages, [Query.equal('dedupeKey', dedupeKey)]);

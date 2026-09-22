@@ -7,7 +7,7 @@ export type PersonRef = { userId: string; displayName: string; handle: string | 
 const ROLES: Role[] = ['student', 'teacher'];
 const asRole = (r: string): Role | null => ((ROLES as string[]).includes(r) ? (r as Role) : null);
 
-export function toMe(user: Models.User, p: ProfileRow, memberships: RoleMembershipRow[]): Me {
+export function toMe(user: Models.User, p: ProfileRow, memberships: RoleMembershipRow[], isAdmin = false): Me {
   const roles = memberships.map((m) => asRole(m.role)).filter((r): r is Role => r !== null);
   const active = memberships.find((m) => m.active);
   return {
@@ -27,6 +27,7 @@ export function toMe(user: Models.User, p: ProfileRow, memberships: RoleMembersh
       student: memberships.some((m) => m.role === 'student' && m.onboarded),
       teacher: memberships.some((m) => m.role === 'teacher' && m.onboarded),
     },
+    isAdmin,
     createdAt: p.createdAt,
   };
 }

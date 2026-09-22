@@ -49,7 +49,7 @@ export async function exportData(userId: string): Promise<Record<string, unknown
 export async function deleteAccount(user: Models.User, requestId?: string): Promise<void> {
   const userId = user.$id;
   await updateRow(TABLES.profiles, userId, { displayName: 'Former member', handle: null, avatarFileId: null, email: `deleted+${userId}@invalid`, status: 'deleted' });
-  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.uploadIntents] as const) {
+  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.uploadIntents, TABLES.notifications] as const) {
     const rows = await listRows(t, [Query.equal(t === TABLES.blocks ? 'blockerId' : 'userId', userId), Query.limit(500)]);
     await Promise.all(rows.map((r) => deleteRow(t, r.$id)));
   }

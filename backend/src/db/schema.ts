@@ -22,6 +22,7 @@ export const TABLES = {
   domainEvents: 'domain_events',
   auditEvents: 'audit_events',
   uploadIntents: 'upload_intents',
+  notifications: 'notifications',
 } as const;
 
 export type TableId = (typeof TABLES)[keyof typeof TABLES];

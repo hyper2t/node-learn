@@ -41,6 +41,9 @@ export default function ConversationScreen() {
           renderItem={({ item }) => <Bubble m={item} mine={item.senderId === myId || item.senderId === 'me'} onRetry={() => msgs.retry(item)} onOpen={(relId) => router.push(`/(app)/relations/${relId}`)} relationId={conv.data?.relationId ?? null} />}
         />
       )}
+      {msgs.hasFailed ? (
+        <View className="border-t border-border bg-warning-subtle px-4 py-1.5"><Text variant="caption">{t('messages.queued')}</Text></View>
+      ) : null}
       <View className="flex-row items-end gap-2 border-t border-border bg-surface px-3 py-2">
         <Input containerClassName="flex-1" value={text} onChangeText={setText} placeholder={t('messages.placeholder')} multiline maxLength={4000} className="max-h-[120px] min-h-[44px] py-2" onSubmitEditing={send} blurOnSubmit={false} />
         <Button title={t('common.send')} onPress={send} disabled={!text.trim()} />

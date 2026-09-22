@@ -8,8 +8,8 @@ import { z } from 'zod';
 const schema = z.object({
   appwriteEndpoint: z.string().url(),
   appwriteProjectId: z.string().min(1),
-  appwriteProjectName: z.string().min(1).default('KnowNode'),
-  appwritePlatform: z.string().min(1).default('com.knownode.app'),
+  appwriteProjectName: z.string().min(1).default('Node Learn'),
+  appwritePlatform: z.string().min(1).default('com.nodelearn.app'),
   apiBaseUrl: z.string().url(),
   apiMock: z.boolean(),
   webUrl: z.string().url(),
@@ -40,4 +40,4 @@ if (!parsed.success) {
 }
 
 export const env: AppEnv = parsed.data;
-export const APP_NAME = 'KnowNode';
+export const APP_NAME = 'Node Learn';

@@ -36,7 +36,7 @@ export default function TeacherDetail() {
       <Stack.Screen options={{ title: tp.displayName }} />
       <View className="gap-3 py-4">
         <View className="flex-row items-center gap-3">
-          <Avatar name={tp.displayName} size={64} />
+          <Avatar name={tp.displayName} fileId={tp.avatarFileId} size={64} />
           <View className="flex-1">
             <Text variant="h2">{tp.displayName}</Text>
             {tp.handle ? <Text variant="small" tone="secondary">@{tp.handle}</Text> : null}

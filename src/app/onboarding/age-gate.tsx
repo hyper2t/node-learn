@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAgeGate, useSignOut } from '@/features/identity/api';
 import { Screen, PageHeader } from '@/shared/layout/screen';
 import { Button, Checkbox, ChoiceCard, InlineError, Text } from '@/shared/ui';
@@ -15,6 +16,7 @@ export default function AgeGateScreen() {
   const [privacy, setPrivacy] = useState(false);
   const gate = useAgeGate();
   const signOut = useSignOut();
+  const router = useRouter();
   const tooYoung = band === 'under_16';
   return (
     <Screen>
@@ -25,6 +27,10 @@ export default function AgeGateScreen() {
         </View>
         {tooYoung ? <Text tone="danger">{t('gate.tooYoung')}</Text> : null}
         <Checkbox checked={privacy} onChange={setPrivacy} label={t('gate.privacy')} />
+        <View className="flex-row gap-4">
+          <Button size="sm" variant="ghost" title={t('gate.privacyLink')} onPress={() => router.push('/legal/privacy')} />
+          <Button size="sm" variant="ghost" title={t('gate.termsLink')} onPress={() => router.push('/legal/terms')} />
+        </View>
         <InlineError error={gate.error} />
         {tooYoung ? (
           <Button variant="secondary" title={t('common.signOut')} loading={signOut.isPending} onPress={() => signOut.mutate()} />

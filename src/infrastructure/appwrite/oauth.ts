@@ -22,11 +22,19 @@ const SCOPES: Record<OAuthProviderName, string[]> = { google: ['openid', 'email'
 
 export const callbackScheme = (): string => `appwrite-callback-${env.appwriteProjectId}`;
 
+/**
+ * Where the OAuth provider sends the user back. Register ALL of these in Appwrite Console → Auth → platforms/redirects:
+ *  - web:        https://<web-host>/auth/oauth-return  (and http://localhost:8071/auth/oauth-return for dev)
+ *  - native:     nodelearn://auth/oauth-return           (app.json `scheme`)
+ *  - Expo Go:    exp://<host>/--/auth/oauth-return       (dev only, derived from hostUri)
+ */
 export function oauthReturnUrl(): string {
   if (Platform.OS === 'web') return `${window.location.origin}${OAUTH_RETURN_PATH}`;
-  if (Constants.expoConfig?.hostUri) return Linking.createURL(OAUTH_RETURN_PATH);
-  return `${callbackScheme()}://auth/oauth-return`;
+  const isExpoGo = Constants.appOwnership === 'expo';
+  if (isExpoGo && Constants.expoConfig?.hostUri) return Linking.createURL(OAUTH_RETURN_PATH);
+  return Linking.createURL(OAUTH_RETURN_PATH, { scheme: APP_SCHEME });
 }
+export const APP_SCHEME = 'nodelearn';
 
 export type OAuthReturnParams = { userId?: string; secret?: string };
 

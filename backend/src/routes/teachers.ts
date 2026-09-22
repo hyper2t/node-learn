@@ -11,16 +11,13 @@ export const teacherRoutes = new Hono<AppEnv>();
 
 teacherRoutes.get('/', async (c) => {
   const q = readQuery(c, S.teacherSearch);
-  const { rows, profiles } = await searchTeachers(q);
-  const hasMore = rows.length > q.limit;
-  const page = hasMore ? rows.slice(0, q.limit) : rows;
+  const { rows, profiles, reviewed, nextCursor } = await searchTeachers(q);
   const items: TeacherProfile[] = [];
-  for (const r of page) {
+  for (const r of rows) {
     const p = profiles.get(r.userId);
-    if (p) items.push(toTeacherProfile(p, r, false, { activeRelations: 0, evidenceReviewed: 0, memberSince: p.createdAt }));
+    if (p) items.push(toTeacherProfile(p, r, false, { activeRelations: 0, evidenceReviewed: reviewed.get(r.userId) ?? 0, memberSince: p.createdAt }));
   }
-  const last = page[page.length - 1];
-  const body: Page<TeacherProfile> = { items, nextCursor: hasMore && last ? last.$id : null };
+  const body: Page<TeacherProfile> = { items, nextCursor };
   return ok(c.get('requestId'), body);
 });
 

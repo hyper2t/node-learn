@@ -4,7 +4,7 @@
 
 ---
 
-你是一名资深 TypeScript、Hono、Appwrite、事件驱动架构、安全与数据建模工程师。请为 `E:\node-learn-en` 制定 `KnowNode` 全球英语版后端开发规划。后端使用 TypeScript + Appwrite，采用“Appwrite Account + Hono BFF + Appwrite Function + TablesDB/Storage/Realtime”的混合架构；MVP 支持学生端和老师端，不做支付、不做实名认证，图谱分析和联系人申请保持极简。
+你是一名资深 TypeScript、Hono、Appwrite、事件驱动架构、安全与数据建模工程师。请为 `E:\node-learn-en` 制定 `Node Learn` 全球英语版后端开发规划。后端使用 TypeScript + Appwrite，采用“Appwrite Account + Hono BFF + Appwrite Function + TablesDB/Storage/Realtime”的混合架构；MVP 支持学生端和老师端，不做支付、不做实名认证，图谱分析和联系人申请保持极简。
 
 ## 1. 必须先做的真实仓库分析
 
@@ -200,7 +200,7 @@ backend/
   tests/
 contracts/                  # 纯 TS DTO/schema 的单一来源或受控副本
 functions/
-  knownode-api/
+  node-learn-api/
 appwrite.config.json
 ```
 

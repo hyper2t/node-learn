@@ -1,4 +1,4 @@
-# KnowNode（知节点海外版）规划提示词
+# Node Learn（知节点海外版）规划提示词
 
 本目录包含三份可独立使用的规划提示词，用于指导后续 AI/开发团队先产出可执行计划，再进入实现：
 
@@ -8,7 +8,7 @@
 
 ## 已确认的决策
 
-- 工作名称：`KnowNode`（仅作为英文工作名，正式品牌名仍可替换）。
+- 工作名称：`Node Learn`（仅作为英文工作名，正式品牌名仍可替换）。
 - 首发定位：全球英语版，按美国 + 欧盟/英国共同隐私与安全基线规划。
 - 终端：iOS、Android、Web，共用 React Native / Expo 代码库。
 - 前端基线：`E:\node-learn-en` 当前为 Expo SDK 57、React Native 0.86、React 19.2、Expo Router 57 的新项目。

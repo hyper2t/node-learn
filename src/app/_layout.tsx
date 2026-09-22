@@ -1,6 +1,6 @@
 import '../global.css';
 import { useEffect, useMemo } from 'react';
-import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { getCurrentUser } from '@/infrastructure/appwrite';
 import { createQueryClient } from '@/state/query-client';
 import { useAuth } from '@/state/auth';
 import { useMe } from '@/features/identity/api';
-import { Loading } from '@/shared/ui';
+import { DialogHost, Loading, OfflineBanner } from '@/shared/ui';
 import { useThemeColors } from '@/shared/hooks/use-theme-colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -22,14 +22,13 @@ export { ErrorBoundary } from 'expo-router';
 function Gate({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const segments = useSegments() as string[];
-  const pathname = usePathname();
   const router = useRouter();
   const authed = auth.status === 'authenticated';
   const me = useMe(authed);
 
   const top = segments[0];
   const inAuth = top === 'auth';
-  const passThrough = inAuth && (segments[1] === 'oauth-return' || segments[1] === 'verify' || segments[1] === 'reset');
+  const passThrough = top === 'legal' || (inAuth && (segments[1] === 'oauth-return' || segments[1] === 'verify' || segments[1] === 'reset'));
   const ready = auth.status !== 'loading' && (!authed || me.data || me.isError);
 
   const target = useMemo(() => {
@@ -48,11 +47,9 @@ function Gate({ children }: { children: React.ReactNode }) {
     return null;
   }, [ready, passThrough, authed, inAuth, me.data, top, segments]);
 
-  // pathname is a dependency so a redirect that loses the race with a concurrent
-  // navigation is re-attempted on the next route change instead of stranding the user.
   useEffect(() => {
     if (target) router.replace(target as never);
-  }, [target, router, pathname]);
+  }, [target, router]);
 
   if (!ready) return <Loading />;
   return <>{children}</>;
@@ -67,13 +64,16 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
+          <OfflineBanner />
           <Gate>
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
               <Stack.Screen name="(app)" />
               <Stack.Screen name="auth" />
               <Stack.Screen name="onboarding" />
+              <Stack.Screen name="legal" />
             </Stack>
           </Gate>
+          <DialogHost />
           <StatusBar style="auto" />
       </QueryClientProvider>
     </GestureHandlerRootView>

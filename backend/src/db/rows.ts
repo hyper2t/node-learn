@@ -41,11 +41,12 @@ export type MessageRow = Stamped & {
 export type ConnectionRequestRow = Stamped & { fromUserId: string; toUserId: string; message: string | null; status: string; source: string; pairKey: string; respondedAt: string | null };
 export type ContactRow = Stamped & { userId: string; contactUserId: string; conversationId: string | null; connectedAt: string };
 export type BlockRow = Stamped & { blockerId: string; blockedId: string };
-export type ReportRow = Stamped & { reporterId: string; targetUserId: string; reason: string; details: string | null; status: string | null };
+export type ReportRow = Stamped & { reporterId: string; targetUserId: string; reason: string; details: string | null; status: string | null; resolution: string | null; resolvedBy: string | null; resolvedAt: string | null; resolutionNote: string | null };
+export type NotificationRow = Stamped & { userId: string; type: string; title: string; body: string | null; href: string | null; refType: string | null; refId: string | null; actorId: string | null; dedupeKey: string | null; readAt: string | null };
 export type IdempotencyKeyRow = Stamped & { userId: string; key: string; status: string; requestHash: string; resultId: string | null; resultJson: string | null };
 export type DomainEventRow = Stamped & { eventType: string; aggregateType: string; aggregateId: string; actorId: string; payloadVersion: number; payloadJson: string | null; requestId: string | null; occurredAt: string; status: string | null };
 export type AuditEventRow = Stamped & { actorId: string; action: string; resourceType: string; resourceId: string; reason: string | null; requestId: string | null };
-export type UploadIntentRow = Stamped & { userId: string; purpose: string; bucketId: string; fileId: string; relationId: string | null; mimeType: string; sizeBytes: number; status: string | null; expiresAt: string };
+export type UploadIntentRow = Stamped & { userId: string; purpose: string; bucketId: string; fileId: string; relationId: string | null; fileName: string | null; mimeType: string; sizeBytes: number; status: string | null; expiresAt: string };
 
 export function isRowNotFound(err: unknown): boolean {
   const e = err as { code?: number; type?: string } | null;

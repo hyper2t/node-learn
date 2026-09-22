@@ -6,7 +6,9 @@ import { TABLES } from '../db/schema';
 import { conflict, notFound } from '../errors';
 import { toEvidence, toFeedback, toProof } from '../mappers/learning';
 import { emitEvent } from './events';
+import { notify } from './notifications';
 import { appendMessage } from './messaging';
+import { assertEvidenceAttachments, resolveAttachments } from './uploads';
 
 export async function listEvidence(relationId: string, limit: number, cursor?: string): Promise<{ items: EvidenceItem[]; nextCursor: string | null }> {
   const q = [Query.equal('relationId', relationId), Query.orderDesc('submittedAt'), Query.limit(limit + 1)];
@@ -16,18 +18,20 @@ export async function listEvidence(relationId: string, limit: number, cursor?: s
   const page = hasMore ? rows.slice(0, limit) : rows;
   const fb = page.length ? await listRows<FeedbackEntryRow>(TABLES.feedbackEntries, [Query.equal('evidenceId', page.map((e) => e.$id)), Query.orderAsc('createdAt'), Query.limit(200)]) : [];
   const last = page[page.length - 1];
-  return { items: page.map((e) => toEvidence(e, fb.filter((f) => f.evidenceId === e.$id))), nextCursor: hasMore && last ? last.$id : null };
+  const items = await Promise.all(page.map(async (e) => toEvidence(e, fb.filter((f) => f.evidenceId === e.$id), await resolveAttachments(e.attachmentFileIds ?? []))));
+  return { items, nextCursor: hasMore && last ? last.$id : null };
 }
 
 export async function getEvidence(relationId: string, evidenceId: string): Promise<EvidenceItem> {
   const row = await getRow<EvidenceItemRow>(TABLES.evidenceItems, evidenceId);
   if (!row || row.relationId !== relationId) throw notFound('not_found', 'This evidence could not be found.');
   const fb = await listRows<FeedbackEntryRow>(TABLES.feedbackEntries, [Query.equal('evidenceId', evidenceId), Query.orderAsc('createdAt'), Query.limit(100)]);
-  return toEvidence(row, fb);
+  return toEvidence(row, fb, await resolveAttachments(row.attachmentFileIds ?? []));
 }
 
 export async function submitEvidence(rel: LearningRelationRow, authorId: string, input: { title: string; body: string; taskId?: string | null; goalId?: string | null; attachmentFileIds?: string[] }, requestId?: string): Promise<EvidenceItem> {
   if (rel.status !== 'active') throw conflict('invalid_state', 'This learning relation is not active.');
+  const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
   let taskId = input.taskId ?? null;
   if (taskId) {
     const task = await getRow<LearningTaskRow>(TABLES.learningTasks, taskId);
@@ -36,13 +40,14 @@ export async function submitEvidence(rel: LearningRelationRow, authorId: string,
   }
   const row = await createRow<EvidenceItemRow>(TABLES.evidenceItems, {
     relationId: rel.$id, taskId, goalId: input.goalId ?? rel.currentGoalId, authorId, title: input.title, body: input.body,
-    attachmentFileIds: input.attachmentFileIds ?? [], status: 'submitted', version: 1, submittedAt: new Date().toISOString(), reviewedAt: null,
+    attachmentFileIds, status: 'submitted', version: 1, submittedAt: new Date().toISOString(), reviewedAt: null,
   });
   await updateRow(TABLES.learningRelations, rel.$id, { evidenceCount: rel.evidenceCount + 1, lastActivityAt: row.submittedAt });
   await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: 'evidence_submitted', payload: { type: 'evidence_submitted', evidenceId: row.$id, title: row.title, taskId }, requestId });
   await emitEvent({ eventType: 'evidence.submitted', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: authorId, payload: { evidenceId: row.$id }, requestId });
+  await notify({ userId: authorId === rel.studentId ? rel.teacherId : rel.studentId, type: 'evidence.submitted', title: 'New evidence to review', body: row.title, href: `/relations/${rel.$id}/evidence/${row.$id}`, refType: 'evidence_item', refId: row.$id, actorId: authorId, dedupeKey: `evidence.submitted:${row.$id}` });
   await recomputeProof(rel.$id);
-  return toEvidence(row, []);
+  return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
 }
 
 export async function addFeedback(rel: LearningRelationRow, evidenceId: string, authorId: string, input: { body: string; nextStep?: string; markTaskDone?: boolean }, requestId?: string): Promise<Feedback> {
@@ -62,6 +67,7 @@ export async function addFeedback(rel: LearningRelationRow, evidenceId: string, 
   await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt, openTasks: Math.max(0, rel.openTasks + openDelta) });
   await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: 'feedback_added', payload: { type: 'feedback_added', feedbackId: fb.$id, evidenceId, excerpt: input.body.slice(0, 140) }, requestId });
   await emitEvent({ eventType: 'feedback.added', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: authorId, payload: { feedbackId: fb.$id }, requestId });
+  await notify({ userId: ev.authorId, type: 'feedback.added', title: 'You received feedback', body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: 'feedback_entry', refId: fb.$id, actorId: authorId, dedupeKey: `feedback.added:${fb.$id}` });
   await recomputeProof(rel.$id);
   return toFeedback(fb);
 }

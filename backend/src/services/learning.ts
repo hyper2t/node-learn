@@ -6,6 +6,7 @@ import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound } from '../errors';
 import { toEvidence, toGoal, toProof, toRelation, toTask } from '../mappers/learning';
 import { emitEvent } from './events';
+import { notify } from './notifications';
 import { appendMessage } from './messaging';
 import { personRefs } from './profiles';
 import { recomputeProof } from './proof';
@@ -100,6 +101,7 @@ export async function createTask(relationId: string, userId: string, input: { ti
   await touch(rel, { openTasks: rel.openTasks + 1 });
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'task_assigned', payload: { type: 'task_assigned', taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId });
   await emitEvent({ eventType: 'task.assigned', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { taskId: row.$id }, requestId });
+  await notify({ userId: userId === rel.teacherId ? rel.studentId : rel.teacherId, type: 'task.assigned', title: 'New task', body: row.title, href: `/relations/${relationId}`, refType: 'learning_task', refId: row.$id, actorId: userId, dedupeKey: `task.assigned:${row.$id}` });
   return toTask(row);
 }
 

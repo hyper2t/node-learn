@@ -1,18 +1,15 @@
 import { useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useCreateGoal, useCreateTask, useSetRelationStatus, useUpdateGoal, useUpdateTask, useWorkspace } from '@/features/learning/api';
 import { ProofSummary } from '@/features/learning/components';
-import { Screen, Section } from '@/shared/layout/screen';
-import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text } from '@/shared/ui';
+import { Screen, Section, TwoColumn } from '@/shared/layout/screen';
+import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text, confirm as confirmDialog } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
 import type { LearningGoal, LearningTask } from '@/types/api';
 
-function confirm(message: string, onOk: () => void) {
-  if (Platform.OS === 'web') { if (window.confirm(message)) onOk(); return; }
-  Alert.alert('', message, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('common.continue'), style: 'destructive', onPress: onOk }]);
-}
+const confirm = (message: string, onOk: () => void) => { void confirmDialog({ message, destructive: true }).then((ok) => { if (ok) onOk(); }); };
 
 export default function RelationWorkspace() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,18 +33,20 @@ export default function RelationWorkspace() {
   const openTasks = tasks.filter((tk) => tk.status !== 'done' && tk.status !== 'dropped');
 
   return (
-    <Screen>
+    <Screen width="wide">
       <Stack.Screen options={{ title: other.displayName, headerRight: () => <Button size="sm" variant="ghost" title={t('messages.title')} onPress={() => router.push(`/(app)/messages/${relation.conversationId}`)} /> }} />
       <View className="gap-1 py-4">
         <View className="flex-row items-center gap-3">
-          <Avatar name={other.displayName} size={48} />
+          <Avatar name={other.displayName} fileId={other.avatarFileId} size={48} />
           <View className="flex-1"><Text variant="h2">{other.displayName}</Text><Text variant="caption" tone="tertiary">{isTeacher ? t('role.student') : t('role.teacher')} · {fmt.date(relation.startedAt)}</Text></View>
           <Badge label={t(`relation.status.${relation.status}`)} tone={active ? 'success' : 'neutral'} />
         </View>
       </View>
 
-      <Section title={t('relation.proof')}><Card><ProofSummary proof={proof} /></Card></Section>
 
+      <TwoColumn
+        asideFirst
+        main={<View>
       <Section title={t('relation.goals')} right={active ? <Button size="sm" variant="ghost" title={t('relation.addGoal')} onPress={() => setGoalForm({ title: '', description: '' })} /> : undefined}>
         {goalForm ? (
           <Card className="gap-2">
@@ -112,6 +111,11 @@ export default function RelationWorkspace() {
         {relation.status === 'paused' ? <Button variant="secondary" className="flex-1" title={t('relation.resume')} loading={setStatus.isPending} onPress={() => setStatus.mutate('active')} /> : null}
         {relation.status !== 'ended' ? <Button variant="danger" className="flex-1" title={t('relation.end')} loading={setStatus.isPending} onPress={() => confirm(t('relation.endConfirm'), () => setStatus.mutate('ended'))} /> : null}
       </View>
+        </View>}
+        aside={<View>
+      <Section title={t('relation.proof')}><Card><ProofSummary proof={proof} /></Card></Section>
+        </View>}
+      />
     </Screen>
   );
 }

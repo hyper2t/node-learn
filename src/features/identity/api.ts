@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, clearJwtCache, newIdempotencyKey } from '@/infrastructure/api';
-import { signOut as appwriteSignOut } from '@/infrastructure/appwrite';
+import { getAuthState, signOut as appwriteSignOut } from '@/infrastructure/appwrite';
+import { resetRealtime } from '@/infrastructure/appwrite/realtime';
+import { outbox } from '@/features/messaging/outbox';
 import { qk } from '@/state/query-keys';
 import type {
   AgeGateInput, LinkedIdentity, Me, Role, SelectRoleInput, StudentProfile, TeacherProfile, UpdateMeInput, UpdateStudentProfileInput, UpdateTeacherProfileInput,
@@ -74,14 +76,25 @@ export function useUnlinkIdentity() {
 export function useSignOut() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => { await appwriteSignOut(); },
+    mutationFn: async () => {
+      const uid = getAuthState().user?.id;
+      resetRealtime();
+      if (uid) await outbox.clear(uid);
+      await appwriteSignOut();
+    },
     onSettled: () => { clearJwtCache(); qc.clear(); },
   });
 }
 export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => { await meApi.deleteAccount(); try { await appwriteSignOut(); } catch { /* session already gone */ } },
+    mutationFn: async () => {
+      const uid = getAuthState().user?.id;
+      await meApi.deleteAccount();
+      resetRealtime();
+      if (uid) await outbox.clear(uid);
+      try { await appwriteSignOut(); } catch { /* session already gone */ }
+    },
     onSettled: () => { clearJwtCache(); qc.clear(); },
   });
 }

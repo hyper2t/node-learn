@@ -1,4 +1,4 @@
-import type { EvidenceItem, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationStatus, RequestKind, RequestStatus, TaskStatus } from '../contracts/api';
+import type { EvidenceItem, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationStatus, RequestKind, RequestStatus, TaskStatus, Attachment } from '../contracts/api';
 import type { EvidenceItemRow, FeedbackEntryRow, LearningGoalRow, LearningRelationRow, LearningRequestRow, LearningTaskRow, ProofRecordRow } from '../db/rows';
 import type { PersonRef } from './profile';
 
@@ -25,9 +25,9 @@ export const toTask = (t: LearningTaskRow): LearningTask => ({
 
 export const toFeedback = (f: FeedbackEntryRow): Feedback => ({ id: f.$id, evidenceId: f.evidenceId, authorId: f.authorId, body: f.body ?? '', nextStep: f.nextStep ?? '', createdAt: f.createdAt });
 
-export const toEvidence = (e: EvidenceItemRow, feedback: FeedbackEntryRow[]): EvidenceItem => ({
+export const toEvidence = (e: EvidenceItemRow, feedback: FeedbackEntryRow[], attachments: Attachment[] = []): EvidenceItem => ({
   id: e.$id, relationId: e.relationId, taskId: e.taskId, goalId: e.goalId, authorId: e.authorId, title: e.title, body: e.body ?? '',
-  attachmentFileIds: e.attachmentFileIds ?? [], status: e.status as EvidenceStatus, version: e.version, submittedAt: e.submittedAt, reviewedAt: e.reviewedAt,
+  attachmentFileIds: e.attachmentFileIds ?? [], attachments, status: e.status as EvidenceStatus, version: e.version, submittedAt: e.submittedAt, reviewedAt: e.reviewedAt,
   feedback: feedback.map(toFeedback),
 });
 

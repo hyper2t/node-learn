@@ -6,6 +6,7 @@ import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound } from '../errors';
 import type { PersonRef } from '../mappers/profile';
 import { emitEvent } from './events';
+import { notify } from './notifications';
 import { getOrCreateConversation } from './messaging';
 import { lookupByHandle, personRefs } from './profiles';
 import { assertNotBlocked, isBlockedEitherWay } from './safety';
@@ -41,6 +42,7 @@ export async function createRequest(from: Models.User, input: { toUserId: string
   }
   const row = await createRow<ConnectionRequestRow>(TABLES.connectionRequests, { fromUserId: from.$id, toUserId: input.toUserId, message: input.message, status: 'pending', source, pairKey: key, respondedAt: null });
   await emitEvent({ eventType: 'connection.requested', aggregateType: 'connection_request', aggregateId: row.$id, actorId: from.$id, payload: {}, requestId });
+  await notify({ userId: input.toUserId, type: 'connection.received', title: 'New connection request', body: input.message, href: '/connections', refType: 'connection_request', refId: row.$id, actorId: from.$id, dedupeKey: `connection.received:${row.$id}` });
   return toRequest(row, (await personRefs([input.toUserId])).get(input.toUserId)!);
 }
 
@@ -76,6 +78,7 @@ export async function accept(id: string, actor: Models.User, requestId?: string)
   await addContactPair(row.fromUserId, row.toUserId, conv.$id);
   const updated = await updateRow<ConnectionRequestRow>(TABLES.connectionRequests, id, { status: 'accepted', respondedAt: new Date().toISOString() });
   await emitEvent({ eventType: 'connection.accepted', aggregateType: 'connection_request', aggregateId: id, actorId: actor.$id, payload: {}, requestId });
+  await notify({ userId: row.fromUserId, type: 'connection.accepted', title: 'Connection accepted', body: '', href: '/connections', refType: 'connection_request', refId: id, actorId: actor.$id, dedupeKey: `connection.accepted:${id}` });
   return toRequest(updated, (await personRefs([row.fromUserId])).get(row.fromUserId)!);
 }
 

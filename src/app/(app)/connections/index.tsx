@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useBlockUser, useConnectionRequests, useContacts, useCreateConnection, useLookup, useReportUser, useRespondConnection } from '@/features/connections/api';
 import { Screen, Section } from '@/shared/layout/screen';
-import { Avatar, Badge, Button, Card, InlineError, Input, ListRow, Loading, Separator, Text } from '@/shared/ui';
+import { Avatar, Badge, Button, Card, InlineError, Input, ListRow, Loading, Separator, Text, confirm } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
 import { useDebounced } from '@/shared/hooks/use-debounced';
 import type { ReportInput } from '@/types/api';
@@ -30,8 +30,7 @@ export default function ConnectionsScreen() {
 
   const askBlock = (userId: string) => {
     const go = () => block.mutate(userId);
-    if (Platform.OS === 'web') { if (window.confirm(t('contacts.blockConfirm'))) go(); return; }
-    Alert.alert('', t('contacts.blockConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: t('common.block'), style: 'destructive', onPress: go }]);
+    void confirm({ message: t('contacts.blockConfirm'), confirmLabel: t('common.block'), destructive: true }).then((ok) => { if (ok) go(); });
   };
 
   return (
@@ -42,7 +41,7 @@ export default function ConnectionsScreen() {
         {lookup.isError ? <Text variant="small" tone="secondary">{t('contacts.notFound')}</Text> : null}
         {lookup.data ? (
           <Card className="gap-2">
-            <View className="flex-row items-center gap-3"><Avatar name={lookup.data.displayName} /><View className="flex-1"><Text variant="body-strong">{lookup.data.displayName}</Text><Text variant="small" tone="secondary">@{lookup.data.handle}</Text></View>{lookup.data.roles.map((r) => <Badge key={r} label={t(`role.${r}`)} tone={r} />)}</View>
+            <View className="flex-row items-center gap-3"><Avatar name={lookup.data.displayName} fileId={lookup.data.avatarFileId} /><View className="flex-1"><Text variant="body-strong">{lookup.data.displayName}</Text><Text variant="small" tone="secondary">@{lookup.data.handle}</Text></View>{lookup.data.roles.map((r) => <Badge key={r} label={t(`role.${r}`)} tone={r} />)}</View>
             <Input value={msg} onChangeText={setMsg} placeholder={t('contacts.message')} maxLength={500} />
             <InlineError error={create.error} />
             {done === lookup.data.userId ? <Text tone="success" variant="small">{t('contacts.sent')}</Text> : (
@@ -58,7 +57,7 @@ export default function ConnectionsScreen() {
           <View className="gap-2">
             {incoming.data?.items.map((r) => (
               <Card key={r.id} className="gap-2">
-                <View className="flex-row items-center gap-3"><Avatar name={r.counterpart.displayName} /><View className="flex-1"><Text variant="body-strong">{r.counterpart.displayName}</Text>{r.message ? <Text variant="small" tone="secondary">{r.message}</Text> : null}</View></View>
+                <View className="flex-row items-center gap-3"><Avatar name={r.counterpart.displayName} fileId={r.counterpart.avatarFileId} /><View className="flex-1"><Text variant="body-strong">{r.counterpart.displayName}</Text>{r.message ? <Text variant="small" tone="secondary">{r.message}</Text> : null}</View></View>
                 <View className="flex-row gap-2">
                   <Button size="sm" variant="secondary" className="flex-1" title={t('common.decline')} onPress={() => respond.mutate({ id: r.id, action: 'decline' })} />
                   <Button size="sm" className="flex-1" title={t('common.accept')} onPress={() => respond.mutate({ id: r.id, action: 'accept' })} />
@@ -67,7 +66,7 @@ export default function ConnectionsScreen() {
             ))}
             {outgoing.data?.items.map((r) => (
               <Card key={r.id} className="flex-row items-center gap-3">
-                <Avatar name={r.counterpart.displayName} /><View className="flex-1"><Text variant="body-strong">{r.counterpart.displayName}</Text><Text variant="caption" tone="tertiary">{t('requests.pending')} · {fmt.relative(r.createdAt)}</Text></View>
+                <Avatar name={r.counterpart.displayName} fileId={r.counterpart.avatarFileId} /><View className="flex-1"><Text variant="body-strong">{r.counterpart.displayName}</Text><Text variant="caption" tone="tertiary">{t('requests.pending')} · {fmt.relative(r.createdAt)}</Text></View>
                 <Button size="sm" variant="ghost" title={t('common.withdraw')} onPress={() => respond.mutate({ id: r.id, action: 'cancel' })} />
               </Card>
             ))}
@@ -81,7 +80,7 @@ export default function ConnectionsScreen() {
             {contacts.data.items.map((c, i) => (
               <View key={c.userId}>
                 {i > 0 ? <Separator /> : null}
-                <ListRow title={c.displayName} subtitle={c.handle ? `@${c.handle}` : undefined} left={<Avatar name={c.displayName} />}
+                <ListRow title={c.displayName} subtitle={c.handle ? `@${c.handle}` : undefined} left={<Avatar name={c.displayName} fileId={c.avatarFileId} />}
                   onPress={c.conversationId ? () => router.push(`/(app)/messages/${c.conversationId}`) : undefined}
                   right={<View className="flex-row gap-1"><Button size="sm" variant="ghost" title={t('common.report')} onPress={() => setReportFor(c.userId)} /><Button size="sm" variant="ghost" title={t('common.block')} onPress={() => askBlock(c.userId)} /></View>} />
               </View>

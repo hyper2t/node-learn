@@ -1,6 +1,7 @@
 import { Query, type Models } from 'node-appwrite';
 import type { Me, StudentProfile, TeacherProfile, UpdateMeInput, UpdateStudentProfileInput, UpdateTeacherProfileInput } from '../contracts/api';
 import { getConfig } from '../config';
+import { isAdminUser } from './admin-check';
 import { createRow, findOne, getRow, listRows, updateRow } from '../db/repo';
 import { isConflict, type ProfileRow, type RoleMembershipRow, type StudentProfileRow, type TeacherProfileRow } from '../db/rows';
 import { TABLES } from '../db/schema';
@@ -23,8 +24,8 @@ export async function getOrCreateProfile(user: Models.User): Promise<ProfileRow>
 }
 
 export async function getMe(user: Models.User): Promise<Me> {
-  const [profile, memberships] = await Promise.all([getOrCreateProfile(user), listMemberships(user.$id)]);
-  return toMe(user, profile, memberships);
+  const [profile, memberships, admin] = await Promise.all([getOrCreateProfile(user), listMemberships(user.$id), isAdminUser(user.$id)]);
+  return toMe(user, profile, memberships, admin);
 }
 
 export async function updateMe(user: Models.User, patch: UpdateMeInput): Promise<Me> {
@@ -47,7 +48,7 @@ const AGE_ORDER = ['under_16', '16_17', '18_plus'];
 export async function applyAgeGate(user: Models.User, ageBand: string): Promise<Me> {
   const min = getConfig().minAgeBand;
   if (AGE_ORDER.indexOf(ageBand) < AGE_ORDER.indexOf(min)) {
-    throw validation('KnowNode is not available for your age group yet.', [{ path: 'ageBand', message: 'below_minimum' }]);
+    throw validation('Node Learn is not available for your age group yet.', [{ path: 'ageBand', message: 'below_minimum' }]);
   }
   await getOrCreateProfile(user);
   const [profile, memberships] = await Promise.all([
@@ -133,16 +134,32 @@ export async function upsertTeacherProfile(user: Models.User, patch: UpdateTeach
   return toTeacherProfile(profile, row, user.emailVerification, await teacherSignals(user.$id));
 }
 
-export async function searchTeachers(params: { q?: string; subject?: string; cursor?: string; limit: number }): Promise<{ rows: TeacherProfileRow[]; profiles: Map<string, ProfileRow> }> {
-  const queries = [Query.equal('acceptingRequests', true), Query.equal('visibility', 'public'), Query.orderDesc('updatedAt'), Query.limit(params.limit + 1)];
+export async function searchTeachers(params: { q?: string; subject?: string; accepting?: boolean; sort?: 'relevance' | 'newest' | 'most_reviewed'; cursor?: string; limit: number }): Promise<{ rows: TeacherProfileRow[]; profiles: Map<string, ProfileRow>; reviewed: Map<string, number>; nextCursor: string | null }> {
+  const queries = [Query.equal('visibility', 'public'), Query.limit(params.limit + 1)];
+  // Default: only teachers currently accepting; `accepting=false` explicitly widens to everyone public.
+  if (params.accepting !== false) queries.push(Query.equal('acceptingRequests', true));
   if (params.q) queries.push(Query.search('searchText', params.q.toLowerCase()));
-  if (params.subject) queries.push(Query.contains('subjects', [params.subject]));
+  if (params.subject) queries.push(Query.contains('subjects', [params.subject.toLowerCase()]));
+  // Fulltext relevance ordering is not exposed by TablesDB; we always paginate on updatedAt and re-rank the page.
+  queries.push(params.sort === 'newest' ? Query.orderDesc('createdAt') : Query.orderDesc('updatedAt'));
   if (params.cursor) queries.push(Query.cursorAfter(params.cursor));
-  const rows = await listRows<TeacherProfileRow>(TABLES.teacherProfiles, queries);
+  const fetched = await listRows<TeacherProfileRow>(TABLES.teacherProfiles, queries);
+  // Cursor must be taken from DB order *before* re-ranking the page.
+  const hasMore = fetched.length > params.limit;
+  const rows = hasMore ? fetched.slice(0, params.limit) : fetched;
+  const nextCursor = hasMore && rows.length ? rows[rows.length - 1]!.$id : null;
   const ids = rows.map((r) => r.userId);
   const profiles = new Map<string, ProfileRow>();
-  if (ids.length) for (const p of await listRows<ProfileRow>(TABLES.profiles, [Query.equal('$id', ids), Query.limit(ids.length)])) profiles.set(p.$id, p);
-  return { rows, profiles };
+  const reviewed = new Map<string, number>();
+  if (ids.length) {
+    for (const p of await listRows<ProfileRow>(TABLES.profiles, [Query.equal('$id', ids), Query.limit(ids.length)])) profiles.set(p.$id, p);
+    // One bounded query for the whole page instead of N: count feedback per author.
+    const fb = await listRows<{ authorId: string } & Models.Row>(TABLES.feedbackEntries, [Query.equal('authorId', ids), Query.select(['authorId']), Query.limit(500)]);
+    for (const f of fb) reviewed.set(f.authorId, (reviewed.get(f.authorId) ?? 0) + 1);
+  }
+  if (params.sort === 'most_reviewed') rows.sort((a, b) => (reviewed.get(b.userId) ?? 0) - (reviewed.get(a.userId) ?? 0));
+  else if (params.sort !== 'newest') rows.sort((a, b) => Number(b.acceptingRequests) - Number(a.acceptingRequests) || (reviewed.get(b.userId) ?? 0) - (reviewed.get(a.userId) ?? 0));
+  return { rows, profiles, reviewed, nextCursor };
 }
 
 export async function lookupByHandle(handle: string): Promise<{ profile: ProfileRow; memberships: RoleMembershipRow[] } | null> {

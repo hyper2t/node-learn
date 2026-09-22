@@ -6,7 +6,7 @@
 import { ID, Query } from 'node-appwrite';
 import { getUsers } from '../src/db/client';
 
-const email = process.argv[2] ?? 'dev@knownode.test';
+const email = process.argv[2] ?? 'dev@node-learn.test';
 const name = process.argv[3] ?? 'Dev User';
 const users = getUsers();
 const existing = await users.list({ queries: [Query.equal('email', email)] });

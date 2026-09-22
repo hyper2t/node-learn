@@ -3,7 +3,8 @@ import type { Models } from 'node-appwrite';
 import type { AppEnv } from '../app-env';
 import type { Role } from '../contracts/api';
 import { getConfig } from '../config';
-import { emailNotVerified, roleRequired, unauthorized } from '../errors';
+import { emailNotVerified, forbidden, roleRequired, unauthorized } from '../errors';
+import { isAdminUser } from '../services/admin-check';
 import { resolveUserById, resolveUserByJwt } from '../services/identity';
 import { getRolesOf } from '../services/roles';
 
@@ -49,3 +50,11 @@ export function currentUser(c: { get: (k: 'user') => Models.User | null }): Mode
   if (!u) throw unauthorized();
   return u;
 }
+
+/** Moderator gate: membership of the admin team, checked server-side per request (cached). */
+export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  const user = c.get('user');
+  if (!user) throw unauthorized();
+  if (!(await isAdminUser(user.$id))) throw forbidden('Moderator access is required.');
+  await next();
+});

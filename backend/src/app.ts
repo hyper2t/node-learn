@@ -1,16 +1,21 @@
 import { Hono, type MiddlewareHandler } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { secureHeaders } from 'hono/secure-headers';
 import type { AppEnv } from './app-env';
 import { getConfig } from './config';
-import { HttpError, notFound, toErrorResponse } from './errors';
+import { HttpError, notFound, payloadTooLarge, toErrorResponse } from './errors';
 import { setLogLevel } from './log';
-import { requireAuth, requireVerifiedEmail } from './middleware/auth';
+import { accessLog } from './middleware/access-log';
+import { requireAdmin, requireAuth, requireVerifiedEmail } from './middleware/auth';
 import { corsMiddleware } from './middleware/cors';
 import { rateLimit } from './middleware/rate-limit';
 import { requestId } from './middleware/request-id';
+import { adminRoutes } from './routes/admin';
 import { connectionRoutes } from './routes/connections';
 import { conversationRoutes } from './routes/conversations';
 import { healthRoutes } from './routes/health';
 import { meRoutes } from './routes/me';
+import { notificationRoutes } from './routes/notifications';
 import { relationRoutes } from './routes/relations';
 import { requestRoutes } from './routes/requests';
 import { teacherRoutes } from './routes/teachers';
@@ -20,12 +25,19 @@ import { uploadRoutes } from './routes/uploads';
  * Single route-assembly point. Web-standard Request/Response so the same app
  * runs behind @hono/node-server locally and the Appwrite Function adapter in prod.
  */
+/** JSON API bodies are small; evidence attachments go straight to Storage. */
+export const BODY_LIMIT_BYTES = 256 * 1024;
+
 export function createApp(): Hono<AppEnv> {
   const config = getConfig();
   setLogLevel(config.logLevel);
   const app = new Hono<AppEnv>();
 
   app.use('*', requestId);
+  app.use('*', accessLog);
+  // API-only service: no HTML, so CSP is unnecessary; keep the rest of the hardening headers.
+  app.use('*', secureHeaders({ contentSecurityPolicy: undefined, crossOriginResourcePolicy: 'cross-origin', crossOriginEmbedderPolicy: false }));
+  app.use('*', bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: () => { throw payloadTooLarge(BODY_LIMIT_BYTES); } }));
   app.use('*', corsMiddleware(config.corsOrigins, { allowPrivateNetworkOrigins: !config.isProduction }));
   app.use('*', rateLimit({ perMin: config.rateLimitPerMin }));
 
@@ -48,6 +60,8 @@ export function createApp(): Hono<AppEnv> {
   mount('/v1/conversations', conversationRoutes, authed);
   mount('/v1/connections', connectionRoutes, social);
   mount('/v1/uploads', uploadRoutes, authed);
+  mount('/v1/notifications', notificationRoutes, authed);
+  mount('/v1/admin', adminRoutes, [requireAuth, requireAdmin]);
 
   app.notFound((c) => {
     throw notFound('route_not_found', `No handler for ${c.req.method} ${c.req.path}`);

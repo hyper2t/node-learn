@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCreateEvidence, useWorkspace } from '@/features/learning/api';
 import { Screen } from '@/shared/layout/screen';
-import { Button, InlineError, Input, Text } from '@/shared/ui';
+import { AttachmentPicker, Button, InlineError, Input, Text, type PendingAttachment } from '@/shared/ui';
 import { t } from '@/shared/i18n';
 
 export default function NewEvidence() {
@@ -14,6 +14,9 @@ export default function NewEvidence() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [taskId, setTaskId] = useState<string | null>(initialTask ?? null);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const uploading = attachments.some((a) => a.status === 'uploading');
+  const fileIds = attachments.filter((a) => a.status === 'done' && a.uploaded).map((a) => a.uploaded!.fileId);
   const openTasks = (ws.data?.tasks ?? []).filter((tk) => tk.status === 'open' || tk.status === 'reviewed');
   const task = openTasks.find((tk) => tk.id === taskId);
   return (
@@ -31,9 +34,10 @@ export default function NewEvidence() {
         ) : null}
         <Input label={t('relation.evidenceTitle')} value={title} onChangeText={setTitle} maxLength={140} placeholder={task?.title} />
         <Input label={t('relation.evidenceBody')} value={body} onChangeText={setBody} multiline maxLength={5000} className="min-h-[160px]" />
+        <AttachmentPicker relationId={id} value={attachments} onChange={setAttachments} />
         <InlineError error={create.error} />
-        <Button title={t('common.send')} loading={create.isPending} disabled={title.trim().length < 3 || body.trim().length < 10}
-          onPress={() => create.mutate({ title: title.trim(), body: body.trim(), taskId, goalId: task?.goalId ?? ws.data?.relation.currentGoalId ?? null }, { onSuccess: (e) => router.replace(`/(app)/relations/${id}/evidence/${e.id}`) })} />
+        <Button title={t('common.send')} loading={create.isPending} disabled={uploading || title.trim().length < 3 || body.trim().length < 10}
+          onPress={() => create.mutate({ title: title.trim(), body: body.trim(), taskId, goalId: task?.goalId ?? ws.data?.relation.currentGoalId ?? null, attachmentFileIds: fileIds }, { onSuccess: (e) => router.replace(`/(app)/relations/${id}/evidence/${e.id}`) })} />
       </View>
     </Screen>
   );

@@ -1,6 +1,6 @@
 /**
  * Seeds demo data for local development: one teacher and one student
- * (Appwrite users + KnowNode profiles + roles). Idempotent by email.
+ * (Appwrite users + Node Learn profiles + roles). Idempotent by email.
  *   npm run seed
  */
 import { ID, Query } from 'node-appwrite';
@@ -15,7 +15,7 @@ async function ensureUser(email: string, name: string): Promise<Models.User> {
   return found.users[0] ?? users.create({ userId: ID.unique(), email, password: 'Seed-Password-2026!', name });
 }
 
-const teacher = await ensureUser('teacher@knownode.test', 'Ada Teacher');
+const teacher = await ensureUser('teacher@node-learn.test', 'Ada Teacher');
 await getOrCreateProfile(teacher);
 await applyAgeGate(teacher, '18_plus');
 await grantRole(teacher.$id, 'teacher', true);
@@ -29,11 +29,11 @@ await upsertTeacherProfile(teacher, {
   visibility: 'public',
 });
 
-const student = await ensureUser('student@knownode.test', 'Sam Student');
+const student = await ensureUser('student@node-learn.test', 'Sam Student');
 await getOrCreateProfile(student);
 await applyAgeGate(student, '18_plus');
 await grantRole(student.$id, 'student', true);
 await updateMe(student, { handle: 'sam_student' }).catch(() => undefined);
 await upsertStudentProfile(student, { goalSummary: 'Reason about recursion without tracing every call', headline: '', interests: ['programming'], visibility: 'public' });
 
-console.log(`seeded teacher=${teacher.$id} (teacher@knownode.test) student=${student.$id} (student@knownode.test) password=Seed-Password-2026!`);
+console.log(`seeded teacher=${teacher.$id} (teacher@node-learn.test) student=${student.$id} (student@node-learn.test) password=Seed-Password-2026!`);

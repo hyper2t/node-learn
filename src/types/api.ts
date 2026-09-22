@@ -1,5 +1,5 @@
 /**
- * KnowNode API wire contract (v1). Single source of truth owned by the Expo app.
+ * Node Learn API wire contract (v1). Single source of truth owned by the Expo app.
  * `backend/src/contracts/api.ts` is a byte-for-byte mirror checked by
  * `scripts/check-contract.mjs`. Pure TypeScript: no RN, Node or Appwrite imports.
  *
@@ -39,6 +39,8 @@ export type Me = {
   ageBand: AgeBand | null;
   privacyAcceptedAt: string | null;
   onboarding: { student: boolean; teacher: boolean };
+  /** Platform moderator (member of APPWRITE_ADMIN_TEAM_ID). */
+  isAdmin: boolean;
   createdAt: string;
 };
 
@@ -54,6 +56,9 @@ export type SelectRoleInput = { role: Role; activate?: boolean };
 export type LinkedIdentity = { id: string; provider: AuthProvider; providerEmail: string | null; createdAt: string };
 
 // ---------------------------------------------------------------- profiles
+
+/** Minimal public reference to a person, embedded in lists. */
+export type PersonRef = { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
 
 export type StudentProfile = {
   userId: string;
@@ -91,7 +96,8 @@ export type UpdateTeacherProfileInput = Partial<
   Pick<TeacherProfile, 'headline' | 'bio' | 'subjects' | 'approach' | 'acceptingRequests' | 'visibility'>
 >;
 
-export type TeacherSearchParams = { q?: string; subject?: string; cursor?: string; limit?: number };
+export type TeacherSort = 'relevance' | 'newest' | 'most_reviewed';
+export type TeacherSearchParams = { q?: string; subject?: string; accepting?: boolean; sort?: TeacherSort; cursor?: string; limit?: number };
 
 // ---------------------------------------------------------------- matching
 
@@ -180,6 +186,17 @@ export type RelationWorkspace = {
 
 export type EvidenceStatus = 'submitted' | 'reviewed' | 'revised';
 
+/** Attachment metadata plus a short-lived, member-only view URL minted by the BFF. */
+export type Attachment = {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** Expires; re-fetch the evidence item to refresh. */
+  url: string;
+  expiresAt: string;
+};
+
 export type EvidenceItem = {
   id: string;
   relationId: string;
@@ -189,6 +206,7 @@ export type EvidenceItem = {
   title: string;
   body: string;
   attachmentFileIds: string[];
+  attachments: Attachment[];
   status: EvidenceStatus;
   version: number;
   submittedAt: string;
@@ -298,12 +316,65 @@ export type UserLookup = { userId: string; displayName: string; handle: string; 
 export type CreateConnectionRequestInput = { toUserId: string; message: string };
 export type ReportInput = { targetUserId: string; reason: 'harassment' | 'spam' | 'inappropriate' | 'other'; details?: string };
 
+// ---------------------------------------------------------------- notifications
+
+export type NotificationType =
+  | 'request.received'
+  | 'request.accepted'
+  | 'request.declined'
+  | 'task.assigned'
+  | 'evidence.submitted'
+  | 'feedback.added'
+  | 'connection.received'
+  | 'connection.accepted'
+  | 'system';
+
+export type Notification = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  /** Deep-link target inside the app (e.g. `/requests/abc`). */
+  href: string | null;
+  refType: string | null;
+  refId: string | null;
+  actor: PersonRef | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type NotificationListParams = { cursor?: string; limit?: number; unreadOnly?: boolean };
+export type MarkNotificationsReadInput = { ids?: string[]; all?: boolean };
+export type NotificationSummary = { unread: number };
+
+// ---------------------------------------------------------------- admin (moderation)
+
+export type ReportStatus = 'open' | 'resolved';
+export type ReportAction = 'dismiss' | 'warn' | 'suspend';
+
+export type ReportItem = {
+  id: string;
+  reporter: PersonRef;
+  target: PersonRef;
+  reason: ReportInput['reason'];
+  details: string;
+  status: ReportStatus;
+  resolution: ReportAction | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+};
+
+export type ReportListParams = { status?: ReportStatus; cursor?: string; limit?: number };
+export type ResolveReportInput = { action: ReportAction; note?: string };
+
 // ---------------------------------------------------------------- uploads
 
 export type UploadPurpose = 'avatar' | 'evidence';
 export type UploadIntentInput = { purpose: UploadPurpose; fileName: string; mimeType: string; sizeBytes: number; relationId?: string };
 export type UploadIntent = { bucketId: string; fileId: string; expiresAt: string };
+export type UploadComplete = { fileId: string; bucketId: string };
 
 // ---------------------------------------------------------------- health
 
-export type Health = { ok: true; version: string; uptimeSec: number };
+export type Health = { ok: true; version: string; uptimeSec: number; checks?: Record<string, { ok: boolean; latencyMs: number }> };

@@ -1,7 +1,12 @@
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { pickImage, uploadFile, UploadError } from '@/infrastructure/uploads';
+import { qk } from '@/state/query-keys';
 import { useRouter } from 'expo-router';
 import { useAddRole, useMe, useSetActiveRole, useSignOut } from '@/features/identity/api';
 import { Screen, PageHeader, Section } from '@/shared/layout/screen';
+import { useUnreadCount } from '@/features/notifications/api';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Loading, Text } from '@/shared/ui';
 import { t } from '@/shared/i18n';
 import type { Role } from '@/types/api';
@@ -12,6 +17,23 @@ export default function ProfileScreen() {
   const setActive = useSetActiveRole();
   const addRole = useAddRole();
   const signOut = useSignOut();
+  const qc = useQueryClient();
+  const notif = useUnreadCount(!!me.data);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+  const changeAvatar = async () => {
+    setAvatarMsg(null);
+    const f = await pickImage({ allowsEditing: true, aspect: [1, 1] });
+    if (!f) return;
+    setAvatarBusy(true);
+    try {
+      await uploadFile('avatar', f);
+      await qc.invalidateQueries({ queryKey: qk.me });
+      setAvatarMsg({ tone: 'success', text: t('profile.avatarUpdated') });
+    } catch (e) {
+      setAvatarMsg({ tone: 'danger', text: e instanceof UploadError ? e.message : t('errors.generic') });
+    } finally { setAvatarBusy(false); }
+  };
   if (me.isLoading) return <Loading />;
   if (me.isError || !me.data) return <ErrorState error={me.error} onRetry={() => me.refetch()} />;
   const m = me.data;
@@ -20,8 +42,14 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <PageHeader title={t('profile.title')} right={<Button size="sm" variant="secondary" title={t('profile.settings')} onPress={() => router.push('/(app)/settings')} />} />
+      <View className="flex-row flex-wrap gap-2 pb-3">
+        <Button size="sm" variant="secondary" title={notif.data?.unread ? `${t('notifications.title')} (${notif.data.unread})` : t('notifications.title')} onPress={() => router.push('/(app)/notifications')} />
+        {m.isAdmin ? <Button size="sm" variant="secondary" title={t('admin.title')} onPress={() => router.push('/(app)/admin/reports')} /> : null}
+      </View>
       <Card className="flex-row items-center gap-3">
-        <Avatar name={m.displayName} size={56} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('profile.changeAvatar')} onPress={changeAvatar} disabled={avatarBusy} className={avatarBusy ? 'opacity-50' : undefined}>
+          <Avatar name={m.displayName} fileId={m.avatarFileId} size={56} />
+        </Pressable>
         <View className="flex-1">
           <Text variant="h3">{m.displayName}</Text>
           {m.handle ? <Text variant="small" tone="secondary">@{m.handle}</Text> : null}
@@ -29,6 +57,8 @@ export default function ProfileScreen() {
             {m.availableRoles.map((r) => <Badge key={r} label={t(`role.${r}`)} tone={r} />)}
             {m.emailVerified ? <Badge label={t('teachers.verifiedEmail')} tone="success" /> : null}
           </View>
+          <Button size="sm" variant="ghost" className="mt-1 self-start" title={t('profile.changeAvatar')} loading={avatarBusy} onPress={changeAvatar} />
+          {avatarMsg ? <Text variant="caption" tone={avatarMsg.tone}>{avatarMsg.text}</Text> : null}
         </View>
       </Card>
       <Section title={t('role.current')}>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { meApi, useDeleteAccount, useIdentities, useMe, useUnlinkIdentity } from '@/features/identity/api';
 import { Screen, Section } from '@/shared/layout/screen';
-import { Badge, Button, Card, InlineError, ListRow, Separator, Text } from '@/shared/ui';
+import { Badge, Button, Card, InlineError, ListRow, Separator, Text, confirm } from '@/shared/ui';
 import { t } from '@/shared/i18n';
 
 export default function SettingsScreen() {
@@ -22,15 +22,14 @@ export default function SettingsScreen() {
       if (Platform.OS === 'web') {
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'knownode-export.json'; a.click(); URL.revokeObjectURL(url);
-        setExported('knownode-export.json');
+        const a = document.createElement('a'); a.href = url; a.download = 'node-learn-export.json'; a.click(); URL.revokeObjectURL(url);
+        setExported('node-learn-export.json');
       } else setExported(json.slice(0, 4000));
     } catch (e) { setExportErr(e); }
   };
   const askDelete = () => {
     const go = () => del.mutate(undefined, { onSettled: () => router.replace('/auth') });
-    if (Platform.OS === 'web') { if (window.confirm(t('profile.deleteConfirm'))) go(); return; }
-    Alert.alert(t('profile.delete'), t('profile.deleteConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: t('profile.delete'), style: 'destructive', onPress: go }]);
+    void confirm({ title: t('profile.delete'), message: t('profile.deleteConfirm'), confirmLabel: t('profile.delete'), destructive: true }).then((ok) => { if (ok) go(); });
   };
   const canUnlink = (ids.data?.length ?? 0) > 1;
 
@@ -62,6 +61,13 @@ export default function SettingsScreen() {
         <InlineError error={exportErr} />
         <Button variant="danger" title={t('profile.delete')} loading={del.isPending} onPress={askDelete} />
         <InlineError error={del.error} />
+      </Section>
+      <Section title={t('profile.legal')}>
+        <View className="rounded-lg border border-border bg-surface">
+          <ListRow title={t('profile.privacyNotice')} onPress={() => router.push('/legal/privacy')} />
+          <Separator />
+          <ListRow title={t('profile.terms')} onPress={() => router.push('/legal/terms')} />
+        </View>
       </Section>
     </Screen>
   );

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+      - run: npm ci
+      - run: npm --prefix backend ci
+      - name: Frontend typecheck + lint + unit tests
+        run: |
+          npm run typecheck
+          npm run lint
+          npm run test
+      - name: Contract in sync + backend typecheck + unit tests
+        run: |
+          npm run api:typecheck
+          npm run api:test
+      - name: Web bundle builds
+        run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_APPWRITE_ENDPOINT: https://example.invalid/v1
+          EXPO_PUBLIC_APPWRITE_PROJECT_ID: ci
+          EXPO_PUBLIC_APPWRITE_PLATFORM: com.nodelearn.app
+          EXPO_PUBLIC_API_BASE_URL: http://localhost:8070
+          EXPO_PUBLIC_WEB_URL: http://localhost:8071
+          CI: 1

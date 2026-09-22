@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useCreateFeedback, useEvidenceItem, useWorkspace } from '@/features/learning/api';
 import { Screen, Section } from '@/shared/layout/screen';
-import { Badge, Button, Card, Checkbox, ErrorState, InlineError, Input, Loading, Text } from '@/shared/ui';
+import { AttachmentList, Badge, Button, Card, Checkbox, ErrorState, InlineError, Input, Loading, Text } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
 
 export default function EvidenceDetail() {
@@ -31,6 +31,7 @@ export default function EvidenceDetail() {
         </View>
         {task ? <Text variant="small" tone="secondary">{t('relation.forTask')}: {task.title}</Text> : null}
         <Card><Text>{e.body}</Text></Card>
+        <AttachmentList items={e.attachments} />
         <Section title={t('relation.feedback')}>
           {e.feedback.length === 0 ? <Text variant="small" tone="secondary">{t('common.empty')}</Text> : null}
           <View className="gap-2">

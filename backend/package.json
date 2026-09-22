@@ -1,10 +1,12 @@
 {
-  "name": "knownode-backend",
+  "name": "node-learn-backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "KnowNode REST API (v1). Hono core + Node / Appwrite Function adapters, Appwrite TablesDB as the data layer.",
-  "engines": { "node": ">=22" },
+  "description": "Node Learn REST API (v1). Hono core + Node / Appwrite Function adapters, Appwrite TablesDB as the data layer.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
@@ -14,7 +16,11 @@
     "smoke": "tsx scripts/smoke.ts",
     "build:function": "node scripts/build-function.mjs",
     "make-dev-user": "tsx scripts/make-dev-user.ts",
-    "tables:ensure": "tsx scripts/ensure-tables.ts"
+    "tables:ensure": "tsx scripts/ensure-tables.ts",
+    "backfill:permissions": "tsx scripts/backfill-permissions.ts",
+    "smoke:uploads": "tsx scripts/upload-smoke.ts",
+    "schema:check": "tsx scripts/check-schema.ts",
+    "deploy:function": "node scripts/build-function.mjs && cd .. && appwrite push function --function-id node-learn-api --with-variables --force"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

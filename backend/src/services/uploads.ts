@@ -1,10 +1,11 @@
-import { ID, Permission, Role } from 'node-appwrite';
+import { ID, Permission, Query, Role, Tokens } from 'node-appwrite';
+import type { Attachment } from '../contracts/api';
 import type { UploadIntent, UploadPurpose } from '../contracts/api';
 import { getConfig } from '../config';
-import { createRow, getRow, updateRow } from '../db/repo';
+import { createRow, getRow, listRows, updateRow } from '../db/repo';
 import type { UploadIntentRow } from '../db/rows';
 import { TABLES } from '../db/schema';
-import { getStorage } from '../db/client';
+import { getAdminClient, getStorage } from '../db/client';
 import { conflict, forbidden, notFound, validation } from '../errors';
 import { requireRelationMember } from './learning';
 
@@ -30,7 +31,7 @@ export async function createIntent(userId: string, input: { purpose: UploadPurpo
   const bucketId = input.purpose === 'avatar' ? cfg.avatarBucketId : cfg.evidenceBucketId;
   const fileId = ID.unique();
   const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
-  await createRow<UploadIntentRow>(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: 'pending', expiresAt }, fileId);
+  await createRow<UploadIntentRow>(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, fileName: input.fileName.slice(0, 255), mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: 'pending', expiresAt }, fileId);
   return { bucketId, fileId, expiresAt };
 }
 
@@ -59,4 +60,52 @@ export async function completeIntent(userId: string, fileId: string): Promise<{ 
   await updateRow(TABLES.uploadIntents, fileId, { status: 'complete' });
   if (intent.purpose === 'avatar') await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
   return { fileId, bucketId: intent.bucketId };
+}
+
+/**
+ * Evidence attachments must be complete uploads owned by the author for this
+ * relation. Returns the ids in the order given (deduped).
+ */
+export async function assertEvidenceAttachments(userId: string, relationId: string, fileIds: string[]): Promise<string[]> {
+  const ids = Array.from(new Set(fileIds)).slice(0, 5);
+  if (!ids.length) return [];
+  const rows = await listRows<UploadIntentRow>(TABLES.uploadIntents, [Query.equal('$id', ids), Query.limit(ids.length)]);
+  for (const id of ids) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row || row.userId !== userId || row.purpose !== 'evidence' || row.relationId !== relationId || row.status !== 'complete') {
+      throw validation('One of the attachments is not a completed upload for this relation.', [{ path: 'attachmentFileIds', message: id }]);
+    }
+  }
+  return ids;
+}
+
+const TOKEN_TTL_MS = 30 * 60_000;
+const tokenCache = new Map<string, { secret: string; expiresAt: number }>();
+
+/** Short-lived, member-only view URLs. The caller has already been authorised on the evidence item. */
+export async function resolveAttachments(fileIds: string[]): Promise<Attachment[]> {
+  if (!fileIds.length) return [];
+  const rows = await listRows<UploadIntentRow>(TABLES.uploadIntents, [Query.equal('$id', fileIds), Query.limit(fileIds.length)]);
+  const cfg = getConfig().appwrite;
+  const tokens = new Tokens(getAdminClient());
+  const now = Date.now();
+  const out: Attachment[] = [];
+  for (const id of fileIds) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row) continue;
+    let tok = tokenCache.get(id);
+    if (!tok || tok.expiresAt - 60_000 < now) {
+      const expiresAt = now + TOKEN_TTL_MS;
+      try {
+        const t = await tokens.createFileToken({ bucketId: row.bucketId, fileId: id, expire: new Date(expiresAt).toISOString() });
+        tok = { secret: t.secret, expiresAt };
+        tokenCache.set(id, tok);
+      } catch {
+        continue; // file may have been deleted; omit rather than fail the whole item
+      }
+    }
+    const url = `${cfg.endpoint}/storage/buckets/${row.bucketId}/files/${id}/view?project=${cfg.projectId}&token=${tok.secret}`;
+    out.push({ fileId: id, fileName: row.fileName ?? 'attachment', mimeType: row.mimeType, sizeBytes: row.sizeBytes, url, expiresAt: new Date(tok.expiresAt).toISOString() });
+  }
+  return out;
 }

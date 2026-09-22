@@ -23,7 +23,8 @@ export const updateTeacherProfile = z.object({
   headline: z.string().trim().max(120).optional(), bio: z.string().trim().max(4000).optional(), subjects: z.array(trimmed(64)).max(10).optional(),
   approach: z.string().trim().max(2000).optional(), acceptingRequests: z.boolean().optional(), visibility: visibility.optional(),
 }).strict();
-export const teacherSearch = z.object({ q: z.string().trim().max(80).optional(), subject: z.string().trim().max(64).optional(), cursor, limit });
+const boolish = z.preprocess((v) => (v === 'true' || v === '1' ? true : v === 'false' || v === '0' ? false : v), z.boolean());
+export const teacherSearch = z.object({ q: z.string().trim().max(80).optional(), subject: z.string().trim().max(64).optional(), accepting: boolish.optional(), sort: z.enum(['relevance', 'newest', 'most_reviewed']).optional(), cursor, limit });
 
 export const createLearningRequest = z.object({ teacherId: trimmed(36), goalTitle: trimmed(120), message: z.string().trim().max(2000).default('') }).strict();
 export const createTeacherInvitation = z.object({ studentId: trimmed(36), goalTitle: trimmed(120), message: z.string().trim().max(2000).default('') }).strict();
@@ -52,3 +53,9 @@ export const reportInput = z.object({ targetUserId: trimmed(36), reason: z.enum(
 
 export const uploadIntent = z.object({ purpose: z.enum(['avatar', 'evidence']), fileName: trimmed(255), mimeType: trimmed(128), sizeBytes: z.number().int().min(1), relationId: z.string().max(36).optional() }).strict();
 export const uploadComplete = z.object({ fileId: trimmed(36) }).strict();
+
+export const notificationList = z.object({ cursor, limit, unreadOnly: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).optional() });
+export const markNotificationsRead = z.object({ ids: z.array(trimmed(36)).max(100).optional(), all: z.boolean().optional() }).strict()
+  .refine((v) => v.all || (v.ids && v.ids.length > 0), { message: 'Provide ids or all=true.' });
+export const reportList = z.object({ status: z.enum(['open', 'resolved']).optional(), cursor, limit });
+export const resolveReport = z.object({ action: z.enum(['dismiss', 'warn', 'suspend']), note: z.string().trim().max(1000).optional() }).strict();

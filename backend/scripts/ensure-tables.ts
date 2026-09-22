@@ -108,7 +108,12 @@ async function ensureTable(def: TableDef): Promise<void> {
 
 async function ensureBucket(def: BucketDef): Promise<void> {
   try {
-    await storage.getBucket({ bucketId: def.$id });
+    const existing = await storage.getBucket({ bucketId: def.$id });
+    const same = JSON.stringify([...existing.$permissions].sort()) === JSON.stringify([...def.$permissions].sort());
+    if (!same || existing.maximumFileSize !== def.maximumFileSize) {
+      await storage.updateBucket({ bucketId: def.$id, name: def.name, permissions: def.$permissions, fileSecurity: def.fileSecurity, enabled: def.enabled, maximumFileSize: def.maximumFileSize, allowedFileExtensions: def.allowedFileExtensions });
+      log('info', 'bucket_updated', { bucketId: def.$id });
+    }
   } catch (err) {
     if (!isNotFound(err)) throw err;
     await storage.createBucket({

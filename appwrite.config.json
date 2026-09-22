@@ -1,6 +1,6 @@
 {
   "projectId": "6ab149e4001d09a18de3",
-  "projectName": "KnowNode",
+  "projectName": "Node Learn",
   "endpoint": "https://sfo.cloud.appwrite.io/v1",
   "settings": {
     "services": {
@@ -31,10 +31,10 @@
   },
   "functions": [
     {
-      "$id": "knownode-api",
-      "name": "KnowNode API",
+      "$id": "node-learn-api",
+      "name": "Node Learn API",
       "runtime": "node-22",
-      "path": "functions/knownode-api",
+      "path": "functions/node-learn-api",
       "entrypoint": "src/main.js",
       "execute": [
         "any"
@@ -45,15 +45,69 @@
       "schedule": "",
       "timeout": 30,
       "commands": "",
-      "scopes": [],
-      "buildSpecification": "s-2vcpu-2gb",
-      "runtimeSpecification": "s-0.5vcpu-512mb"
+      "scopes": [
+        "users.read",
+        "users.write",
+        "teams.read",
+        "databases.read",
+        "tables.read",
+        "tables.write",
+        "rows.read",
+        "rows.write",
+        "collections.read",
+        "documents.read",
+        "documents.write",
+        "buckets.read",
+        "files.read",
+        "files.write",
+        "tokens.read",
+        "tokens.write"
+      ],
+      "specification": "s-0.5vcpu-512mb",
+      "vars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "APPWRITE_ENDPOINT",
+          "value": "https://sfo.cloud.appwrite.io/v1"
+        },
+        {
+          "key": "APPWRITE_PROJECT_ID",
+          "value": "6ab149e4001d09a18de3"
+        },
+        {
+          "key": "APPWRITE_DATABASE_ID",
+          "value": "main"
+        },
+        {
+          "key": "APPWRITE_EVIDENCE_BUCKET_ID",
+          "value": "evidence"
+        },
+        {
+          "key": "APPWRITE_AVATAR_BUCKET_ID",
+          "value": "avatars"
+        },
+        {
+          "key": "CORS_ORIGINS",
+          "value": "http://localhost:8071,http://127.0.0.1:8071"
+        },
+        {
+          "key": "RATE_LIMIT_PER_MIN",
+          "value": "120"
+        },
+        {
+          "key": "LOG_LEVEL",
+          "value": "info"
+        }
+      ]
     }
   ],
   "tablesDB": [
     {
       "$id": "main",
-      "name": "KnowNode main",
+      "name": "Node Learn main",
       "enabled": true
     }
   ],
@@ -401,6 +455,16 @@
           "type": "fulltext",
           "columns": [
             "searchText"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_visibility_accepting",
+          "type": "key",
+          "columns": [
+            "visibility",
+            "acceptingRequests",
+            "updatedAt"
           ],
           "orders": []
         }
@@ -1609,6 +1673,32 @@
           "type": "datetime",
           "required": true,
           "array": false
+        },
+        {
+          "key": "resolution",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 16
+        },
+        {
+          "key": "resolvedBy",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "resolvedAt",
+          "type": "datetime",
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "resolutionNote",
+          "type": "text",
+          "required": false,
+          "array": false
         }
       ],
       "indexes": [
@@ -1617,6 +1707,15 @@
           "type": "key",
           "columns": [
             "targetUserId",
+            "createdAt"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_status_created",
+          "type": "key",
+          "columns": [
+            "status",
             "createdAt"
           ],
           "orders": []
@@ -1960,6 +2059,13 @@
           "type": "datetime",
           "required": true,
           "array": false
+        },
+        {
+          "key": "fileName",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 255
         }
       ],
       "indexes": [
@@ -1973,6 +2079,125 @@
           "orders": []
         }
       ]
+    },
+    {
+      "$id": "notifications",
+      "$permissions": [],
+      "databaseId": "main",
+      "name": "notifications",
+      "enabled": true,
+      "rowSecurity": true,
+      "columns": [
+        {
+          "key": "userId",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "type",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 32
+        },
+        {
+          "key": "title",
+          "type": "varchar",
+          "required": true,
+          "array": false,
+          "size": 160
+        },
+        {
+          "key": "body",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 500
+        },
+        {
+          "key": "href",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 255
+        },
+        {
+          "key": "refType",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 32
+        },
+        {
+          "key": "refId",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "actorId",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 36
+        },
+        {
+          "key": "dedupeKey",
+          "type": "varchar",
+          "required": false,
+          "array": false,
+          "size": 120
+        },
+        {
+          "key": "readAt",
+          "type": "datetime",
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "createdAt",
+          "type": "datetime",
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "updatedAt",
+          "type": "datetime",
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "ix_user_created",
+          "type": "key",
+          "columns": [
+            "userId",
+            "createdAt"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_user_read",
+          "type": "key",
+          "columns": [
+            "userId",
+            "readAt"
+          ],
+          "orders": []
+        },
+        {
+          "key": "uq_dedupe",
+          "type": "unique",
+          "columns": [
+            "dedupeKey"
+          ],
+          "orders": []
+        }
+      ]
     }
   ],
   "buckets": [
@@ -1980,7 +2205,8 @@
       "$id": "avatars",
       "name": "avatars",
       "$permissions": [
-        "read(\"any\")"
+        "read(\"any\")",
+        "create(\"users\")"
       ],
       "fileSecurity": true,
       "enabled": true,
@@ -1998,7 +2224,9 @@
     {
       "$id": "evidence",
       "name": "evidence",
-      "$permissions": [],
+      "$permissions": [
+        "create(\"users\")"
+      ],
       "fileSecurity": true,
       "enabled": true,
       "maximumFileSize": 26214400,
