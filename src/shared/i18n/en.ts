@@ -38,6 +38,9 @@ export const en = {
   legal: {
     onThisPage: 'On this page', lastUpdated: 'Last updated {date}',
   },
+  tags: {
+    add: 'Add', placeholder: 'Add your own topic…', remove: 'Remove {tag}', max: 'Pick suggestions or add your own — up to {max} tags.',
+  },
   role: {
     chooseTitle: 'How do you want to start?', chooseBody: 'You can add the other role any time.', student: 'Learn', studentBody: 'Set a goal, work with a teacher, and build evidence of what changed.',
     teacher: 'Teach', teacherBody: 'Share how you think, set tasks, and review real work.', switch: 'Switch role', current: 'Current role', add: 'Add {role} role',
@@ -47,6 +50,7 @@ export const en = {
     interests: 'Topics', interestsHint: 'Comma separated, up to 10', teacherTitle: 'Tell learners how you teach', teacherBody: 'This is your own description. Node Learn does not verify credentials — trust builds from your work and feedback.',
     headline: 'Headline', headlinePlaceholder: 'e.g. Systems thinking for self-taught programmers', bio: 'About', subjects: 'Subjects', approach: 'How you work with learners', accepting: 'Accepting new learners',
     handle: 'Handle', handleHint: 'People can find you only by exact handle.',
+    handlePlaceholder: 'e.g. ada_lovelace',
     skip: 'Skip for now', skipHint: 'You can add or change this any time from your Profile.',
   },
   tabs: { home: 'Home', messages: 'Messages', learning: 'Learning', profile: 'Profile', workbench: 'Workbench', students: 'Students' },

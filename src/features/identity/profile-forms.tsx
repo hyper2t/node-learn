@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Switch, View } from 'react-native';
 import { useMe, useSaveStudentProfile, useSaveTeacherProfile, useStudentProfile, useTeacherProfile, useUpdateMe } from '@/features/identity/api';
-import { Button, ErrorState, Input, InlineError, Loading, Text } from '@/shared/ui';
+import { Button, ErrorState, Input, InlineError, Loading, TagPicker, Text } from '@/shared/ui';
+import { TOPIC_SUGGESTIONS } from '@/content/topics';
 import { t } from '@/shared/i18n';
 import { useThemeColors } from '@/shared/hooks/use-theme-colors';
 import type { Me, StudentProfile, TeacherProfile } from '@/types/api';
@@ -11,7 +12,7 @@ const HANDLE_RE = /^[a-z0-9_]{3,24}$/;
 
 function HandleField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const bad = value.length > 0 && !HANDLE_RE.test(value);
-  return <Input label={t('onboarding.handle')} value={value} onChangeText={(v) => onChange(v.toLowerCase())} autoCapitalize="none" hint={t('onboarding.handleHint')} error={bad ? 'a–z, 0–9, _ (3–24)' : undefined} />;
+  return <Input label={t('onboarding.handle')} value={value} onChangeText={(v) => onChange(v.toLowerCase())} autoCapitalize="none" placeholder={t('onboarding.handlePlaceholder')} hint={t('onboarding.handleHint')} error={bad ? 'a–z, 0–9, _ (3–24)' : undefined} />;
 }
 
 type FormProps = { onDone: () => void; submitLabel: string; /** Onboarding only: allow saving an empty profile and continuing. */ allowSkip?: boolean };
@@ -32,12 +33,12 @@ function StudentForm({ onDone, submitLabel, me, initial, allowSkip }: FormProps 
   const [handle, setHandle] = useState(me.handle ?? '');
   const [goal, setGoal] = useState(initial?.goalSummary ?? '');
   const [headline, setHeadline] = useState(initial?.headline ?? '');
-  const [interests, setInterests] = useState(initial?.interests.join(', ') ?? '');
+  const [interests, setInterests] = useState<string[]>(initial?.interests ?? []);
   const handleValid = handle === '' || HANDLE_RE.test(handle);
   const submit = async () => {
     try {
       if (handle && handle !== me.handle) await updateMe.mutateAsync({ handle });
-      await save.mutateAsync({ goalSummary: goal.trim(), headline: headline.trim(), interests: splitList(interests) });
+      await save.mutateAsync({ goalSummary: goal.trim(), headline: headline.trim(), interests });
       onDone();
     } catch { /* surfaced via mutation.error */ }
   };
@@ -52,7 +53,7 @@ function StudentForm({ onDone, submitLabel, me, initial, allowSkip }: FormProps 
     <View className="gap-4">
       <Input label={t('onboarding.goalLabel')} value={goal} onChangeText={setGoal} placeholder={t('onboarding.goalPlaceholder')} multiline maxLength={280} />
       <Input label={t('onboarding.headline')} value={headline} onChangeText={setHeadline} maxLength={120} hint={t('common.optional')} />
-      <Input label={t('onboarding.interests')} value={interests} onChangeText={setInterests} hint={t('onboarding.interestsHint')} />
+      <TagPicker label={t('onboarding.interests')} value={interests} onChange={setInterests} suggestions={TOPIC_SUGGESTIONS} />
       <HandleField value={handle} onChange={setHandle} />
       <InlineError error={save.error ?? updateMe.error} />
       <Button title={submitLabel} disabled={goal.trim().length < 3 || !handleValid} loading={save.isPending || updateMe.isPending} onPress={submit} />

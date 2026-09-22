@@ -19,6 +19,7 @@ const PATHS = {
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
   shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4',
   filter: 'M4 5h16l-6 8v5l-4 2v-7z',
+  close: 'M6 6l12 12M18 6L6 18',
 } as const;
 export type IconName = keyof typeof PATHS;
 

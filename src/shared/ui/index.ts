@@ -10,4 +10,5 @@ export { Loading, Empty, ErrorState, InlineError, errorMessage } from './states'
 export { AttachmentPicker, AttachmentList, type PendingAttachment } from './attachments';
 export { confirm, useConfirm, DialogHost, type ConfirmOptions } from './dialog';
 export { Skeleton, SkeletonCard, SkeletonList } from './skeleton';
+export { TagPicker } from './tag-picker';
 export { OfflineBanner } from './offline-banner';
