@@ -14,7 +14,7 @@ function HandleField({ value, onChange }: { value: string; onChange: (v: string)
   return <Input label={t('onboarding.handle')} value={value} onChangeText={(v) => onChange(v.toLowerCase())} autoCapitalize="none" hint={t('onboarding.handleHint')} error={bad ? 'a–z, 0–9, _ (3–24)' : undefined} />;
 }
 
-type FormProps = { onDone: () => void; submitLabel: string };
+type FormProps = { onDone: () => void; submitLabel: string; /** Onboarding only: allow saving an empty profile and continuing. */ allowSkip?: boolean };
 
 /** Loads current data first so the inner form can seed state from props (no setState-in-effect). */
 export function StudentProfileForm(props: FormProps) {
@@ -26,7 +26,7 @@ export function StudentProfileForm(props: FormProps) {
   return <StudentForm {...props} me={me.data} initial={profile.data ?? null} />;
 }
 
-function StudentForm({ onDone, submitLabel, me, initial }: FormProps & { me: Me; initial: StudentProfile | null }) {
+function StudentForm({ onDone, submitLabel, me, initial, allowSkip }: FormProps & { me: Me; initial: StudentProfile | null }) {
   const save = useSaveStudentProfile();
   const updateMe = useUpdateMe();
   const [handle, setHandle] = useState(me.handle ?? '');
@@ -41,6 +41,13 @@ function StudentForm({ onDone, submitLabel, me, initial }: FormProps & { me: Me;
       onDone();
     } catch { /* surfaced via mutation.error */ }
   };
+  /** Saves an empty student profile so onboarding is marked complete; editable later under Profile. */
+  const skip = async () => {
+    try {
+      await save.mutateAsync({});
+      onDone();
+    } catch { /* surfaced via mutation.error */ }
+  };
   return (
     <View className="gap-4">
       <Input label={t('onboarding.goalLabel')} value={goal} onChangeText={setGoal} placeholder={t('onboarding.goalPlaceholder')} multiline maxLength={280} />
@@ -49,6 +56,12 @@ function StudentForm({ onDone, submitLabel, me, initial }: FormProps & { me: Me;
       <HandleField value={handle} onChange={setHandle} />
       <InlineError error={save.error ?? updateMe.error} />
       <Button title={submitLabel} disabled={goal.trim().length < 3 || !handleValid} loading={save.isPending || updateMe.isPending} onPress={submit} />
+      {allowSkip ? (
+        <View className="items-center gap-1">
+          <Button variant="ghost" title={t('onboarding.skip')} disabled={save.isPending} onPress={skip} />
+          <Text variant="caption" tone="tertiary" className="text-center">{t('onboarding.skipHint')}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

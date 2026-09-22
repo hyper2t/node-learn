@@ -10,7 +10,7 @@ export default function StudentOnboarding() {
     <Screen>
       <View className="mx-auto w-full max-w-[520px] py-6">
         <PageHeader title={t('onboarding.studentTitle')} body={t('onboarding.studentBody')} />
-        <StudentProfileForm submitLabel={t('common.continue')} onDone={() => router.replace('/')} />
+        <StudentProfileForm allowSkip submitLabel={t('common.continue')} onDone={() => router.replace('/')} />
       </View>
     </Screen>
   );

@@ -44,10 +44,12 @@ export const en = {
     interests: 'Topics', interestsHint: 'Comma separated, up to 10', teacherTitle: 'Tell learners how you teach', teacherBody: 'This is your own description. KnowNode does not verify credentials — trust builds from your work and feedback.',
     headline: 'Headline', headlinePlaceholder: 'e.g. Systems thinking for self-taught programmers', bio: 'About', subjects: 'Subjects', approach: 'How you work with learners', accepting: 'Accepting new learners',
     handle: 'Handle', handleHint: 'People can find you only by exact handle.',
+    skip: 'Skip for now', skipHint: 'You can add or change this any time from your Profile.',
   },
   tabs: { home: 'Home', messages: 'Messages', learning: 'Learning', profile: 'Profile', workbench: 'Workbench', students: 'Students' },
   home: {
     studentTitle: 'Your learning', currentFocus: 'Current focus', nextStep: 'Next step', recentChange: 'Recent change', pending: 'Pending requests', findTeacher: 'Find a teacher',
+    setGoal: 'Set your learning goal', setGoalBody: 'A goal helps teachers understand what you are working toward. Add it any time from your Profile.',
     noRelation: 'No learning relation yet.', noRelationBody: 'Find a teacher who fits your goal, or accept an invitation.', teacherTitle: 'Workbench', needsAttention: 'Needs your attention',
     toReview: 'Evidence to review', activeStudents: 'Active learners', noStudents: 'No learners yet.', noStudentsBody: 'When someone sends a request, it will show here.',
   },

@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMe } from '@/features/identity/api';
+import { useMe, useStudentProfile } from '@/features/identity/api';
 import { useRelations, useWorkspace } from '@/features/learning/api';
 import { useRequests } from '@/features/requests/api';
 import { ProofSummary, RelationCard, RequestCard } from '@/features/learning/components';
@@ -20,6 +20,7 @@ export default function HomeScreen() {
   const role = me.data?.activeRole ?? 'student';
   const relations = useRelations(role, 'active', !!me.data);
   const requests = useRequests(role, 'pending', !!me.data);
+  const studentProfile = useStudentProfile(!!me.data && role === 'student');
   if (me.isLoading) return <Loading />;
   if (me.isError) return <ErrorState error={me.error} onRetry={() => me.refetch()} />;
 
@@ -34,6 +35,13 @@ export default function HomeScreen() {
         <Card className="mb-3 bg-warning-subtle">
           <Text variant="small">{t('auth.verifyBody', { email: me.data?.email ?? '' })}</Text>
           <Button size="sm" variant="ghost" className="self-start" title={t('auth.resend')} onPress={() => router.push('/auth/verify')} />
+        </Card>
+      ) : null}
+      {!isTeacher && studentProfile.data && !studentProfile.data.goalSummary ? (
+        <Card className="mb-3 gap-1">
+          <Text variant="body-strong">{t('home.setGoal')}</Text>
+          <Text variant="small" tone="secondary">{t('home.setGoalBody')}</Text>
+          <Button size="sm" variant="secondary" className="mt-1 self-start" title={t('common.edit')} onPress={() => router.push('/(app)/settings/student-profile')} />
         </Card>
       ) : null}
       {relations.isError ? <ErrorState error={relations.error} onRetry={() => relations.refetch()} /> : null}
