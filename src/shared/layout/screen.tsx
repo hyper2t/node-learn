@@ -1,20 +1,24 @@
-import { KeyboardAvoidingView, Platform, ScrollView, View, type ViewProps } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { cn } from '@/shared/lib/cn';
 import { useBreakpoint } from '@/shared/hooks/use-breakpoint';
 import { useShell } from '@/shared/hooks/use-shell';
 import { Text } from '@/shared/ui/text';
 
-type Width = 'narrow' | 'default' | 'wide';
-const WIDTH: Record<Width, string> = { narrow: 'max-w-[560px]', default: 'max-w-[840px]', wide: 'max-w-[1200px]' };
+type Width = 'narrow' | 'default' | 'article' | 'wide';
+const WIDTH: Record<Width, string> = { narrow: 'max-w-[560px]', default: 'max-w-[840px]', article: 'max-w-[1024px]', wide: 'max-w-[1200px]' };
 
 /**
  * Page container: safe area, centred max-width column, optional scroll +
  * keyboard avoidance. On the web sidebar shell padding is larger and the
- * column can be wider (`width="wide"` for dashboards / two-column pages).
+ * column can be wider (`width="wide"` for dashboards / two-column pages,
+ * `width="article"` for long-form text with a side table of contents).
+ * `scrollRef` / `onScroll` expose the inner ScrollView for scroll-spy or
+ * programmatic scrolling (ignored when `scroll` is false).
  */
-export function Screen({ children, scroll = true, className, padded = true, edges, width = 'default' }: {
+export function Screen({ children, scroll = true, className, padded = true, edges, width = 'default', scrollRef, onScroll, scrollEventThrottle }: {
   children: React.ReactNode; scroll?: boolean; className?: string; padded?: boolean; edges?: ('top' | 'bottom' | 'left' | 'right')[]; width?: Width;
+  scrollRef?: React.Ref<ScrollView>; onScroll?: ScrollViewProps['onScroll']; scrollEventThrottle?: number;
 }) {
   const bp = useBreakpoint();
   const shell = useShell();
@@ -25,7 +29,16 @@ export function Screen({ children, scroll = true, className, padded = true, edge
     <SafeAreaView className="flex-1 bg-background" edges={edges ?? ['top', 'left', 'right']}>
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {scroll ? (
-          <ScrollView className="flex-1" contentContainerClassName={cn('flex-grow', shell === 'sidebar' ? 'pb-16' : 'pb-8')} keyboardShouldPersistTaps="handled">{inner}</ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            onScroll={onScroll}
+            scrollEventThrottle={scrollEventThrottle}
+            className="flex-1"
+            contentContainerClassName={cn('flex-grow', shell === 'sidebar' ? 'pb-16' : 'pb-8')}
+            keyboardShouldPersistTaps="handled"
+          >
+            {inner}
+          </ScrollView>
         ) : inner}
       </KeyboardAvoidingView>
     </SafeAreaView>

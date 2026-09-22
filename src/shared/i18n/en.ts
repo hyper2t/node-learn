@@ -35,6 +35,9 @@ export const en = {
     under16: 'Under 16', b16_17: '16–17', b18: '18 or over', privacy: 'I have read the privacy notice and agree to how Node Learn uses my data.',
     tooYoung: 'Node Learn is not available for your age group yet.', privacyLink: 'Privacy notice', termsLink: 'Terms of use',
   },
+  legal: {
+    onThisPage: 'On this page', lastUpdated: 'Last updated {date}',
+  },
   role: {
     chooseTitle: 'How do you want to start?', chooseBody: 'You can add the other role any time.', student: 'Learn', studentBody: 'Set a goal, work with a teacher, and build evidence of what changed.',
     teacher: 'Teach', teacherBody: 'Share how you think, set tasks, and review real work.', switch: 'Switch role', current: 'Current role', add: 'Add {role} role',
