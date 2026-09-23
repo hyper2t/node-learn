@@ -1,6 +1,6 @@
 # Node Learn — marketing portal
 
-Static Astro site for the public `node-learn.example` portal. Separate from the Expo app in
+Static Astro site for the public `node-learn.com` portal. Separate from the Expo app in
 `src/` on purpose: the app is a product surface behind auth, this is an indexable marketing
 site with no client-side framework and no Appwrite SDK.
 

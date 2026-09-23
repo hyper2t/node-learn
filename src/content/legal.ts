@@ -49,7 +49,7 @@ Data is stored with Appwrite Cloud (region: US West). Uploads are stored in priv
 
 - **Export:** Settings → Export my data gives you a JSON copy of everything linked to your account.
 - **Delete:** Settings → Delete account removes your account and starts the deletion schedule above.
-- **Correct:** edit your profile at any time. For anything else write to [privacy@node-learn.example](mailto:privacy@node-learn.example).
+- **Correct:** edit your profile at any time. For anything else write to [privacy@node-learn.com](mailto:privacy@node-learn.com).
 
 ## Under 16
 
@@ -88,6 +88,6 @@ We will show a notice in the app before material changes take effect. Continuing
 
 ## Contact
 
-[legal@node-learn.example](mailto:legal@node-learn.example) — how we handle your data is described in the [Privacy notice](/legal/privacy).
+[legal@node-learn.com](mailto:legal@node-learn.com) — how we handle your data is described in the [Privacy notice](/legal/privacy).
 `,
 };

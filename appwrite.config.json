@@ -101,7 +101,7 @@
         },
         {
           "key": "CORS_ORIGINS",
-          "value": "http://localhost:8071,http://127.0.0.1:8071"
+          "value": "http://localhost:8071,http://127.0.0.1:8071,https://app.node-learn.com,https://node-learn.com"
         },
         {
           "key": "RATE_LIMIT_PER_MIN",

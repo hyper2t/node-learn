@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://node-learn.example/sitemap-index.xml
+Sitemap: https://node-learn.com/sitemap-index.xml
 

@@ -9,15 +9,15 @@ export const SITE = {
   tagline: 'Learning is a relationship, not a catalogue.',
   description:
     'Node Learn pairs learners with teachers around a shared goal, then keeps the goals, tasks, evidence and feedback in one place you both can see. No courses to buy, no streaks to protect.',
-  url: 'https://node-learn.example',
+  url: 'https://node-learn.com',
   /** Expo app scheme + bundle id, from app.json. */
   bundleId: 'com.hyperter96.nodelearn',
-  appUrl: 'https://app.node-learn.example',
+  appUrl: 'https://app.node-learn.com',
   email: {
-    hello: 'hello@node-learn.example',
-    privacy: 'privacy@node-learn.example',
-    legal: 'legal@node-learn.example',
-    safety: 'safety@node-learn.example',
+    hello: 'hello@node-learn.com',
+    privacy: 'privacy@node-learn.com',
+    legal: 'legal@node-learn.com',
+    safety: 'safety@node-learn.com',
   },
   /** MVP status shown honestly across the site. */
   status: 'Early access · MVP',

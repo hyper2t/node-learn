@@ -100,7 +100,8 @@ for (const profile of ['preview', 'production']) {
   }
   if (parsed.protocol !== 'https:') fail(`eas.json ${profile} EXPO_PUBLIC_WEB_URL must be https in release builds: ${value}`);
   if (value.endsWith('/')) fail(`eas.json ${profile} EXPO_PUBLIC_WEB_URL must not have a trailing slash: ${value}`);
-  if (parsed.hostname === 'app.node-learn.example') warn(`eas.json ${profile} still uses placeholder web domain app.node-learn.example`);
+  // .example is reserved for documentation (RFC 2606) — any such host is still a placeholder.
+  if (parsed.hostname.endsWith('.example')) warn(`eas.json ${profile} still uses a placeholder web domain: ${parsed.hostname}`);
 }
 ok('EAS web URL values are syntactically valid');
 

@@ -31,7 +31,7 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "https", "host": "app.node-learn.example", "pathPrefix": "/auth/oauth-return" }],
+          "data": [{ "scheme": "https", "host": "app.node-learn.com", "pathPrefix": "/auth/oauth-return" }],
           "category": ["BROWSABLE", "DEFAULT"]
         }
       ]

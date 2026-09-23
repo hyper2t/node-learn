@@ -15,7 +15,7 @@
         "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6ab149e4001d09a18de3",
         "EXPO_PUBLIC_APPWRITE_PLATFORM": "com.hyperter96.nodelearn",
         "EXPO_PUBLIC_API_BASE_URL": "https://6ab25202000c575857b2.appwrite.network",
-        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.example"
+        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.com"
       }
     },
     "production": {
@@ -26,7 +26,7 @@
         "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "6ab149e4001d09a18de3",
         "EXPO_PUBLIC_APPWRITE_PLATFORM": "com.hyperter96.nodelearn",
         "EXPO_PUBLIC_API_BASE_URL": "https://6ab25202000c575857b2.appwrite.network",
-        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.example"
+        "EXPO_PUBLIC_WEB_URL": "https://app.node-learn.com"
       }
     }
   },
