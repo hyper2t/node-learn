@@ -12,3 +12,4 @@ export { confirm, useConfirm, DialogHost, type ConfirmOptions } from './dialog';
 export { Skeleton, SkeletonCard, SkeletonList } from './skeleton';
 export { TagPicker } from './tag-picker';
 export { OfflineBanner } from './offline-banner';
+export { Logo } from './logo';

@@ -7,7 +7,7 @@ import { useUiStore } from '@/state/ui';
 import { useThemeColors } from '@/shared/hooks/use-theme-colors';
 import { cn } from '@/shared/lib/cn';
 import { t } from '@/shared/i18n';
-import { Avatar, Badge, Text } from '@/shared/ui';
+import { Avatar, Badge, Logo, Text } from '@/shared/ui';
 import { Icon, type IconName } from '@/shared/ui/icon';
 
 type Item = { href: Href; icon: IconName; label: string; match: (p: string) => boolean; badge?: number };
@@ -70,7 +70,12 @@ export function Sidebar() {
       className="h-full border-r border-border bg-surface px-3 py-4 transition-all duration-base"
     >
       <View className={cn('mb-6 flex-row items-center', collapsed ? 'justify-center' : 'justify-between px-1')}>
-        {!collapsed ? <Text variant="h3" tone="primary">{t('app.name')}</Text> : null}
+        {!collapsed ? (
+          <View className="flex-row items-center gap-2">
+            <Logo size={24} />
+            <Text variant="h3" tone="primary">{t('app.name')}</Text>
+          </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

@@ -3,7 +3,8 @@ import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { completeOAuthSession } from '@/infrastructure/appwrite';
 import { Screen } from '@/shared/layout/screen';
-import { Button, Loading, Text } from '@/shared/ui';
+import { SplashTransition } from '@/shared/layout/splash-transition';
+import { Button, Text } from '@/shared/ui';
 import { t } from '@/shared/i18n';
 import { authErrorMessage } from '@/features/identity/auth-form';
 
@@ -26,7 +27,7 @@ export default function OAuthReturnScreen() {
     return () => { cancelled = true; };
   }, [params.userId, params.secret, params.error, router]);
 
-  if (!error) return <Loading label={t('auth.finishing')} />;
+  if (!error) return <SplashTransition label={t('auth.finishing')} />;
   return (
     <Screen>
       <View className="mx-auto w-full max-w-[420px] gap-4 py-16">

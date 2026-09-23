@@ -8,8 +8,11 @@ import { getCurrentUser } from '@/infrastructure/appwrite';
 import { createQueryClient } from '@/state/query-client';
 import { useAuth } from '@/state/auth';
 import { useMe } from '@/features/identity/api';
-import { DialogHost, Loading, OfflineBanner } from '@/shared/ui';
+import { DialogHost, OfflineBanner } from '@/shared/ui';
+import { DocumentTitle } from '@/shared/layout/document-title';
+import { SplashTransition } from '@/shared/layout/splash-transition';
 import { useThemeColors } from '@/shared/hooks/use-theme-colors';
+import { t } from '@/shared/i18n';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -51,7 +54,9 @@ function Gate({ children }: { children: React.ReactNode }) {
     if (target) router.replace(target as never);
   }, [target, router]);
 
-  if (!ready) return <Loading />;
+  // Same branded surface the OAuth return screen shows, so the hand-off from
+  // provider redirect to destination reads as one continuous transition.
+  if (!ready) return <SplashTransition label={inAuth ? t('auth.finishing') : undefined} />;
   return <>{children}</>;
 }
 
@@ -64,6 +69,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
+          <DocumentTitle />
           <OfflineBanner />
           <Gate>
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>

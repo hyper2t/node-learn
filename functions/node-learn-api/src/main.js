@@ -17527,7 +17527,7 @@ var require_fetch = __commonJS({
     function handleFetchDone(response) {
       finalizeAndReportTiming(response, "fetch");
     }
-    function fetch2(input, init = void 0) {
+    function fetch3(input, init = void 0) {
       webidl.argumentLengthCheck(arguments, 1, "globalThis.fetch");
       let p = createDeferredPromise();
       let requestObject;
@@ -18484,7 +18484,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch: fetch2,
+      fetch: fetch3,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -22944,7 +22944,7 @@ var require_undici = __commonJS({
     module2.exports.setGlobalDispatcher = setGlobalDispatcher;
     module2.exports.getGlobalDispatcher = getGlobalDispatcher;
     var fetchImpl = require_fetch().fetch;
-    module2.exports.fetch = async function fetch2(init, options = void 0) {
+    module2.exports.fetch = async function fetch3(init, options = void 0) {
       try {
         return await fetchImpl(init, options);
       } catch (err) {
@@ -36052,6 +36052,91 @@ var init_profile = __esm({
   }
 });
 
+// src/services/oauth-avatar.ts
+async function pictureUrlFor(identity) {
+  const token = identity.providerAccessToken;
+  if (!token) return null;
+  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  if (identity.provider === "google") {
+    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${token}` },
+      signal
+    });
+    if (!res.ok) return null;
+    const body2 = await res.json();
+    return body2.picture ?? null;
+  }
+  if (identity.provider === "notion") {
+    const res = await fetch("https://api.notion.com/v1/users/me", {
+      headers: { Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28" },
+      signal
+    });
+    if (!res.ok) return null;
+    const body2 = await res.json();
+    return body2.avatar_url ?? body2.bot?.owner?.user?.avatar_url ?? null;
+  }
+  return null;
+}
+async function download(url) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) return null;
+  const mime = (res.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
+  if (!ALLOWED.test(mime)) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!buf.length || buf.length > MAX_BYTES) return null;
+  return { bytes: buf, mime };
+}
+async function syncOAuthAvatar(user, profile) {
+  if (profile.avatarFileId) return profile.avatarFileId;
+  try {
+    const res = await getUsers().listIdentities({ queries: [Query.equal("userId", user.$id)] });
+    const identity = res.identities.find((i) => i.provider === "google" || i.provider === "notion");
+    if (!identity) return null;
+    const url = await pictureUrlFor(identity);
+    if (!url) return null;
+    const image = await download(url);
+    if (!image) return null;
+    const bucketId = getConfig().appwrite.avatarBucketId;
+    const fileId = ID.unique();
+    await getStorage().createFile({
+      bucketId,
+      fileId,
+      file: InputFile.fromBuffer(image.bytes, `avatar-${user.$id}.${EXT[image.mime] ?? "jpg"}`),
+      permissions: [Permission.read(Role.any()), Permission.delete(Role.user(user.$id))]
+    });
+    const fresh = await getRow(TABLES.profiles, user.$id);
+    if (fresh?.avatarFileId) {
+      await getStorage().deleteFile({ bucketId, fileId }).catch(() => void 0);
+      return fresh.avatarFileId;
+    }
+    await updateRow(TABLES.profiles, user.$id, { avatarFileId: fileId });
+    return fileId;
+  } catch {
+    return null;
+  }
+}
+var MAX_BYTES, ALLOWED, FETCH_TIMEOUT_MS, EXT;
+var init_oauth_avatar = __esm({
+  "src/services/oauth-avatar.ts"() {
+    "use strict";
+    init_dist();
+    init_inputFile();
+    init_config();
+    init_repo();
+    init_client2();
+    init_schema();
+    MAX_BYTES = 2 * 1024 * 1024;
+    ALLOWED = /^image\/(jpeg|png|webp|gif)$/;
+    FETCH_TIMEOUT_MS = 5e3;
+    EXT = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif"
+    };
+  }
+});
+
 // src/services/profiles.ts
 async function getOrCreateProfile(user) {
   const row = await getRow(TABLES.profiles, user.$id);
@@ -36075,7 +36160,8 @@ async function getOrCreateProfile(user) {
 }
 async function getMe(user) {
   const [profile, memberships, admin] = await Promise.all([getOrCreateProfile(user), listMemberships(user.$id), isAdminUser(user.$id)]);
-  return toMe(user, profile, memberships, admin);
+  const avatarFileId = await syncOAuthAvatar(user, profile);
+  return toMe(user, avatarFileId ? { ...profile, avatarFileId } : profile, memberships, admin);
 }
 async function updateMe2(user, patch) {
   const data = {};
@@ -36195,6 +36281,7 @@ var init_profiles = __esm({
     init_schema();
     init_errors2();
     init_profile();
+    init_oauth_avatar();
     init_roles();
     AGE_ORDER = ["under_16", "16_17", "18_plus"];
   }

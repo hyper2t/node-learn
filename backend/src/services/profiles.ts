@@ -7,6 +7,7 @@ import { isConflict, type ProfileRow, type RoleMembershipRow, type StudentProfil
 import { TABLES } from '../db/schema';
 import { conflict, notFound, validation } from '../errors';
 import { toMe, toStudentProfile, toTeacherProfile, type PersonRef } from '../mappers/profile';
+import { syncOAuthAvatar } from './oauth-avatar';
 import { listMemberships, markOnboarded } from './roles';
 
 export async function getOrCreateProfile(user: Models.User): Promise<ProfileRow> {
@@ -25,7 +26,10 @@ export async function getOrCreateProfile(user: Models.User): Promise<ProfileRow>
 
 export async function getMe(user: Models.User): Promise<Me> {
   const [profile, memberships, admin] = await Promise.all([getOrCreateProfile(user), listMemberships(user.$id), isAdminUser(user.$id)]);
-  return toMe(user, profile, memberships, admin);
+  // First load after a Google / Notion sign-in: adopt the provider picture.
+  // Best-effort and no-ops once an avatar exists, so this costs nothing later.
+  const avatarFileId = await syncOAuthAvatar(user, profile);
+  return toMe(user, avatarFileId ? { ...profile, avatarFileId } : profile, memberships, admin);
 }
 
 export async function updateMe(user: Models.User, patch: UpdateMeInput): Promise<Me> {
