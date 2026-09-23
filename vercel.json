@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/messages/:id", "destination": "/messages/[id].html" },
+    { "source": "/requests/:id", "destination": "/requests/[id].html" },
+    { "source": "/teachers/:userId", "destination": "/teachers/[userId].html" },
+    { "source": "/relations/:id", "destination": "/relations/[id].html" },
+    { "source": "/relations/:id/evidence", "destination": "/relations/[id]/evidence.html" },
+    { "source": "/relations/:id/evidence/new", "destination": "/relations/[id]/evidence/new.html" },
+    { "source": "/relations/:id/evidence/:evidenceId", "destination": "/relations/[id]/evidence/[evidenceId].html" }
+  ]
+}
