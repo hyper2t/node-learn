@@ -1,0 +1,167 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { STUDENT_JOURNEY, TOPICS } from '../data/site';
+
+const benefits = [
+  {
+    title: 'Someone reacts to your actual work',
+    body: 'Not a comment section, not a forum thread that goes cold. A teacher who agreed to work with you reads what you made and tells you what to change.',
+  },
+  {
+    title: 'You always know the next step',
+    body: 'Goals break into a small number of visible tasks. When you open the app there is one obvious thing to do — not a dashboard of competing prompts.',
+  },
+  {
+    title: 'Your record belongs to you',
+    body: 'Every submission and every round of feedback stays in the workspace, exportable as JSON whenever you want it. Leaving does not erase what you built.',
+  },
+  {
+    title: 'Nothing is engineered to keep you here',
+    body: 'No streak to protect, no notification designed to pull you back, no feed to scroll. You come back because the work matters, or you do not come back.',
+  },
+];
+---
+
+<Base
+  title="For students"
+  description="Describe a real goal, work with a teacher who responds to your actual submissions, and build an exportable record of what you can do."
+>
+  <Section
+    eyebrow="For students"
+    title="A teacher who responds to your actual work."
+    lede="You do not need another library of videos. You need someone who knows the subject to look at what you produced and tell you precisely what to fix."
+  >
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/get-started"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+      >
+        Get started free
+      </a>
+      <a
+        href="/how-it-works"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT border border-border-strong bg-surface px-6 text-body font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+      >
+        How it works
+      </a>
+    </div>
+  </Section>
+
+  <Section eyebrow="What you get" title="Four things worth showing up for.">
+    <div class="grid gap-4 sm:grid-cols-2">
+      {
+        benefits.map((b) => (
+          <Card class="border-l-4 border-l-student">
+            <h3 class="text-h3 font-semibold text-foreground">{b.title}</h3>
+            <p class="mt-2 text-small leading-6 text-foreground-secondary">{b.body}</p>
+          </Card>
+        ))
+      }
+    </div>
+  </Section>
+
+  <Section eyebrow="Your path" title="Six steps from goal to proof." narrow>
+    <ol class="relative space-y-4 border-l border-border pl-8">
+      {
+        STUDENT_JOURNEY.map((s) => (
+          <li class="relative">
+            <span
+              class="absolute -left-[41px] flex size-6 items-center justify-center rounded-full border border-border bg-surface font-mono text-[11px] font-semibold text-student"
+              aria-hidden="true"
+            >
+              {s.step}
+            </span>
+            <Card>
+              <h3 class="text-h3 font-semibold text-foreground">{s.title}</h3>
+              <p class="mt-2 text-small leading-6 text-foreground-secondary">{s.body}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section
+    eyebrow="Write a good goal"
+    title="The better your goal, the better your match."
+    lede="Teachers see your stated goal and context before they accept. A specific goal gets a specific reply."
+    narrow
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Card>
+        <p class="text-caption font-semibold uppercase tracking-wider text-foreground-tertiary">
+          Vague
+        </p>
+        <p class="mt-2 text-body leading-7 text-foreground-tertiary line-through decoration-border-strong">
+          "I want to get better at programming."
+        </p>
+      </Card>
+      <Card class="border-l-4 border-l-success">
+        <p class="text-caption font-semibold uppercase tracking-wider text-success">Specific</p>
+        <p class="mt-2 text-body leading-7 text-foreground">
+          "I can write scripts but my code falls apart past 200 lines. I want to be able to structure
+          a small Python project so someone else could read it."
+        </p>
+      </Card>
+    </div>
+  </Section>
+
+  <Section eyebrow="Subjects" title="Start anywhere you can describe.">
+    <ul class="flex flex-wrap gap-2">
+      {
+        TOPICS.map((t) => (
+          <li class="rounded-full border border-border bg-surface px-3.5 py-2 text-small text-foreground-secondary">
+            {t}
+          </li>
+        ))
+      }
+      <li class="rounded-full border border-dashed border-border-strong px-3.5 py-2 text-small text-foreground-tertiary">
+        + your own
+      </li>
+    </ul>
+  </Section>
+
+  <Section
+    eyebrow="Being safe here"
+    title="What you should know before you start."
+    narrow
+    class="pb-24"
+  >
+    <div class="space-y-4">
+      <Card class="border-l-4 border-l-warning">
+        <h3 class="text-h3 font-semibold text-foreground">Teachers are not vetted by us</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Profiles are self-described. We verify an email address — nothing more. Judge a teacher by
+          the work they show, how they answer your request, and the feedback other learners left.
+          Node Learn never certifies anyone.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Your profile is private by default</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Student profiles default to contacts-only. Your evidence, feedback and messages are visible
+          only to your teacher in that relation — plus a moderator if someone files a report.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">You control contact</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          People can only message you once you share a connection or a learning relation. You can
+          block or report anyone, and end a relation at any time.
+        </p>
+      </Card>
+    </div>
+
+    <div class="mt-8">
+      <a
+        href="/get-started"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+      >
+        Get started
+      </a>
+    </div>
+  </Section>
+</Base>
+

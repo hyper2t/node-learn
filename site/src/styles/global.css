@@ -1,0 +1,284 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — mirrored 1:1 from src/styles/tokens/palette.js in the app repo.
+ * Quiet, trustworthy, low-stimulation: one neutral scale + one restrained accent.
+ * Roles differ only by a subtle semantic tint (student blue / teacher teal).
+ *
+ * Structure matches the app's tailwind.config.js: Tailwind colour utilities point at
+ * CSS variables, and the variables are swapped under prefers-color-scheme.
+ * (@theme must stay top-level — Tailwind v4 does not support it inside @media.)
+ */
+
+:root {
+  /* Brand accent */
+  --nl-primary: #2f6fed;
+  --nl-primary-pressed: #255cc7;
+  --nl-primary-subtle: #eaf0fd;
+  --nl-on-primary: #ffffff;
+
+  /* Surfaces */
+  --nl-background: #f7f8fa;
+  --nl-surface: #ffffff;
+  --nl-surface-elevated: #ffffff;
+  --nl-element: #f0f1f4;
+  --nl-selected: #e2e5eb;
+  --nl-border: #e3e6ea;
+  --nl-border-strong: #c9ced6;
+  --nl-skeleton: #e9ecef;
+
+  /* Text */
+  --nl-foreground: #111418;
+  --nl-foreground-secondary: #5f6570;
+  --nl-foreground-tertiary: #8a9099;
+
+  /* Semantic status */
+  --nl-success: #1e8e3e;
+  --nl-success-subtle: #e6f4ea;
+  --nl-warning: #9a5b00;
+  --nl-warning-subtle: #fff4e0;
+  --nl-danger: #c62828;
+  --nl-danger-subtle: #fdecea;
+  --nl-info: #2f6fed;
+  --nl-info-subtle: #eaf0fd;
+
+  /* Role tints (subtle; never two different products) */
+  --nl-student: #2f6fed;
+  --nl-teacher: #0e8a7a;
+  --nl-focus-ring: #2f6fed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nl-primary: #7aa2f7;
+    --nl-primary-pressed: #5f8ae0;
+    --nl-primary-subtle: #16233d;
+    --nl-on-primary: #0b1220;
+
+    --nl-background: #0f1115;
+    --nl-surface: #181b21;
+    --nl-surface-elevated: #1f232b;
+    --nl-element: #212225;
+    --nl-selected: #2e3135;
+    --nl-border: #2a2f38;
+    --nl-border-strong: #3b4250;
+    --nl-skeleton: #242933;
+
+    --nl-foreground: #f2f4f7;
+    --nl-foreground-secondary: #b0b4ba;
+    --nl-foreground-tertiary: #7d848f;
+
+    --nl-success: #4cc26a;
+    --nl-success-subtle: #12301b;
+    --nl-warning: #f5b342;
+    --nl-warning-subtle: #3a2a0c;
+    --nl-danger: #f28b82;
+    --nl-danger-subtle: #3b1a18;
+    --nl-info: #7aa2f7;
+    --nl-info-subtle: #16233d;
+
+    --nl-student: #7aa2f7;
+    --nl-teacher: #4fbfae;
+    --nl-focus-ring: #7aa2f7;
+  }
+}
+
+@theme {
+  --color-primary: var(--nl-primary);
+  --color-primary-pressed: var(--nl-primary-pressed);
+  --color-primary-subtle: var(--nl-primary-subtle);
+  --color-on-primary: var(--nl-on-primary);
+
+  --color-background: var(--nl-background);
+  --color-surface: var(--nl-surface);
+  --color-surface-elevated: var(--nl-surface-elevated);
+  --color-element: var(--nl-element);
+  --color-selected: var(--nl-selected);
+  --color-border: var(--nl-border);
+  --color-border-strong: var(--nl-border-strong);
+  --color-skeleton: var(--nl-skeleton);
+
+  --color-foreground: var(--nl-foreground);
+  --color-foreground-secondary: var(--nl-foreground-secondary);
+  --color-foreground-tertiary: var(--nl-foreground-tertiary);
+
+  --color-success: var(--nl-success);
+  --color-success-subtle: var(--nl-success-subtle);
+  --color-warning: var(--nl-warning);
+  --color-warning-subtle: var(--nl-warning-subtle);
+  --color-danger: var(--nl-danger);
+  --color-danger-subtle: var(--nl-danger-subtle);
+  --color-info: var(--nl-info);
+  --color-info-subtle: var(--nl-info-subtle);
+
+  --color-student: var(--nl-student);
+  --color-teacher: var(--nl-teacher);
+  --color-focus-ring: var(--nl-focus-ring);
+
+  /* Type ramp — mirrors tailwind.config.js fontSize */
+  --text-display: 32px;
+  --text-display--line-height: 40px;
+  --text-display--font-weight: 700;
+  --text-h1: 24px;
+  --text-h1--line-height: 32px;
+  --text-h1--font-weight: 700;
+  --text-h2: 20px;
+  --text-h2--line-height: 28px;
+  --text-h2--font-weight: 600;
+  --text-h3: 17px;
+  --text-h3--line-height: 24px;
+  --text-h3--font-weight: 600;
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-small: 14px;
+  --text-small--line-height: 20px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 500;
+
+  /* Radii, spacing, widths — mirrors tailwind.config.js */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-DEFAULT: 10px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --spacing-touch: 44px;
+  --spacing-header: 56px;
+
+  --container-form: 440px;
+  --container-tablet: 960px;
+  --container-desktop: 1200px;
+
+  --shadow-card: 0 1px 2px rgba(11, 18, 32, 0.06), 0 2px 8px rgba(11, 18, 32, 0.04);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Anti-addiction principle #8: motion only expresses state change; respect the OS setting. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    background-color: var(--nl-background);
+    color: var(--nl-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* WCAG 2.2 AA: visible focus everywhere. */
+  :focus-visible {
+    outline: 2px solid var(--nl-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  ::selection {
+    background-color: var(--nl-primary-subtle);
+    color: var(--nl-foreground);
+  }
+}
+
+@layer components {
+  /* Skip link for keyboard users. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 1000;
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--nl-surface);
+    border: 1px solid var(--nl-border-strong);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Long-form legal / prose rendering. */
+  .prose-legal h2 {
+    font-size: var(--text-h2);
+    line-height: var(--text-h2--line-height);
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    scroll-margin-top: 6rem;
+  }
+  .prose-legal h3 {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3--line-height);
+    font-weight: 600;
+    margin-top: 1.75rem;
+    margin-bottom: 0.5rem;
+    scroll-margin-top: 6rem;
+  }
+  .prose-legal p {
+    margin-bottom: 1rem;
+    color: var(--nl-foreground-secondary);
+  }
+  .prose-legal ul,
+  .prose-legal ol {
+    margin-bottom: 1rem;
+    padding-left: 1.25rem;
+    color: var(--nl-foreground-secondary);
+  }
+  .prose-legal ul {
+    list-style: disc;
+  }
+  .prose-legal ol {
+    list-style: decimal;
+  }
+  .prose-legal li {
+    margin-bottom: 0.5rem;
+    padding-left: 0.25rem;
+  }
+  .prose-legal strong {
+    color: var(--nl-foreground);
+    font-weight: 600;
+  }
+  .prose-legal a {
+    color: var(--nl-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-legal blockquote {
+    margin: 1rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid var(--nl-border-strong);
+    color: var(--nl-foreground-secondary);
+  }
+  .prose-legal hr {
+    margin: 2rem 0;
+    border-color: var(--nl-border);
+  }
+  .prose-legal code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--nl-element);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-xs);
+  }
+}
+

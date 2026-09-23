@@ -1,0 +1,184 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { SITE } from '../data/site';
+
+const signIn = [
+  {
+    name: 'Email and password',
+    note: 'With email verification and password recovery.',
+  },
+  {
+    name: 'Continue with Google',
+    note: 'We receive your name and email. Nothing else.',
+  },
+  {
+    name: 'Continue with Notion',
+    note: 'Identity only — we never read your pages or databases.',
+  },
+];
+
+const steps = [
+  {
+    n: '1',
+    title: 'Confirm your age band',
+    body: 'Node Learn is for people 16 and over. We ask for a band — "16–17" or "18 or over" — and never store your birthday.',
+  },
+  {
+    n: '2',
+    title: 'Choose how you are starting',
+    body: 'Student, teacher, or both. One account holds both roles and you can switch or add the other role later.',
+  },
+  {
+    n: '3',
+    title: 'Write your goal or your profile',
+    body: 'Students describe what they want to be able to do. Teachers write a short profile covering experience, method and topics.',
+  },
+  {
+    n: '4',
+    title: 'Send or accept your first request',
+    body: 'Search for a teacher and send a request with context, or review the requests arriving in your workbench.',
+  },
+];
+---
+
+<Base
+  title="Get started"
+  description="Create a Node Learn account with email, Google or Notion. Free during early access, available on iOS, Android and the web."
+>
+  <Section
+    eyebrow="Get started"
+    title="Free during early access."
+    lede="No payment details, no plan to choose, no catalogue to browse first. Create an account, describe a goal, and start."
+    narrow
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Card class="border-l-4 border-l-student">
+        <p class="text-caption font-semibold uppercase tracking-wider text-student">Student</p>
+        <h2 class="mt-2 text-h2 font-semibold text-foreground">I want to learn something</h2>
+        <p class="mt-3 text-small leading-6 text-foreground-secondary">
+          Bring a goal you can describe. You will be matched with a teacher who reads your context
+          before replying.
+        </p>
+        <a
+          href={SITE.appUrl}
+          class="mt-6 inline-flex min-h-touch w-full items-center justify-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+        >
+          Sign up as a student
+        </a>
+      </Card>
+
+      <Card class="border-l-4 border-l-teacher">
+        <p class="text-caption font-semibold uppercase tracking-wider text-teacher">Teacher</p>
+        <h2 class="mt-2 text-h2 font-semibold text-foreground">I want to teach</h2>
+        <p class="mt-3 text-small leading-6 text-foreground-secondary">
+          Write a concise profile and take on learners whose goals you can genuinely help with.
+          Decline the rest, freely.
+        </p>
+        <a
+          href={SITE.appUrl}
+          class="mt-6 inline-flex min-h-touch w-full items-center justify-center rounded-DEFAULT bg-teacher px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:opacity-90"
+        >
+          Sign up as a teacher
+        </a>
+      </Card>
+    </div>
+
+    <p class="mt-4 text-caption text-foreground-tertiary">
+      Not sure which? Pick either — one account can hold both roles.
+    </p>
+  </Section>
+
+  <Section eyebrow="Sign-in options" title="Three equal ways in." narrow>
+    <div class="overflow-hidden rounded-lg border border-border bg-surface shadow-card">
+      {
+        signIn.map((s) => (
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5 last:border-0">
+            <span class="text-body font-semibold text-foreground">{s.name}</span>
+            <span class="text-small text-foreground-secondary">{s.note}</span>
+          </div>
+        ))
+      }
+    </div>
+    <p class="mt-4 text-small leading-6 text-foreground-secondary">
+      All three appear side by side with the same visual weight. Sign in with any of them and the
+      same email always resolves to one account — you will be prompted to link, never to create a
+      duplicate.
+    </p>
+  </Section>
+
+  <Section eyebrow="First few minutes" title="What happens after you sign up." narrow>
+    <ol class="space-y-4">
+      {
+        steps.map((s) => (
+          <li>
+            <Card>
+              <div class="flex items-start gap-4">
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-subtle font-mono text-small font-bold text-primary"
+                  aria-hidden="true"
+                >
+                  {s.n}
+                </span>
+                <div>
+                  <h3 class="text-h3 font-semibold text-foreground">{s.title}</h3>
+                  <p class="mt-1.5 text-small leading-6 text-foreground-secondary">{s.body}</p>
+                </div>
+              </div>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section eyebrow="Where to use it" title="Available on three platforms." narrow class="pb-24">
+    <div class="grid gap-4 sm:grid-cols-3">
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Web</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Works in any modern browser with a full desktop layout.
+        </p>
+        <a
+          href={SITE.appUrl}
+          class="mt-4 inline-flex items-center gap-1.5 rounded-sm text-small font-semibold text-primary hover:underline"
+        >
+          Open the web app <span aria-hidden="true">→</span>
+        </a>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">iOS</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Native app for iPhone and iPad.
+        </p>
+        <p class="mt-4 text-small font-semibold text-foreground-tertiary">
+          Coming with early access
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Android</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Native app for phones and tablets.
+        </p>
+        <p class="mt-4 text-small font-semibold text-foreground-tertiary">
+          Coming with early access
+        </p>
+      </Card>
+    </div>
+
+    <div class="mt-8 rounded-lg border border-border bg-element p-5">
+      <p class="text-small leading-6 text-foreground-secondary">
+        <strong class="font-semibold text-foreground">Before you sign up:</strong> teacher profiles are
+        self-described and not verified by us, there are no payments in the MVP, and you can export or
+        delete everything at any time. The
+        <a href="/legal/privacy" class="rounded-sm text-primary underline underline-offset-2"
+          >privacy notice</a
+        > and <a href="/legal/terms" class="rounded-sm text-primary underline underline-offset-2"
+          >terms</a
+        > are short and worth two minutes.
+      </p>
+    </div>
+  </Section>
+</Base>
+

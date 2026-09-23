@@ -1,0 +1,160 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { TEACHER_JOURNEY } from '../data/site';
+
+const benefits = [
+  {
+    title: 'Requests arrive with context',
+    body: 'You see the learner\u2019s stated goal and situation before you reply. No blind enquiries, no "hi are you available" with nothing attached.',
+  },
+  {
+    title: 'Declining costs you nothing',
+    body: 'There is no response-rate score, no acceptance ratio and no ranking penalty. Saying no to a poor fit is a normal action, not a mark against you.',
+  },
+  {
+    title: 'No content treadmill',
+    body: 'You are not required to record videos, publish lessons, post updates or maintain an audience. You teach the people you agreed to teach.',
+  },
+  {
+    title: 'A quiet workbench',
+    body: 'Active relations, pending reviews and who is waiting on you. No vanity metrics, no leaderboard, no engagement graph.',
+  },
+];
+
+const notes = [
+  {
+    title: 'No payments in the MVP',
+    body: 'Node Learn does not process money between members and takes no commission — because there is nothing to take a commission on yet. Any future model will be announced before it exists.',
+  },
+  {
+    title: 'Your profile is yours to state',
+    body: 'We do not verify qualifications, and we never display a badge implying we did. Credibility comes from a verified email, the work you choose to show, learner feedback and consistency over time.',
+  },
+  {
+    title: 'You can learn here too',
+    body: 'One account holds both roles. Switch between teaching and learning whenever you want — many of the best teachers are actively learning something else.',
+  },
+];
+---
+
+<Base
+  title="For teachers"
+  description="Teach one learner at a time with full context, no content treadmill, no ratings race and no algorithm to perform for."
+>
+  <Section
+    eyebrow="For teachers"
+    title="Teach without performing for an algorithm."
+    lede="No audience to grow, no lessons to package, no response-time score. You get a learner with a stated goal, a shared workspace, and the room to do the actual work."
+  >
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/get-started"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT bg-teacher px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:opacity-90"
+      >
+        Create a teaching profile
+      </a>
+      <a
+        href="/philosophy"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT border border-border-strong bg-surface px-6 text-body font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+      >
+        Read our principles
+      </a>
+    </div>
+  </Section>
+
+  <Section eyebrow="Why teach here" title="What we deliberately removed.">
+    <div class="grid gap-4 sm:grid-cols-2">
+      {
+        benefits.map((b) => (
+          <Card class="border-l-4 border-l-teacher">
+            <h3 class="text-h3 font-semibold text-foreground">{b.title}</h3>
+            <p class="mt-2 text-small leading-6 text-foreground-secondary">{b.body}</p>
+          </Card>
+        ))
+      }
+    </div>
+  </Section>
+
+  <Section eyebrow="Your path" title="Six steps from profile to follow-through." narrow>
+    <ol class="relative space-y-4 border-l border-border pl-8">
+      {
+        TEACHER_JOURNEY.map((s) => (
+          <li class="relative">
+            <span
+              class="absolute -left-[41px] flex size-6 items-center justify-center rounded-full border border-border bg-surface font-mono text-[11px] font-semibold text-teacher"
+              aria-hidden="true"
+            >
+              {s.step}
+            </span>
+            <Card>
+              <h3 class="text-h3 font-semibold text-foreground">{s.title}</h3>
+              <p class="mt-2 text-small leading-6 text-foreground-secondary">{s.body}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section
+    eyebrow="How trust works here"
+    title="Credibility is earned, never purchased."
+    lede="There is no badge to buy and no verification tier. What a learner sees is what you actually did."
+    narrow
+  >
+    <div class="grid gap-3 sm:grid-cols-2">
+      {
+        [
+          'A verified email address',
+          'Work and evidence you choose to show',
+          'Feedback from learners you worked with',
+          'Consistency over months, not spikes',
+        ].map((item) => (
+          <div class="flex items-start gap-3 rounded-lg border border-border bg-surface p-4">
+            <svg class="mt-0.5 size-5 shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="10" cy="10" r="8.25" class="stroke-teacher" stroke-width="1.4" />
+              <path
+                d="M6.25 10.25 L8.75 12.75 L13.75 7.5"
+                class="stroke-teacher"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="text-small leading-6 text-foreground-secondary">{item}</span>
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="mt-6 text-small leading-6 text-foreground-tertiary">
+      What you will not find: follower counts, star ratings averaged into a single number, paid
+      placement, or a black-box recommendation score.
+    </p>
+  </Section>
+
+  <Section eyebrow="Before you sign up" title="Three things to be clear about." narrow class="pb-24">
+    <div class="space-y-4">
+      {
+        notes.map((n) => (
+          <Card>
+            <h3 class="text-h3 font-semibold text-foreground">{n.title}</h3>
+            <p class="mt-2 text-small leading-6 text-foreground-secondary">{n.body}</p>
+          </Card>
+        ))
+      }
+    </div>
+
+    <div class="mt-8">
+      <a
+        href="/get-started"
+        class="inline-flex min-h-touch items-center rounded-DEFAULT bg-teacher px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:opacity-90"
+      >
+        Create a teaching profile
+      </a>
+    </div>
+  </Section>
+</Base>
+

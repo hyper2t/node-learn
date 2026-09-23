@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+import { NAV } from '../data/site';
+---
+
+<Base title="Page not found" description="That page does not exist.">
+  <section class="mx-auto flex max-w-desktop flex-col items-start px-5 py-24 sm:px-8 sm:py-32">
+    <p class="font-mono text-small font-semibold text-foreground-tertiary">404</p>
+    <h1 class="mt-3 text-[32px] font-bold leading-10 tracking-[-0.02em] text-foreground">
+      That page does not exist.
+    </h1>
+    <p class="mt-4 max-w-md text-body leading-7 text-foreground-secondary">
+      The link may be out of date. Here is everything else on the site.
+    </p>
+
+    <ul class="mt-8 flex flex-wrap gap-2">
+      <li>
+        <a
+          href="/"
+          class="inline-flex min-h-[40px] items-center rounded-DEFAULT bg-primary px-4 text-small font-semibold text-on-primary hover:bg-primary-pressed"
+          >Home</a
+        >
+      </li>
+      {
+        NAV.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class="inline-flex min-h-[40px] items-center rounded-DEFAULT border border-border-strong bg-surface px-4 text-small font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+            >
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Base>
+

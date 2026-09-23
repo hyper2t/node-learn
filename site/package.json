@@ -1,0 +1,21 @@
+{
+  "name": "node-learn-site",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node Learn marketing portal — static Astro site deployed to Appwrite Sites.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
+

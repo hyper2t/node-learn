@@ -1,0 +1,15 @@
+# Astro
+dist/
+.astro/
+
+# Dependencies
+node_modules/
+
+# Local
+.env
+.env.production
+.DS_Store
+
+# Verification artifacts
+shots/
+

@@ -1,0 +1,40 @@
+---
+import Base from '../../layouts/Base.astro';
+import Section from '../../components/Section.astro';
+import Card from '../../components/Card.astro';
+import { LEGAL_DOCS } from '../../data/legal';
+---
+
+<Base
+  title="Legal"
+  description="Node Learn's privacy notice and terms of use — written to be read, not to be skipped."
+>
+  <Section
+    eyebrow="Legal"
+    title="Written to be read."
+    lede="Both documents are short and in plain English. They are MVP drafts pending legal review, and we say so on each page rather than implying more certainty than we have."
+    narrow
+    class="pb-24"
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      {
+        LEGAL_DOCS.map((doc) => (
+          <Card>
+            <h2 class="text-h2 font-semibold text-foreground">{doc.title}</h2>
+            <p class="mt-1 text-caption text-foreground-tertiary">
+              Last updated <time datetime={doc.updated}>{doc.updated}</time>
+            </p>
+            <p class="mt-3 text-small leading-6 text-foreground-secondary">{doc.intro}</p>
+            <a
+              href={`/legal/${doc.slug}`}
+              class="mt-5 inline-flex items-center gap-1.5 rounded-sm text-small font-semibold text-primary hover:underline"
+            >
+              Read {doc.title.toLowerCase()} <span aria-hidden="true">→</span>
+            </a>
+          </Card>
+        ))
+      }
+    </div>
+  </Section>
+</Base>
+

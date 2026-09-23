@@ -1,0 +1,243 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import RelationDiagram from '../components/RelationDiagram.astro';
+import { PRINCIPLES, SITE, TOPICS } from '../data/site';
+
+const antiGoals = [
+  'No course catalogue',
+  'No infinite scroll',
+  'No streaks',
+  'No follower counts',
+  'No ads',
+  'No payments in MVP',
+];
+
+const pillars = PRINCIPLES.filter((p) =>
+  ['learning-relation', 'evidence', 'structural-change', 'anti-addiction'].includes(p.id),
+);
+---
+
+<Base title={SITE.tagline} suffix={false} description={SITE.description}>
+  <!-- Hero -->
+  <section class="mx-auto max-w-desktop px-5 pb-8 pt-16 sm:px-8 sm:pt-24">
+    <div class="grid items-start gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+      <div>
+        <p
+          class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-caption font-medium text-foreground-secondary"
+        >
+          <span class="inline-block size-1.5 rounded-full bg-success" aria-hidden="true"></span>
+          {SITE.status} · iOS, Android and web
+        </p>
+
+        <h1
+          class="mt-6 text-balance text-[38px] font-bold leading-[1.1] tracking-[-0.03em] text-foreground sm:text-[52px]"
+        >
+          Learning is a relationship, not a catalogue.
+        </h1>
+
+        <p class="mt-6 max-w-xl text-pretty text-[18px] leading-8 text-foreground-secondary">
+          Node Learn pairs you with a teacher around one real goal — then keeps the tasks, the work
+          you submit and the feedback you get in a single shared space you both can see.
+        </p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a
+            href="/get-started"
+            class="inline-flex min-h-touch items-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+          >
+            Get started
+          </a>
+          <a
+            href="/how-it-works"
+            class="inline-flex min-h-touch items-center rounded-DEFAULT border border-border-strong bg-surface px-6 text-body font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+          >
+            See how it works
+          </a>
+        </div>
+
+        <p class="mt-5 text-small text-foreground-tertiary">
+          Free during early access. No payment details required.
+        </p>
+      </div>
+
+      <Card class="lg:mt-2">
+        <p class="text-caption font-semibold uppercase tracking-wider text-foreground-tertiary">
+          What the product is built around
+        </p>
+        <RelationDiagram class="mt-4" />
+        <p class="mt-4 text-small leading-6 text-foreground-secondary">
+          Everything — matching, goals, tasks, messages, feedback and proof — hangs off one durable
+          <strong class="font-semibold text-foreground">learning relation</strong> instead of a pile of
+          disconnected sessions.
+        </p>
+      </Card>
+    </div>
+
+    <!-- Anti-goals strip -->
+    <ul class="mt-16 flex flex-wrap gap-x-6 gap-y-3 border-t border-border pt-6" aria-label="What Node Learn deliberately does not do">
+      {
+        antiGoals.map((item) => (
+          <li class="inline-flex items-center gap-2 text-small text-foreground-tertiary">
+            <svg class="size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6.5" class="stroke-border-strong" stroke-width="1.2" />
+              <path d="M5.2 10.8 L10.8 5.2" class="stroke-border-strong" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+            {item}
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <!-- The problem -->
+  <Section
+    eyebrow="The problem"
+    title="Most learning products optimise for the wrong thing."
+    lede="Catalogues sell access. Feeds sell attention. Neither one can tell you whether your understanding actually changed — or give you anything to show for it afterwards."
+  >
+    <div class="grid gap-4 sm:grid-cols-3">
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Access is not learning</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Buying a course records a transaction, not a capability. The hard part — someone who knows
+          the subject reacting to <em>your</em> specific work — is exactly what a catalogue cannot sell you.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Hours are not progress</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Watch time, check-in streaks and completion bars measure compliance. They say nothing about
+          whether you can explain the idea or apply it somewhere new.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Certificates are not evidence</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          A badge asserts a claim with nothing behind it. The work you produced, and the feedback that
+          shaped it, is the part worth keeping.
+        </p>
+      </Card>
+    </div>
+  </Section>
+
+  <!-- Pillars -->
+  <Section
+    eyebrow="How we're different"
+    title="Four commitments that shape every screen."
+    lede="These are not marketing lines — they are constraints we design against. The full set of ten is on the philosophy page."
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      {
+        pillars.map((p) => (
+          <Card>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <h3 class="text-h3 font-semibold text-foreground">{p.title}</h3>
+              <span class="w-fit shrink-0 rounded-full bg-element px-2.5 py-1 text-caption font-medium text-foreground-tertiary">
+                {p.antiGoal}
+              </span>
+            </div>
+            <p class="mt-2 text-body font-semibold leading-6 text-foreground">{p.claim}</p>
+            <p class="mt-2 text-small leading-6 text-foreground-secondary">{p.detail}</p>
+          </Card>
+        ))
+      }
+    </div>
+    <a
+      href="/philosophy"
+      class="mt-6 inline-flex items-center gap-1.5 rounded-sm text-small font-semibold text-primary hover:underline"
+    >
+      Read all ten principles
+      <span aria-hidden="true">→</span>
+    </a>
+  </Section>
+
+  <!-- Two audiences -->
+  <Section eyebrow="Two sides, one relationship" title="Built for both ends of the exchange.">
+    <div class="grid gap-4 md:grid-cols-2">
+      <Card class="border-l-4 border-l-student">
+        <p class="text-caption font-semibold uppercase tracking-wider text-student">For students</p>
+        <h3 class="mt-2 text-h2 font-semibold text-foreground">
+          Get a teacher who responds to your actual work.
+        </h3>
+        <p class="mt-3 text-small leading-6 text-foreground-secondary">
+          Describe a goal in your own words, connect with someone who can help, and build a record of
+          what you made and how it improved.
+        </p>
+        <a
+          href="/students"
+          class="mt-5 inline-flex items-center gap-1.5 rounded-sm text-small font-semibold text-primary hover:underline"
+        >
+          For students <span aria-hidden="true">→</span>
+        </a>
+      </Card>
+
+      <Card class="border-l-4 border-l-teacher">
+        <p class="text-caption font-semibold uppercase tracking-wider text-teacher">For teachers</p>
+        <h3 class="mt-2 text-h2 font-semibold text-foreground">
+          Teach without performing for an algorithm.
+        </h3>
+        <p class="mt-3 text-small leading-6 text-foreground-secondary">
+          Requests arrive with real context. Decline freely. No ratings race, no response-time score,
+          no obligation to produce content.
+        </p>
+        <a
+          href="/teachers"
+          class="mt-5 inline-flex items-center gap-1.5 rounded-sm text-small font-semibold text-teacher hover:underline"
+        >
+          For teachers <span aria-hidden="true">→</span>
+        </a>
+      </Card>
+    </div>
+  </Section>
+
+  <!-- Topics -->
+  <Section
+    eyebrow="Subjects"
+    title="Bring any goal you can describe."
+    lede="These are starting points, not a fixed catalogue. If you can explain what you want to be able to do, it belongs here."
+  >
+    <ul class="flex flex-wrap gap-2">
+      {
+        TOPICS.map((t) => (
+          <li class="rounded-full border border-border bg-surface px-3.5 py-2 text-small text-foreground-secondary">
+            {t}
+          </li>
+        ))
+      }
+      <li class="rounded-full border border-dashed border-border-strong px-3.5 py-2 text-small text-foreground-tertiary">
+        + your own
+      </li>
+    </ul>
+  </Section>
+
+  <!-- Closing CTA -->
+  <Section class="pb-24">
+    <div class="rounded-xl border border-border bg-surface p-8 text-center shadow-card sm:p-14">
+      <h2
+        class="mx-auto max-w-2xl text-balance text-[26px] font-bold leading-[1.25] tracking-[-0.02em] text-foreground sm:text-[32px]"
+      >
+        Start with one goal and one person who can help.
+      </h2>
+      <p class="mx-auto mt-4 max-w-xl text-pretty text-body leading-7 text-foreground-secondary">
+        No catalogue to browse, no plan to choose. Describe what you want to learn and go from there.
+      </p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a
+          href="/get-started"
+          class="inline-flex min-h-touch items-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+        >
+          Get started
+        </a>
+        <a
+          href="/faq"
+          class="inline-flex min-h-touch items-center rounded-DEFAULT border border-border-strong bg-surface px-6 text-body font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+        >
+          Read the FAQ
+        </a>
+      </div>
+    </div>
+  </Section>
+</Base>
+

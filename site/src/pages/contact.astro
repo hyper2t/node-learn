@@ -1,0 +1,101 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { SITE } from '../data/site';
+
+const channels = [
+  {
+    id: 'general',
+    label: 'General questions',
+    email: SITE.email.hello,
+    body: 'Product questions, feedback, or anything that does not fit the categories below.',
+  },
+  {
+    id: 'privacy',
+    label: 'Privacy and your data',
+    email: SITE.email.privacy,
+    body: 'Data access, correction or deletion requests. Most things you can do yourself in Settings — export and account deletion are both self-service.',
+  },
+  {
+    id: 'safety',
+    label: 'Safety and abuse',
+    email: SITE.email.safety,
+    body: 'Report harmful behaviour. If it is happening inside the app, use the in-app report action — it gives moderators the context they need.',
+  },
+  {
+    id: 'legal',
+    label: 'Legal',
+    email: SITE.email.legal,
+    body: 'Terms of use, lawful requests and anything requiring a formal response.',
+  },
+];
+---
+
+<Base
+  title="Contact"
+  description="How to reach Node Learn about product questions, privacy requests, safety reports or legal matters."
+>
+  <Section
+    eyebrow="Contact"
+    title="Reach a person, not a ticket queue."
+    lede="We are a small team. Pick the closest match below so your message gets to the right place quickly."
+    narrow
+  >
+    <div class="space-y-4">
+      {
+        channels.map((c) => (
+          <Card id={c.id} class="scroll-mt-24">
+            <h2 class="text-h3 font-semibold text-foreground">{c.label}</h2>
+            <p class="mt-2 text-small leading-6 text-foreground-secondary">{c.body}</p>
+            <a
+              href={`mailto:${c.email}`}
+              class="mt-4 inline-flex min-h-[40px] items-center rounded-DEFAULT border border-border-strong bg-surface px-4 font-mono text-small font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+            >
+              {c.email}
+            </a>
+          </Card>
+        ))
+      }
+    </div>
+  </Section>
+
+  <Section eyebrow="Faster than email" title="Things you can do yourself." narrow class="pb-24">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Export your data</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Settings → Export my data returns a JSON copy of everything linked to your account. No
+          request needed, no waiting period.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Delete your account</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Settings → Delete account. Your profile is anonymised immediately and the deletion schedule
+          in the privacy notice begins.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Block or report someone</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Available on any profile or conversation. Reporting in-app attaches the context moderators
+          need to act.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Unlink a sign-in method</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Settings → Linked accounts. You can remove Google or Notion as long as one working sign-in
+          method remains.
+        </p>
+      </Card>
+    </div>
+
+    <p class="mt-8 text-small leading-6 text-foreground-tertiary">
+      Node Learn is an early-access MVP and we do not yet offer 24/7 support. For anything urgent
+      involving someone's safety, contact your local emergency services first.
+    </p>
+  </Section>
+</Base>
+

@@ -1,0 +1,88 @@
+---
+import Base from '../../layouts/Base.astro';
+import { LEGAL_DOCS, renderMarkdown, tocOf } from '../../data/legal';
+
+export function getStaticPaths() {
+  return LEGAL_DOCS.map((doc) => ({ params: { slug: doc.slug }, props: { doc } }));
+}
+
+const { doc } = Astro.props;
+const toc = tocOf(doc.markdown);
+const body = renderMarkdown(doc.markdown);
+
+const updated = new Date(doc.updated).toLocaleDateString('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+---
+
+<Base title={doc.title} description={doc.intro}>
+  <div class="mx-auto max-w-desktop px-5 py-16 sm:px-8 sm:py-20">
+    <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <article class="min-w-0 max-w-2xl">
+        <p class="text-caption font-semibold uppercase tracking-wider text-primary">Legal</p>
+        <h1
+          class="mt-3 text-balance text-[32px] font-bold leading-10 tracking-[-0.02em] text-foreground"
+        >
+          {doc.title}
+        </h1>
+        <p class="mt-3 text-small text-foreground-tertiary">
+          Last updated <time datetime={doc.updated}>{updated}</time>
+        </p>
+
+        <p class="mt-6 text-pretty text-[17px] leading-7 text-foreground-secondary">{doc.intro}</p>
+
+        <div
+          class="mt-8 rounded-lg border-l-4 border-l-warning border-y border-r border-border bg-surface p-4"
+        >
+          <p class="text-small leading-6 text-foreground-secondary">
+            <strong class="font-semibold text-foreground">MVP draft.</strong> This text is written to be
+            readable and honest, and will be replaced after legal review. It is not legal advice.
+          </p>
+        </div>
+
+        <div class="prose-legal mt-10" set:html={body} />
+
+        <nav class="mt-14 flex flex-wrap gap-3 border-t border-border pt-6" aria-label="Other legal documents">
+          {
+            LEGAL_DOCS.filter((d) => d.slug !== doc.slug).map((d) => (
+              <a
+                href={`/legal/${d.slug}`}
+                class="inline-flex min-h-[40px] items-center rounded-DEFAULT border border-border-strong bg-surface px-4 text-small font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+              >
+                {d.title} →
+              </a>
+            ))
+          }
+        </nav>
+      </article>
+
+      <aside class="hidden lg:block">
+        <div class="sticky top-[calc(var(--spacing-header)+24px)]">
+          <h2 class="text-caption font-semibold uppercase tracking-wider text-foreground-tertiary">
+            On this page
+          </h2>
+          <ul class="mt-3 space-y-1.5 border-l border-border">
+            {
+              toc.map((t) => (
+                <li>
+                  <a
+                    href={`#${t.id}`}
+                    class:list={[
+                      'block border-l-2 border-transparent py-1 text-small text-foreground-secondary transition-colors duration-150 hover:border-l-primary hover:text-foreground',
+                      t.level === 3 ? 'pl-7' : 'pl-4',
+                    ]}
+                  >
+                    {t.text}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>
+

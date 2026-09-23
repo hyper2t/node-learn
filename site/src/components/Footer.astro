@@ -1,0 +1,64 @@
+---
+import { FOOTER_NAV, SITE } from '../data/site';
+import Logo from './Logo.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-24 border-t border-border bg-surface">
+  <div class="mx-auto max-w-desktop px-5 py-14 sm:px-8">
+    <div class="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+      <div class="max-w-xs">
+        <div class="flex items-center gap-2.5">
+          <Logo class="h-7 w-7" />
+          <span class="text-[17px] font-semibold tracking-[-0.01em] text-foreground"
+            >{SITE.name}</span
+          >
+        </div>
+        <p class="mt-3 text-small text-foreground-secondary">
+          {SITE.tagline}
+        </p>
+        <p class="mt-4 inline-flex items-center gap-1.5 text-caption text-foreground-tertiary">
+          <span class="inline-block size-1.5 rounded-full bg-success" aria-hidden="true"></span>
+          {SITE.status}
+        </p>
+      </div>
+
+      {
+        FOOTER_NAV.map((group) => (
+          <nav aria-label={group.title}>
+            <h2 class="text-caption font-semibold uppercase tracking-wider text-foreground-tertiary">
+              {group.title}
+            </h2>
+            <ul class="mt-3 space-y-2.5">
+              {group.links.map((link) => (
+                <li>
+                  <a
+                    href={link.href}
+                    class="rounded-sm text-small text-foreground-secondary transition-colors duration-150 hover:text-foreground"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))
+      }
+    </div>
+
+    <div
+      class="mt-12 flex flex-col gap-3 border-t border-border pt-6 text-caption text-foreground-tertiary sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p>© {year} {SITE.name}. Built for learners and the people who teach them.</p>
+      <p>
+        Questions? <a
+          href={`mailto:${SITE.email.hello}`}
+          class="rounded-sm text-foreground-secondary underline underline-offset-2 hover:text-foreground"
+          >{SITE.email.hello}</a
+        >
+      </p>
+    </div>
+  </div>
+</footer>
+

@@ -1,0 +1,97 @@
+---
+/**
+ * "UI is a projection of structure" — a quiet, inline SVG showing the
+ * goal → task → evidence → feedback → change chain around one LearningRelation.
+ * No external assets, no animation loops.
+ */
+interface Props {
+  class?: string;
+}
+const { class: className = '' } = Astro.props;
+
+const nodes = [
+  { label: 'Goal', x: 78 },
+  { label: 'Tasks', x: 218 },
+  { label: 'Evidence', x: 358 },
+  { label: 'Feedback', x: 498 },
+  { label: 'Change', x: 638 },
+];
+---
+
+<div class={className}>
+  <svg
+    viewBox="0 0 716 188"
+    class="w-full"
+    role="img"
+    aria-label="A learning relation links a goal to tasks, evidence, feedback and a recorded change."
+  >
+    <!-- relation container -->
+    <rect
+      x="16"
+      y="16"
+      width="684"
+      height="156"
+      rx="16"
+      class="fill-primary-subtle stroke-border"
+      stroke-width="1"></rect>
+    <text x="36" y="42" class="fill-primary" style="font-size:11px;font-weight:700;letter-spacing:0.08em">
+      LEARNING RELATION
+    </text>
+
+    <!-- connecting line -->
+    <path
+      d="M78 108 H638"
+      class="stroke-border-strong"
+      stroke-width="1.5"
+      stroke-dasharray="4 5"
+      opacity="0.7"></path>
+
+    {
+      nodes.map((n, i) => (
+        <g>
+          <circle
+            cx={n.x}
+            cy={108}
+            r={i === 0 || i === nodes.length - 1 ? 13 : 10}
+            class:list={[
+              i === nodes.length - 1 ? 'fill-teacher' : 'fill-primary',
+              i !== 0 && i !== nodes.length - 1 ? 'opacity-70' : '',
+            ]}
+          />
+          <circle cx={n.x} cy={108} r={20} class="fill-none stroke-border" stroke-width="1" />
+          <text
+            x={n.x}
+            y={152}
+            text-anchor="middle"
+            class="fill-foreground-secondary"
+            style="font-size:12px;font-weight:600"
+          >
+            {n.label}
+          </text>
+        </g>
+      ))
+    }
+
+    <!-- revision loop: feedback returns to evidence -->
+    <path
+      d="M498 88 C 498 62, 358 62, 358 88"
+      class="stroke-teacher"
+      stroke-width="1.5"
+      fill="none"
+      marker-end="url(#nl-arrow)"></path>
+    <text
+      x="428"
+      y="58"
+      text-anchor="middle"
+      class="fill-teacher"
+      style="font-size:11px;font-weight:600">revise</text
+    >
+
+    <defs>
+      <marker id="nl-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0 0 L8 4 L0 8 z" class="fill-teacher"></path>
+      </marker>
+    </defs>
+  </svg>
+</div>
+

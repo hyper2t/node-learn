@@ -1,0 +1,93 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { PRINCIPLES } from '../data/site';
+---
+
+<Base
+  title="Philosophy"
+  description="Ten first principles behind Node Learn: nodes before courses, learning as structural change, capability through evidence, and a deliberate refusal of attention-farming mechanics."
+>
+  <Section
+    eyebrow="Philosophy"
+    title="Ten principles we design against."
+    lede="These are constraints, not slogans. Each one rules out product decisions that would be easy, profitable or conventional — and each one is meant to be checkable against what actually ships."
+    narrow
+  >
+    <ol class="space-y-4">
+      {
+        PRINCIPLES.map((p, i) => (
+          <li>
+            <Card id={p.id} class="scroll-mt-24">
+              <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <div class="flex items-baseline gap-3">
+                  <span class="font-mono text-small font-semibold text-foreground-tertiary">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <h2 class="text-h2 font-semibold text-foreground">{p.title}</h2>
+                </div>
+                <span class="rounded-full bg-element px-2.5 py-1 text-caption font-medium text-foreground-tertiary">
+                  {p.antiGoal}
+                </span>
+              </div>
+              <p class="mt-3 text-[17px] font-semibold leading-7 text-foreground">{p.claim}</p>
+              <p class="mt-2 text-body leading-7 text-foreground-secondary">{p.detail}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section
+    eyebrow="Consequences"
+    title="What these principles cost us."
+    lede="Principles only mean something when they rule things out. Here is what we gave up."
+    narrow
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">No engagement growth loop</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Streaks, daily goals and push-to-return nudges reliably increase retention metrics. We do
+          not use them, so our numbers will look worse than products that do.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">No marketplace economics</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Taking a cut of lesson payments is the obvious business model for a product like this. The
+          MVP has no payments at all, which means no take rate and no transaction flywheel.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">No verification badge to sell</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          We could run identity checks and charge teachers for a trust badge. Instead profiles are
+          openly self-described, and we say so plainly wherever a profile appears.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">No viral invitation mechanics</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          No contact-book uploads, no "people you may know", no referral rewards. Discovery is
+          deliberately narrow: exact handles, invite links and genuine learning context.
+        </p>
+      </Card>
+    </div>
+  </Section>
+
+  <Section narrow class="pb-24">
+    <div class="rounded-lg border-l-4 border-l-primary border-y border-r border-border bg-surface p-6 shadow-card">
+      <h2 class="text-h3 font-semibold text-foreground">On AI</h2>
+      <p class="mt-2 text-body leading-7 text-foreground-secondary">
+        Node Learn ships no autonomous AI in the MVP. If we add assistance later it will summarise,
+        structure or explain — always showing its sources and its confidence, and always correctable
+        by you. A model will never be positioned as the authority on whether you have understood
+        something. That judgement belongs to you and your teacher.
+      </p>
+    </div>
+  </Section>
+</Base>
+

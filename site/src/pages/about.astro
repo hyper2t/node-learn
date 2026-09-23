@@ -1,0 +1,170 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import { SITE } from '../data/site';
+
+const shipped = [
+  'Sign up and sign in with email, Google or Notion',
+  'Age band gate and role selection',
+  'Student and teacher profiles',
+  'Teacher search and learning requests',
+  'Learning relations with goals and tasks',
+  'Evidence submission and feedback',
+  'Structured messaging inside a relation',
+  'Explainable progress and proof records',
+  'Data export and account deletion',
+  'Blocking and reporting',
+];
+
+const building = [
+  'Realtime message delivery (currently polled)',
+  'In-app uploads for avatars and evidence attachments',
+  'In-app notifications for requests and feedback',
+  'Offline and stale-data indicators',
+  'Moderation tooling for reports',
+];
+---
+
+<Base
+  title="About"
+  description="Node Learn is an early-access learning-relationship platform: what exists today, what is still being built, and the constraints we hold ourselves to."
+>
+  <Section
+    eyebrow="About"
+    title="A small product with a narrow, stubborn idea."
+    lede="Node Learn began as a simple observation: the scarce thing in learning is not information, and never has been. It is a knowledgeable person paying attention to your specific work."
+    narrow
+  >
+    <div class="space-y-5 text-body leading-7 text-foreground-secondary">
+      <p>
+        Almost every learning product answers a different question — how to distribute content more
+        cheaply, how to keep someone in an app longer, how to compress a subject into short videos.
+        Those are real engineering problems. They are not the problem that stops most people from
+        learning something hard.
+      </p>
+      <p>
+        What stops them is that nobody is going to look at what they made. You can read every article
+        about writing and still not know why your paragraphs do not land. You can finish a
+        programming course and still write code no one else can maintain. The gap closes when someone
+        who knows the subject reads your work and tells you precisely what to change.
+      </p>
+      <p>
+        So we built the smallest thing that makes that exchange durable: a shared space between one
+        learner and one teacher, holding the goal they agreed on, the tasks it broke into, the work
+        that was submitted and the feedback it received. We call it a
+        <strong class="font-semibold text-foreground">learning relation</strong>, and it is the only
+        object in the product that really matters.
+      </p>
+      <p>
+        Everything else follows from refusing to compromise that. No catalogue, because a catalogue
+        sells access rather than attention. No streaks, because we do not want you here out of habit.
+        No verification badges, because we have not verified anyone and would rather say so.
+      </p>
+    </div>
+  </Section>
+
+  <Section
+    eyebrow="Honest status"
+    title="What exists today."
+    lede="Node Learn is an early-access MVP. The core loop runs end to end; several things are visibly unfinished. Here is the real list."
+    narrow
+  >
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Card class="border-l-4 border-l-success">
+        <h3 class="text-h3 font-semibold text-foreground">Working now</h3>
+        <ul class="mt-3 space-y-2">
+          {
+            shipped.map((s) => (
+              <li class="flex items-start gap-2.5 text-small leading-6 text-foreground-secondary">
+                <svg class="mt-1 size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path
+                    d="M3.5 8.5 L6.5 11.5 L12.5 5"
+                    class="stroke-success"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>{s}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </Card>
+
+      <Card class="border-l-4 border-l-warning">
+        <h3 class="text-h3 font-semibold text-foreground">Still being built</h3>
+        <ul class="mt-3 space-y-2">
+          {
+            building.map((s) => (
+              <li class="flex items-start gap-2.5 text-small leading-6 text-foreground-secondary">
+                <svg class="mt-1 size-4 shrink-0" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6" class="stroke-warning" stroke-width="1.4" />
+                  <path d="M8 5v3.5l2 1.5" class="stroke-warning" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+                <span>{s}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </Card>
+    </div>
+
+    <p class="mt-6 text-small leading-6 text-foreground-tertiary">
+      We would rather list the gaps than let you discover them. If something below matters a lot to
+      you, say so — it moves up the list.
+    </p>
+  </Section>
+
+  <Section eyebrow="Where it runs" title="One codebase, three platforms." narrow>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">iOS &amp; Android</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          Native apps from a single Expo and React Native codebase, so both platforms get the same
+          features at the same time.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Web</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          The same application runs in the browser with a desktop layout — no reduced "mobile web"
+          version and no second product to maintain.
+        </p>
+      </Card>
+      <Card>
+        <h3 class="text-h3 font-semibold text-foreground">Accessibility</h3>
+        <p class="mt-2 text-small leading-6 text-foreground-secondary">
+          WCAG 2.2 AA is the design floor: 44px touch targets, visible focus, screen-reader labels,
+          Dynamic Type and reduced-motion support.
+        </p>
+      </Card>
+    </div>
+  </Section>
+
+  <Section narrow class="pb-24">
+    <div class="rounded-xl border border-border bg-surface p-8 shadow-card">
+      <h2 class="text-h2 font-semibold text-foreground">Tell us where we are wrong</h2>
+      <p class="mt-3 text-body leading-7 text-foreground-secondary">
+        The principles on this site are meant to be held to. If you find a place where the product
+        contradicts them, that is a bug worth reporting.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a
+          href="/contact"
+          class="inline-flex min-h-touch items-center rounded-DEFAULT bg-primary px-6 text-body font-semibold text-on-primary transition-colors duration-150 hover:bg-primary-pressed"
+        >
+          Contact us
+        </a>
+        <a
+          href={`mailto:${SITE.email.hello}`}
+          class="inline-flex min-h-touch items-center rounded-DEFAULT border border-border-strong bg-surface px-6 text-body font-semibold text-foreground transition-colors duration-150 hover:bg-element"
+        >
+          {SITE.email.hello}
+        </a>
+      </div>
+    </div>
+  </Section>
+</Base>
+

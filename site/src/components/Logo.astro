@@ -1,0 +1,32 @@
+---
+/**
+ * Node Learn mark: three connected nodes — the "nodes before courses" idea,
+ * drawn as a relation rather than a hierarchy. Inline SVG so it renders in
+ * sandboxed previews with no network access.
+ */
+interface Props {
+  class?: string;
+}
+const { class: className = 'h-7 w-7' } = Astro.props;
+---
+
+<svg
+  class={className}
+  viewBox="0 0 32 32"
+  fill="none"
+  role="img"
+  aria-hidden="true"
+  focusable="false"
+>
+  <path
+    d="M9 10.5 L23 8 M9 10.5 L17 23 M23 8 L17 23"
+    stroke="currentColor"
+    stroke-width="1.6"
+    stroke-linecap="round"
+    class="text-border-strong"
+    opacity="0.55"></path>
+  <circle cx="9" cy="10.5" r="4" class="fill-primary"></circle>
+  <circle cx="23" cy="8" r="2.75" class="fill-teacher"></circle>
+  <circle cx="17" cy="23" r="2.75" class="fill-primary" opacity="0.5"></circle>
+</svg>
+

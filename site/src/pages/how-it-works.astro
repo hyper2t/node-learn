@@ -1,0 +1,141 @@
+---
+import Base from '../layouts/Base.astro';
+import Section from '../components/Section.astro';
+import Card from '../components/Card.astro';
+import RelationDiagram from '../components/RelationDiagram.astro';
+import { STUDENT_JOURNEY, TEACHER_JOURNEY } from '../data/site';
+
+const concepts = [
+  {
+    term: 'Knowledge node',
+    def: 'A single idea or skill. The first-class object in the system. A "course" is only a temporary path between nodes.',
+  },
+  {
+    term: 'Learning relation',
+    def: 'The durable link between one learner and one teacher. It holds the goals, tasks, messages, evidence, feedback and proof for that pairing.',
+  },
+  {
+    term: 'Goal',
+    def: 'What the learner wants to be able to do, written in their own words and agreed by both sides.',
+  },
+  {
+    term: 'Task',
+    def: 'A concrete next step inside a goal. Kept few and visible so there is always one obvious thing to do.',
+  },
+  {
+    term: 'Evidence',
+    def: 'Actual work — a file, a write-up, a link. Feedback attaches to it, so revisions leave a visible history.',
+  },
+  {
+    term: 'Proof',
+    def: 'A short, explainable record of a change in capability. Every proof traces back to the evidence behind it. No mystery scores.',
+  },
+];
+---
+
+<Base
+  title="How it works"
+  description="From a stated goal to a recorded change in capability: how a Node Learn learning relation is established, run and evidenced."
+>
+  <Section
+    eyebrow="How it works"
+    title="One goal, one relationship, a visible chain of work."
+    lede="There is no catalogue step and no matching quiz. The loop below is the entire product — everything else exists to support it."
+  >
+    <Card>
+      <RelationDiagram />
+    </Card>
+  </Section>
+
+  <Section eyebrow="For the learner" title="The student loop" narrow>
+    <ol class="relative space-y-4 border-l border-border pl-8">
+      {
+        STUDENT_JOURNEY.map((s) => (
+          <li class="relative">
+            <span
+              class="absolute -left-[41px] flex size-6 items-center justify-center rounded-full border border-border bg-surface font-mono text-[11px] font-semibold text-student"
+              aria-hidden="true"
+            >
+              {s.step}
+            </span>
+            <Card>
+              <h3 class="text-h3 font-semibold text-foreground">{s.title}</h3>
+              <p class="mt-2 text-small leading-6 text-foreground-secondary">{s.body}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section eyebrow="For the teacher" title="The teacher loop" narrow>
+    <ol class="relative space-y-4 border-l border-border pl-8">
+      {
+        TEACHER_JOURNEY.map((s) => (
+          <li class="relative">
+            <span
+              class="absolute -left-[41px] flex size-6 items-center justify-center rounded-full border border-border bg-surface font-mono text-[11px] font-semibold text-teacher"
+              aria-hidden="true"
+            >
+              {s.step}
+            </span>
+            <Card>
+              <h3 class="text-h3 font-semibold text-foreground">{s.title}</h3>
+              <p class="mt-2 text-small leading-6 text-foreground-secondary">{s.body}</p>
+            </Card>
+          </li>
+        ))
+      }
+    </ol>
+  </Section>
+
+  <Section
+    eyebrow="Vocabulary"
+    title="Six words worth knowing."
+    lede="The product uses these terms precisely. They are the data model as much as the interface."
+  >
+    <dl class="grid gap-4 sm:grid-cols-2">
+      {
+        concepts.map((c) => (
+          <Card>
+            <dt class="text-h3 font-semibold text-foreground">{c.term}</dt>
+            <dd class="mt-2 text-small leading-6 text-foreground-secondary">{c.def}</dd>
+          </Card>
+        ))
+      }
+    </dl>
+  </Section>
+
+  <Section
+    eyebrow="Messaging"
+    title="Messages carry structure, not just text."
+    lede="Inside a relation, a message can be a goal proposal, a task, a submission, a piece of feedback or a milestone. That means the important moments stay findable instead of scrolling away."
+    narrow
+    class="pb-24"
+  >
+    <Card>
+      <ul class="space-y-3">
+        {
+          [
+            { kind: 'Goal', tint: 'bg-primary-subtle text-primary', text: 'Be able to explain recursion well enough to teach it.' },
+            { kind: 'Task', tint: 'bg-element text-foreground-secondary', text: 'Write a recursive tree walk and describe each call in plain English.' },
+            { kind: 'Evidence', tint: 'bg-element text-foreground-secondary', text: 'tree-walk.py + a 200-word explanation' },
+            { kind: 'Feedback', tint: 'bg-success-subtle text-success', text: 'The base case reasoning is solid. Your explanation skips why the stack unwinds — try again on that paragraph.' },
+            { kind: 'Change', tint: 'bg-primary-subtle text-teacher', text: 'Can explain recursion including stack unwinding — 2 evidence items, 1 revision.' },
+          ].map((m) => (
+            <li class="flex flex-wrap items-start gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
+              <span class:list={['shrink-0 rounded-full px-2.5 py-1 text-caption font-semibold', m.tint]}>
+                {m.kind}
+              </span>
+              <span class="flex-1 text-small leading-6 text-foreground-secondary">{m.text}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="mt-4 text-caption text-foreground-tertiary">
+        Illustrative example, not real user data.
+      </p>
+    </Card>
+  </Section>
+</Base>
+
