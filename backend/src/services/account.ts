@@ -1,7 +1,8 @@
 import { Query, type Models } from 'node-appwrite';
 import type { LinkedIdentity } from '../contracts/api';
+import { getConfig } from '../config';
 import { deleteRow, getRow, listRows, updateRow } from '../db/repo';
-import { getUsers } from '../db/client';
+import { getStorage, getUsers } from '../db/client';
 import type { ProfileRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict } from '../errors';
@@ -42,14 +43,22 @@ export async function exportData(userId: string): Promise<Record<string, unknown
   return { exportedAt: new Date().toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, feedback, messagesSent: messages, contacts, blocks };
 }
 
+async function deleteAvatarFile(fileId: string | null | undefined): Promise<void> {
+  if (!fileId) return;
+  const bucketId = getConfig().appwrite.avatarBucketId;
+  await getStorage().deleteFile({ bucketId, fileId }).catch(() => undefined);
+}
+
 /**
- * Account deletion = anonymise shared records (evidence/feedback/messages stay for the counterpart's proof but lose PII),
- * remove private rows, then delete the Appwrite user. Legal retention rules are a pending review item.
+ * Account deletion = anonymise the profile, remove private rows, delete avatar/user immediately, and
+ * leave messages/evidence upload intents for the scheduled retention job to purge within 30 days.
  */
 export async function deleteAccount(user: Models.User, requestId?: string): Promise<void> {
   const userId = user.$id;
+  const profile = await getRow<ProfileRow>(TABLES.profiles, userId);
   await updateRow(TABLES.profiles, userId, { displayName: 'Former member', handle: null, avatarFileId: null, email: `deleted+${userId}@invalid`, status: 'deleted' });
-  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.uploadIntents, TABLES.notifications] as const) {
+  await deleteAvatarFile(profile?.avatarFileId);
+  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.notifications] as const) {
     const rows = await listRows(t, [Query.equal(t === TABLES.blocks ? 'blockerId' : 'userId', userId), Query.limit(500)]);
     await Promise.all(rows.map((r) => deleteRow(t, r.$id)));
   }

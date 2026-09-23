@@ -11,7 +11,7 @@ export type LegalDoc = { title: string; updated: string; intro?: string; markdow
 
 export const PRIVACY: LegalDoc = {
   title: 'Privacy notice',
-  updated: '2026-09-22',
+  updated: '2026-09-23',
   intro: 'Node Learn connects learners with teachers and keeps a record of the work you do together. This notice explains what we store, why, and how to get it back or delete it.',
   markdown: `
 ## What we collect
@@ -41,7 +41,7 @@ Data is stored with Appwrite Cloud (region: US West). Uploads are stored in priv
 ## How long we keep it
 
 - **Active account:** for as long as the account exists.
-- **Deleted account:** profile and messages are removed within 30 days; evidence files within 30 days; aggregated proof records are anonymised and kept.
+- **Deleted account:** profile is anonymised immediately; messages and evidence files are removed within 30 days; aggregated proof records are anonymised and kept.
 - **Reports and audit records:** 12 months after resolution, for safety and dispute handling.
 - **Server logs:** 30 days.
 

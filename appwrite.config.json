@@ -112,6 +112,106 @@
           "value": "info"
         }
       ]
+    },
+    {
+      "$id": "node-learn-purge-deleted",
+      "name": "Node Learn Retention Purge",
+      "runtime": "node-22",
+      "path": "functions/node-learn-purge-deleted",
+      "entrypoint": "src/main.js",
+      "execute": [],
+      "enabled": true,
+      "logging": true,
+      "events": [],
+      "schedule": "0 3 * * *",
+      "timeout": 120,
+      "commands": "",
+      "scopes": [
+        "databases.read",
+        "tables.read",
+        "tables.write",
+        "rows.read",
+        "rows.write",
+        "collections.read",
+        "documents.read",
+        "documents.write",
+        "buckets.read",
+        "files.read",
+        "files.write"
+      ],
+      "specification": "s-0.5vcpu-512mb",
+      "vars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "APPWRITE_ENDPOINT",
+          "value": "https://sfo.cloud.appwrite.io/v1"
+        },
+        {
+          "key": "APPWRITE_PROJECT_ID",
+          "value": "6ab149e4001d09a18de3"
+        },
+        {
+          "key": "APPWRITE_DATABASE_ID",
+          "value": "main"
+        },
+        {
+          "key": "APPWRITE_EVIDENCE_BUCKET_ID",
+          "value": "evidence"
+        },
+        {
+          "key": "APPWRITE_AVATAR_BUCKET_ID",
+          "value": "avatars"
+        },
+        {
+          "key": "LOG_LEVEL",
+          "value": "info"
+        }
+      ]
+    },
+    {
+      "$id": "node-learn-healthcheck",
+      "name": "Node Learn Healthcheck",
+      "runtime": "node-22",
+      "path": "functions/node-learn-healthcheck",
+      "entrypoint": "src/main.js",
+      "execute": [],
+      "enabled": true,
+      "logging": true,
+      "events": [],
+      "schedule": "*/10 * * * *",
+      "timeout": 30,
+      "commands": "",
+      "scopes": [],
+      "specification": "s-0.5vcpu-512mb",
+      "vars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "LOG_LEVEL",
+          "value": "info"
+        },
+        {
+          "key": "HEALTHCHECK_NAME",
+          "value": "Node Learn API"
+        },
+        {
+          "key": "HEALTHCHECK_URL",
+          "value": "https://6ab25202000c575857b2.appwrite.network/readyz"
+        },
+        {
+          "key": "HEALTHCHECK_TIMEOUT_MS",
+          "value": "7000"
+        },
+        {
+          "key": "ALERT_WEBHOOK_URL",
+          "value": "__SET_IN_APPWRITE_CONSOLE__"
+        }
+      ]
     }
   ],
   "tablesDB": [
@@ -222,6 +322,15 @@
           "type": "key",
           "columns": [
             "email"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_status_updated",
+          "type": "key",
+          "columns": [
+            "status",
+            "updatedAt"
           ],
           "orders": []
         }
@@ -998,6 +1107,15 @@
             "taskId"
           ],
           "orders": []
+        },
+        {
+          "key": "ix_author_submitted",
+          "type": "key",
+          "columns": [
+            "authorId",
+            "submittedAt"
+          ],
+          "orders": []
         }
       ]
     },
@@ -1404,6 +1522,15 @@
             "createdAt"
           ],
           "orders": []
+        },
+        {
+          "key": "ix_sender_created",
+          "type": "key",
+          "columns": [
+            "senderId",
+            "createdAt"
+          ],
+          "orders": []
         }
       ]
     },
@@ -1729,6 +1856,15 @@
             "createdAt"
           ],
           "orders": []
+        },
+        {
+          "key": "ix_status_resolved",
+          "type": "key",
+          "columns": [
+            "status",
+            "resolvedAt"
+          ],
+          "orders": []
         }
       ]
     },
@@ -1800,6 +1936,14 @@
           "type": "key",
           "columns": [
             "userId",
+            "createdAt"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_created",
+          "type": "key",
+          "columns": [
             "createdAt"
           ],
           "orders": []
@@ -1984,6 +2128,14 @@
             "createdAt"
           ],
           "orders": []
+        },
+        {
+          "key": "ix_created",
+          "type": "key",
+          "columns": [
+            "createdAt"
+          ],
+          "orders": []
         }
       ]
     },
@@ -2085,6 +2237,15 @@
           "columns": [
             "userId",
             "createdAt"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_status_expires",
+          "type": "key",
+          "columns": [
+            "status",
+            "expiresAt"
           ],
           "orders": []
         }
@@ -2204,6 +2365,14 @@
           "type": "unique",
           "columns": [
             "dedupeKey"
+          ],
+          "orders": []
+        },
+        {
+          "key": "ix_created",
+          "type": "key",
+          "columns": [
+            "createdAt"
           ],
           "orders": []
         }

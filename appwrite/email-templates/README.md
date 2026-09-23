@@ -4,9 +4,16 @@ Source of truth for the branded `verification` and `recovery` emails, locale `en
 `{{user}}`, `{{project}}`, `{{redirect}}`, `{{b}}…{{/b}}` are Appwrite placeholders; `{{redirect}}`
 is the URL the app passes to `account.createVerification` / `account.createRecovery`
 (`EXPO_PUBLIC_WEB_URL/auth/verify` and `/auth/reset`).
+Verification links are valid for 7 days; recovery links are valid for 1 hour.
 
 Use single quotes for HTML attributes: the CLI is invoked from Windows PowerShell and double quotes
-inside the `--message` argument get mangled. Push after editing (subjects live in `../push-email-templates.ps1`):
+inside the `--message` argument get mangled. Validate locally after editing (no cloud login required):
+
+```bash
+npm run appwrite:email-templates:check
+```
+
+Push after editing (subjects live in `../push-email-templates.ps1`):
 
 ```powershell
 npm run appwrite:email-templates
@@ -21,5 +28,6 @@ appwrite project update-smtp --enabled true --sender-name "Node Learn" --sender-
   --host <smtp-host> --port 465 --username <user> --password <secret> --secure tls
 appwrite project create-smtp-test --emails you@example.com --sender-name "Node Learn" --sender-email noreply@<domain> `
   --host <smtp-host> --port 465 --username <user> --password <secret> --secure tls
+npm run appwrite:email-templates:check
 npm run appwrite:email-templates
 ```

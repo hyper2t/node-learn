@@ -33,6 +33,8 @@ jobs:
         run: |
           npm run api:typecheck
           npm run api:test
+      - name: Appwrite Function bundles build
+        run: npm --prefix backend run build:function
       - name: Web bundle builds
         run: npx expo export --platform web
         env:

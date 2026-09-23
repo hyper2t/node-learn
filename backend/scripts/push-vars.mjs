@@ -21,11 +21,14 @@ const argValue = (flag, fallback) => {
 const functionId = argValue('--function-id', 'node-learn-api');
 const dryRun = args.has('--dry-run');
 const keepExtra = args.has('--keep-extra');
+const MANUAL_SECRET = '__SET_IN_APPWRITE_CONSOLE__';
 
 const config = JSON.parse(readFileSync(resolve(repoRoot, 'appwrite.config.json'), 'utf8'));
 const fn = (config.functions ?? []).find((f) => f.$id === functionId);
 if (!fn) throw new Error(`function ${functionId} not found in appwrite.config.json`);
-const desired = new Map((fn.vars ?? []).map((v) => [v.key, String(v.value ?? '')]));
+const declared = fn.vars ?? [];
+const manual = new Set(declared.filter((v) => String(v.value ?? '') === MANUAL_SECRET).map((v) => v.key));
+const desired = new Map(declared.filter((v) => !manual.has(v.key)).map((v) => [v.key, String(v.value ?? '')]));
 
 function appwrite(...cliArgs) {
   // shell:true so the Windows `appwrite.cmd`/`appwrite.ps1` shim resolves; JSON goes to stdout.
@@ -51,8 +54,13 @@ for (const [key, value] of desired) {
     if (!dryRun) appwrite('functions', 'update-variable', '--function-id', functionId, '--variable-id', cur.$id, '--key', key, '--value', value);
   }
 }
+for (const key of manual) {
+  if (existing.has(key)) console.log(`  keep   ${key} (managed manually in Appwrite Console/CI secret store)`);
+  else console.warn(`! manual ${key} is declared but not present in Appwrite; create it with the real secret before relying on this Function.`);
+}
 for (const [key, cur] of existing) {
   if (desired.has(key)) continue;
+  if (manual.has(key)) continue;
   if (keepExtra) { console.log(`  keep   ${key} (not in config)`); continue; }
   console.log(`- delete ${key} (not in config)`);
   deleted++;
@@ -60,9 +68,9 @@ for (const [key, cur] of existing) {
 }
 
 const after = dryRun ? remote : appwrite('functions', 'list-variables', '--function-id', functionId);
-console.log(`${dryRun ? '[dry-run] ' : ''}created=${created} updated=${updated} deleted=${deleted} → cloud total=${after.total ?? '?'} (config=${desired.size})`);
-if (!dryRun && (after.total ?? 0) !== desired.size) {
+console.log(`${dryRun ? '[dry-run] ' : ''}created=${created} updated=${updated} deleted=${deleted} → cloud total=${after.total ?? '?'} (managed=${desired.size}, manual=${manual.size})`);
+if (!dryRun && manual.size === 0 && (after.total ?? 0) !== desired.size) {
   console.error(`✗ variable count mismatch: cloud=${after.total} config=${desired.size}`);
   process.exit(1);
 }
-console.log('Note: variables apply to NEW deployments only — run `npm run deploy:api` (or `appwrite push function`) afterwards.');
+console.log('Note: variables apply to NEW deployments only — run `npm run deploy:api`, `npm run deploy:purge`, `npm run deploy:healthcheck`, or `appwrite push function` afterwards.');

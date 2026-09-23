@@ -78,8 +78,12 @@
     "api:push-vars": "npm --prefix backend run push-vars",
     "api:verify-deploy": "npm --prefix backend run verify:deploy",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run api:typecheck && npm run api:test",
+    "appwrite:email-templates:check": "node scripts/check-email-templates.mjs",
+    "check": "npm run typecheck && npm run lint && npm run appwrite:email-templates:check && npm run test && npm run api:typecheck && npm run api:test",
     "deploy:api": "npm --prefix backend run deploy:function",
+    "deploy:purge": "npm --prefix backend run deploy:purge",
+    "deploy:healthcheck": "npm --prefix backend run deploy:healthcheck",
+    "deploy:functions": "npm --prefix backend run deploy:functions",
     "appwrite:email-templates": "powershell -NoProfile -ExecutionPolicy Bypass -File appwrite/push-email-templates.ps1"
   },
   "private": true

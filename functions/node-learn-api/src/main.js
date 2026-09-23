@@ -36747,7 +36747,13 @@ async function completeIntent(userId, fileId) {
   }
   await storage2.updateFile({ bucketId: intent.bucketId, fileId, permissions: [...readers, Permission.delete(Role.user(userId))] });
   await updateRow(TABLES.uploadIntents, fileId, { status: "complete" });
-  if (intent.purpose === "avatar") await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
+  if (intent.purpose === "avatar") {
+    const profile = await getRow(TABLES.profiles, userId);
+    await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
+    if (profile?.avatarFileId && profile.avatarFileId !== fileId) {
+      await storage2.deleteFile({ bucketId: getConfig().appwrite.avatarBucketId, fileId: profile.avatarFileId }).catch(() => void 0);
+    }
+  }
   return { fileId, bucketId: intent.bucketId };
 }
 async function assertEvidenceAttachments(userId, relationId, fileIds) {
@@ -39923,6 +39929,7 @@ init_errors2();
 
 // src/services/account.ts
 init_dist();
+init_config();
 init_repo();
 init_client2();
 init_schema();
@@ -39962,10 +39969,17 @@ async function exportData(userId) {
   const messages = await by(TABLES.messages, "senderId");
   return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, feedback, messagesSent: messages, contacts, blocks };
 }
+async function deleteAvatarFile(fileId) {
+  if (!fileId) return;
+  const bucketId = getConfig().appwrite.avatarBucketId;
+  await getStorage().deleteFile({ bucketId, fileId }).catch(() => void 0);
+}
 async function deleteAccount(user, requestId2) {
   const userId = user.$id;
+  const profile = await getRow(TABLES.profiles, userId);
   await updateRow(TABLES.profiles, userId, { displayName: "Former member", handle: null, avatarFileId: null, email: `deleted+${userId}@invalid`, status: "deleted" });
-  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.uploadIntents, TABLES.notifications]) {
+  await deleteAvatarFile(profile?.avatarFileId);
+  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.notifications]) {
     const rows = await listRows(t, [Query.equal(t === TABLES.blocks ? "blockerId" : "userId", userId), Query.limit(500)]);
     await Promise.all(rows.map((r) => deleteRow(t, r.$id)));
   }

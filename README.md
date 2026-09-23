@@ -52,9 +52,10 @@ CI (`.github/workflows/ci.yml`) runs the same gates plus `expo export --platform
 
 ## Deploying
 
-- **API** → `npm run deploy:api` (esbuild → `appwrite push function` → `verify-deploy` asserts variables, `/readyz` and CORS). Runbook: `docs/runbooks/deploy-api.md`. Current Function domain: `https://6ab25202000c575857b2.appwrite.network`.
+- **Functions** → `npm run deploy:functions` (esbuild → push vars → push API + retention purge + healthcheck → verify API). API-only: `npm run deploy:api`; retention-only: `npm run deploy:purge`; healthcheck-only: `npm run deploy:healthcheck`. Runbook: `docs/runbooks/deploy-api.md`. Current API Function domain: `https://6ab25202000c575857b2.appwrite.network`.
 - **Project settings / tables / buckets** → `appwrite push settings`, `npm run api:tables`. `npm run api:typecheck` fails if `db/schema.ts` and `appwrite.config.json` disagree.
 - **Function variables** → `npm run api:push-vars` (the CLI's `push --with-variables` is a no-op in 27.x).
+- **Auth email templates** → `npm run appwrite:email-templates:check` locally, then `npm run appwrite:email-templates` after custom SMTP is enabled.
 - **Mobile** → `eas build --profile preview|production` (`eas.json`). **Web** → `npm run export:web`.
 
 ## Environment variables

@@ -3,7 +3,7 @@ import type { Attachment } from '../contracts/api';
 import type { UploadIntent, UploadPurpose } from '../contracts/api';
 import { getConfig } from '../config';
 import { createRow, getRow, listRows, updateRow } from '../db/repo';
-import type { UploadIntentRow } from '../db/rows';
+import type { ProfileRow, UploadIntentRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { getAdminClient, getStorage } from '../db/client';
 import { conflict, forbidden, notFound, validation } from '../errors';
@@ -58,7 +58,13 @@ export async function completeIntent(userId: string, fileId: string): Promise<{ 
   }
   await storage.updateFile({ bucketId: intent.bucketId, fileId, permissions: [...readers, Permission.delete(Role.user(userId))] });
   await updateRow(TABLES.uploadIntents, fileId, { status: 'complete' });
-  if (intent.purpose === 'avatar') await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
+  if (intent.purpose === 'avatar') {
+    const profile = await getRow<ProfileRow>(TABLES.profiles, userId);
+    await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
+    if (profile?.avatarFileId && profile.avatarFileId !== fileId) {
+      await storage.deleteFile({ bucketId: getConfig().appwrite.avatarBucketId, fileId: profile.avatarFileId }).catch(() => undefined);
+    }
+  }
   return { fileId, bucketId: intent.bucketId };
 }
 
