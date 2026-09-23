@@ -56,7 +56,7 @@ CI (`.github/workflows/ci.yml`) runs the same gates plus `expo export --platform
 - **Project settings / tables / buckets** → `appwrite push settings`, `npm run api:tables`. `npm run api:typecheck` fails if `db/schema.ts` and `appwrite.config.json` disagree.
 - **Function variables** → `npm run api:push-vars` (the CLI's `push --with-variables` is a no-op in 27.x).
 - **Auth email templates** → `npm run appwrite:email-templates:check` locally, then `npm run appwrite:email-templates` after custom SMTP is enabled.
-- **Mobile** → `eas build --profile preview|production` (`eas.json`). **Web** → `npm run export:web`.
+- **Mobile** → `eas build --profile preview|production` (`eas.json`). **Web** → `npm run build:web` (static bundle in `dist/`, served by any static host; `npm run export:web` is the same export without the clean bundler cache).
 
 ## Environment variables
 
