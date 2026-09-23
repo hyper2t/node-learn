@@ -1,2427 +1,2452 @@
 {
-  "projectId": "6ab149e4001d09a18de3",
-  "projectName": "Node Learn",
-  "endpoint": "https://sfo.cloud.appwrite.io/v1",
-  "settings": {
-    "services": {
-      "account": true,
-      "avatars": true,
-      "databases": true,
-      "locale": true,
-      "health": true,
-      "storage": true,
-      "teams": true,
-      "users": true,
-      "functions": true,
-      "sites": true,
-      "graphql": true,
-      "messaging": true
+    "projectId": "6ab149e4001d09a18de3",
+    "projectName": "Node Learn",
+    "endpoint": "https://sfo.cloud.appwrite.io/v1",
+    "settings": {
+        "services": {
+            "account": true,
+            "avatars": true,
+            "databases": true,
+            "locale": true,
+            "health": true,
+            "storage": true,
+            "teams": true,
+            "users": true,
+            "functions": true,
+            "sites": true,
+            "graphql": true,
+            "messaging": true
+        },
+        "auth": {
+            "methods": {
+                "jwt": true,
+                "email-password": true,
+                "invites": false,
+                "anonymous": false,
+                "email-otp": false,
+                "magic-url": false,
+                "phone": false
+            },
+            "security": {
+                "duration": 31536000,
+                "sessionsLimit": 10,
+                "passwordDictionary": true,
+                "personalDataCheck": true
+            }
+        }
     },
-    "auth": {
-      "methods": {
-        "jwt": true,
-        "email-password": true,
-        "invites": false,
-        "anonymous": false,
-        "email-otp": false,
-        "magic-url": false,
-        "phone": false
-      },
-      "security": {
-        "duration": 31536000,
-        "sessionsLimit": 10,
-        "passwordDictionary": true,
-        "personalDataCheck": true
-      }
-    }
-  },
-  "functions": [
-    {
-      "$id": "node-learn-api",
-      "name": "Node Learn API",
-      "runtime": "node-22",
-      "path": "functions/node-learn-api",
-      "entrypoint": "src/main.js",
-      "execute": [
-        "any"
-      ],
-      "enabled": true,
-      "logging": true,
-      "events": [],
-      "schedule": "",
-      "timeout": 30,
-      "commands": "",
-      "scopes": [
-        "users.read",
-        "users.write",
-        "teams.read",
-        "databases.read",
-        "tables.read",
-        "tables.write",
-        "rows.read",
-        "rows.write",
-        "collections.read",
-        "documents.read",
-        "documents.write",
-        "buckets.read",
-        "files.read",
-        "files.write",
-        "tokens.read",
-        "tokens.write"
-      ],
-      "specification": "s-0.5vcpu-512mb",
-      "vars": [
+    "functions": [
         {
-          "key": "NODE_ENV",
-          "value": "production"
+            "$id": "node-learn-api",
+            "name": "Node Learn API",
+            "runtime": "node-22",
+            "path": "functions/node-learn-api",
+            "entrypoint": "src/main.js",
+            "execute": [
+                "any"
+            ],
+            "enabled": true,
+            "logging": true,
+            "events": [],
+            "schedule": "",
+            "timeout": 30,
+            "commands": "",
+            "scopes": [
+                "users.read",
+                "users.write",
+                "teams.read",
+                "databases.read",
+                "tables.read",
+                "tables.write",
+                "rows.read",
+                "rows.write",
+                "collections.read",
+                "documents.read",
+                "documents.write",
+                "buckets.read",
+                "files.read",
+                "files.write",
+                "tokens.read",
+                "tokens.write"
+            ],
+            "specification": "s-0.5vcpu-512mb",
+            "vars": [
+                {
+                    "key": "NODE_ENV",
+                    "value": "production"
+                },
+                {
+                    "key": "APPWRITE_ENDPOINT",
+                    "value": "https://sfo.cloud.appwrite.io/v1"
+                },
+                {
+                    "key": "APPWRITE_PROJECT_ID",
+                    "value": "6ab149e4001d09a18de3"
+                },
+                {
+                    "key": "APPWRITE_DATABASE_ID",
+                    "value": "main"
+                },
+                {
+                    "key": "APPWRITE_EVIDENCE_BUCKET_ID",
+                    "value": "evidence"
+                },
+                {
+                    "key": "APPWRITE_AVATAR_BUCKET_ID",
+                    "value": "avatars"
+                },
+                {
+                    "key": "APPWRITE_ADMIN_TEAM_ID",
+                    "value": "admins"
+                },
+                {
+                    "key": "CORS_ORIGINS",
+                    "value": "http://localhost:8071,http://127.0.0.1:8071,https://app.node-learn.com,https://node-learn.com"
+                },
+                {
+                    "key": "RATE_LIMIT_PER_MIN",
+                    "value": "120"
+                },
+                {
+                    "key": "LOG_LEVEL",
+                    "value": "info"
+                }
+            ]
         },
         {
-          "key": "APPWRITE_ENDPOINT",
-          "value": "https://sfo.cloud.appwrite.io/v1"
+            "$id": "node-learn-purge-deleted",
+            "name": "Node Learn Retention Purge",
+            "runtime": "node-22",
+            "path": "functions/node-learn-purge-deleted",
+            "entrypoint": "src/main.js",
+            "execute": [],
+            "enabled": true,
+            "logging": true,
+            "events": [],
+            "schedule": "0 3 * * *",
+            "timeout": 120,
+            "commands": "",
+            "scopes": [
+                "databases.read",
+                "tables.read",
+                "tables.write",
+                "rows.read",
+                "rows.write",
+                "collections.read",
+                "documents.read",
+                "documents.write",
+                "buckets.read",
+                "files.read",
+                "files.write"
+            ],
+            "specification": "s-0.5vcpu-512mb",
+            "vars": [
+                {
+                    "key": "NODE_ENV",
+                    "value": "production"
+                },
+                {
+                    "key": "APPWRITE_ENDPOINT",
+                    "value": "https://sfo.cloud.appwrite.io/v1"
+                },
+                {
+                    "key": "APPWRITE_PROJECT_ID",
+                    "value": "6ab149e4001d09a18de3"
+                },
+                {
+                    "key": "APPWRITE_DATABASE_ID",
+                    "value": "main"
+                },
+                {
+                    "key": "APPWRITE_EVIDENCE_BUCKET_ID",
+                    "value": "evidence"
+                },
+                {
+                    "key": "APPWRITE_AVATAR_BUCKET_ID",
+                    "value": "avatars"
+                },
+                {
+                    "key": "LOG_LEVEL",
+                    "value": "info"
+                }
+            ]
         },
         {
-          "key": "APPWRITE_PROJECT_ID",
-          "value": "6ab149e4001d09a18de3"
-        },
-        {
-          "key": "APPWRITE_DATABASE_ID",
-          "value": "main"
-        },
-        {
-          "key": "APPWRITE_EVIDENCE_BUCKET_ID",
-          "value": "evidence"
-        },
-        {
-          "key": "APPWRITE_AVATAR_BUCKET_ID",
-          "value": "avatars"
-        },
-        {
-          "key": "APPWRITE_ADMIN_TEAM_ID",
-          "value": "admins"
-        },
-        {
-          "key": "CORS_ORIGINS",
-          "value": "http://localhost:8071,http://127.0.0.1:8071,https://app.node-learn.com,https://node-learn.com"
-        },
-        {
-          "key": "RATE_LIMIT_PER_MIN",
-          "value": "120"
-        },
-        {
-          "key": "LOG_LEVEL",
-          "value": "info"
+            "$id": "node-learn-healthcheck",
+            "name": "Node Learn Healthcheck",
+            "runtime": "node-22",
+            "path": "functions/node-learn-healthcheck",
+            "entrypoint": "src/main.js",
+            "execute": [],
+            "enabled": true,
+            "logging": true,
+            "events": [],
+            "schedule": "*/10 * * * *",
+            "timeout": 30,
+            "commands": "",
+            "scopes": [],
+            "specification": "s-0.5vcpu-512mb",
+            "vars": [
+                {
+                    "key": "NODE_ENV",
+                    "value": "production"
+                },
+                {
+                    "key": "LOG_LEVEL",
+                    "value": "info"
+                },
+                {
+                    "key": "HEALTHCHECK_NAME",
+                    "value": "Node Learn API"
+                },
+                {
+                    "key": "HEALTHCHECK_URL",
+                    "value": "https://6ab25202000c575857b2.appwrite.network/readyz"
+                },
+                {
+                    "key": "HEALTHCHECK_TIMEOUT_MS",
+                    "value": "7000"
+                },
+                {
+                    "key": "ALERT_WEBHOOK_URL",
+                    "value": "__SET_IN_APPWRITE_CONSOLE__"
+                }
+            ]
         }
-      ]
-    },
-    {
-      "$id": "node-learn-purge-deleted",
-      "name": "Node Learn Retention Purge",
-      "runtime": "node-22",
-      "path": "functions/node-learn-purge-deleted",
-      "entrypoint": "src/main.js",
-      "execute": [],
-      "enabled": true,
-      "logging": true,
-      "events": [],
-      "schedule": "0 3 * * *",
-      "timeout": 120,
-      "commands": "",
-      "scopes": [
-        "databases.read",
-        "tables.read",
-        "tables.write",
-        "rows.read",
-        "rows.write",
-        "collections.read",
-        "documents.read",
-        "documents.write",
-        "buckets.read",
-        "files.read",
-        "files.write"
-      ],
-      "specification": "s-0.5vcpu-512mb",
-      "vars": [
+    ],
+    "sites": [
         {
-          "key": "NODE_ENV",
-          "value": "production"
-        },
-        {
-          "key": "APPWRITE_ENDPOINT",
-          "value": "https://sfo.cloud.appwrite.io/v1"
-        },
-        {
-          "key": "APPWRITE_PROJECT_ID",
-          "value": "6ab149e4001d09a18de3"
-        },
-        {
-          "key": "APPWRITE_DATABASE_ID",
-          "value": "main"
-        },
-        {
-          "key": "APPWRITE_EVIDENCE_BUCKET_ID",
-          "value": "evidence"
-        },
-        {
-          "key": "APPWRITE_AVATAR_BUCKET_ID",
-          "value": "avatars"
-        },
-        {
-          "key": "LOG_LEVEL",
-          "value": "info"
+            "$id": "node-learn-site",
+            "name": "Node Learn Site",
+            "path": "site",
+            "framework": "astro",
+            "logging": true,
+            "timeout": 30,
+            "buildRuntime": "node-22",
+            "adapter": "static",
+            "installCommand": "npm install",
+            "buildCommand": "npm run build",
+            "outputDirectory": "./dist",
+            "fallbackFile": "",
+            "installationId": "",
+            "providerRepositoryId": "",
+            "providerBranch": "",
+            "providerSilentMode": false,
+            "providerRootDirectory": "",
+            "startCommand": "",
+            "buildSpecification": "s-2vcpu-2gb",
+            "runtimeSpecification": "s-0.5vcpu-512mb",
+            "deploymentRetention": 0
         }
-      ]
-    },
-    {
-      "$id": "node-learn-healthcheck",
-      "name": "Node Learn Healthcheck",
-      "runtime": "node-22",
-      "path": "functions/node-learn-healthcheck",
-      "entrypoint": "src/main.js",
-      "execute": [],
-      "enabled": true,
-      "logging": true,
-      "events": [],
-      "schedule": "*/10 * * * *",
-      "timeout": 30,
-      "commands": "",
-      "scopes": [],
-      "specification": "s-0.5vcpu-512mb",
-      "vars": [
+    ],
+    "tablesDB": [
         {
-          "key": "NODE_ENV",
-          "value": "production"
-        },
-        {
-          "key": "LOG_LEVEL",
-          "value": "info"
-        },
-        {
-          "key": "HEALTHCHECK_NAME",
-          "value": "Node Learn API"
-        },
-        {
-          "key": "HEALTHCHECK_URL",
-          "value": "https://6ab25202000c575857b2.appwrite.network/readyz"
-        },
-        {
-          "key": "HEALTHCHECK_TIMEOUT_MS",
-          "value": "7000"
-        },
-        {
-          "key": "ALERT_WEBHOOK_URL",
-          "value": "__SET_IN_APPWRITE_CONSOLE__"
+            "$id": "main",
+            "name": "Node Learn main",
+            "enabled": true
         }
-      ]
-    }
-  ],
-  "tablesDB": [
-    {
-      "$id": "main",
-      "name": "Node Learn main",
-      "enabled": true
-    }
-  ],
-  "tables": [
-    {
-      "$id": "profiles",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "profiles",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
+    ],
+    "tables": [
         {
-          "key": "email",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 320
+            "$id": "profiles",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "profiles",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "email",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 320
+                },
+                {
+                    "key": "handle",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 32
+                },
+                {
+                    "key": "displayName",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 80
+                },
+                {
+                    "key": "avatarFileId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "locale",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "en"
+                },
+                {
+                    "key": "timeZone",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 64,
+                    "default": "UTC"
+                },
+                {
+                    "key": "ageBand",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "privacyAcceptedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "active"
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_handle",
+                    "type": "unique",
+                    "columns": [
+                        "handle"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_email",
+                    "type": "key",
+                    "columns": [
+                        "email"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_updated",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "updatedAt"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "handle",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 32
+            "$id": "role_memberships",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "role_memberships",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "role",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "active",
+                    "type": "boolean",
+                    "required": false,
+                    "array": false,
+                    "default": false
+                },
+                {
+                    "key": "onboarded",
+                    "type": "boolean",
+                    "required": false,
+                    "array": false,
+                    "default": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_user_role",
+                    "type": "unique",
+                    "columns": [
+                        "userId",
+                        "role"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_user",
+                    "type": "key",
+                    "columns": [
+                        "userId"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "displayName",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 80
+            "$id": "student_profiles",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "student_profiles",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "headline",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 120,
+                    "default": ""
+                },
+                {
+                    "key": "goalSummary",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "interests",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 64
+                },
+                {
+                    "key": "visibility",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "relations"
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_user",
+                    "type": "unique",
+                    "columns": [
+                        "userId"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "avatarFileId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
+            "$id": "teacher_profiles",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "teacher_profiles",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "headline",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 120,
+                    "default": ""
+                },
+                {
+                    "key": "bio",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "subjects",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 64
+                },
+                {
+                    "key": "approach",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "acceptingRequests",
+                    "type": "boolean",
+                    "required": false,
+                    "array": false,
+                    "default": true
+                },
+                {
+                    "key": "visibility",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "public"
+                },
+                {
+                    "key": "searchText",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 1024,
+                    "default": ""
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_user",
+                    "type": "unique",
+                    "columns": [
+                        "userId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_accepting",
+                    "type": "key",
+                    "columns": [
+                        "acceptingRequests",
+                        "updatedAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ft_search",
+                    "type": "fulltext",
+                    "columns": [
+                        "searchText"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_visibility_accepting",
+                    "type": "key",
+                    "columns": [
+                        "visibility",
+                        "acceptingRequests",
+                        "updatedAt"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "locale",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "en"
+            "$id": "learning_requests",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "learning_requests",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "kind",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 24
+                },
+                {
+                    "key": "studentId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "teacherId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "initiatorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "goalTitle",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "message",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "pairKey",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 80
+                },
+                {
+                    "key": "respondedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_student",
+                    "type": "key",
+                    "columns": [
+                        "studentId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_teacher",
+                    "type": "key",
+                    "columns": [
+                        "teacherId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_pair_status",
+                    "type": "key",
+                    "columns": [
+                        "pairKey",
+                        "status"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "timeZone",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 64,
-          "default": "UTC"
+            "$id": "learning_relations",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "learning_relations",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "studentId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "teacherId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "sourceRequestId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "conversationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "currentGoalId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "startedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "endedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "version",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 1
+                },
+                {
+                    "key": "openTasks",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "evidenceCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "lastActivityAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_source",
+                    "type": "unique",
+                    "columns": [
+                        "sourceRequestId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_student",
+                    "type": "key",
+                    "columns": [
+                        "studentId",
+                        "status"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_teacher",
+                    "type": "key",
+                    "columns": [
+                        "teacherId",
+                        "status"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "ageBand",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16
+            "$id": "learning_goals",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "learning_goals",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "description",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "createdBy",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_relation",
+                    "type": "key",
+                    "columns": [
+                        "relationId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "privacyAcceptedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
+            "$id": "learning_tasks",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "learning_tasks",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "goalId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "instructions",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "assignedBy",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "dueAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_relation",
+                    "type": "key",
+                    "columns": [
+                        "relationId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_relation_status",
+                    "type": "key",
+                    "columns": [
+                        "relationId",
+                        "status"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "status",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "active"
+            "$id": "evidence_items",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "evidence_items",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "taskId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "goalId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "authorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "attachmentFileIds",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 36
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "version",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 1
+                },
+                {
+                    "key": "submittedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "reviewedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_relation",
+                    "type": "key",
+                    "columns": [
+                        "relationId",
+                        "submittedAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_task",
+                    "type": "key",
+                    "columns": [
+                        "taskId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_author_submitted",
+                    "type": "key",
+                    "columns": [
+                        "authorId",
+                        "submittedAt"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
+            "$id": "feedback_entries",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "feedback_entries",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "evidenceId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "authorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "nextStep",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_evidence",
+                    "type": "key",
+                    "columns": [
+                        "evidenceId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
         },
         {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
+            "$id": "proof_records",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "proof_records",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "currentFocus",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 200
+                },
+                {
+                    "key": "milestonesJson",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "tasksDone",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "evidenceSubmitted",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "feedbackReceived",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "revisions",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "recentChange",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 300
+                },
+                {
+                    "key": "nextStep",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 300
+                },
+                {
+                    "key": "computedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_relation",
+                    "type": "unique",
+                    "columns": [
+                        "relationId"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "conversations",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "conversations",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "memberIds",
+                    "type": "varchar",
+                    "required": true,
+                    "array": true,
+                    "size": 36
+                },
+                {
+                    "key": "pairKey",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 80
+                },
+                {
+                    "key": "lastSequence",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "lastMessageAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_pair",
+                    "type": "unique",
+                    "columns": [
+                        "pairKey"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "conversation_members",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "conversation_members",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "conversationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "lastReadSequence",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_member",
+                    "type": "unique",
+                    "columns": [
+                        "conversationId",
+                        "userId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_user",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "updatedAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "messages",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "messages",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "conversationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "sequence",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "senderId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "type",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 24
+                },
+                {
+                    "key": "payloadVersion",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 1
+                },
+                {
+                    "key": "payloadJson",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "clientMessageId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 64
+                },
+                {
+                    "key": "dedupeKey",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "removedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_seq",
+                    "type": "unique",
+                    "columns": [
+                        "conversationId",
+                        "sequence"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "uq_dedupe",
+                    "type": "unique",
+                    "columns": [
+                        "dedupeKey"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_conv_created",
+                    "type": "key",
+                    "columns": [
+                        "conversationId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_sender_created",
+                    "type": "key",
+                    "columns": [
+                        "senderId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "connection_requests",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "connection_requests",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "fromUserId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "toUserId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "message",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "source",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "pairKey",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 80
+                },
+                {
+                    "key": "respondedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_to",
+                    "type": "key",
+                    "columns": [
+                        "toUserId",
+                        "status"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_from",
+                    "type": "key",
+                    "columns": [
+                        "fromUserId",
+                        "status"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_pair_status",
+                    "type": "key",
+                    "columns": [
+                        "pairKey",
+                        "status"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "contacts",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "contacts",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "contactUserId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "conversationId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "connectedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_pair",
+                    "type": "unique",
+                    "columns": [
+                        "userId",
+                        "contactUserId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_user",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "connectedAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "blocks",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "blocks",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "blockerId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "blockedId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "uq_pair",
+                    "type": "unique",
+                    "columns": [
+                        "blockerId",
+                        "blockedId"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_blocked",
+                    "type": "key",
+                    "columns": [
+                        "blockedId"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "reports",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "reports",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "reporterId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "targetUserId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "reason",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 24
+                },
+                {
+                    "key": "details",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "open"
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "resolution",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "resolvedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "resolvedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "resolutionNote",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_target",
+                    "type": "key",
+                    "columns": [
+                        "targetUserId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_created",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_resolved",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "resolvedAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "idempotency_keys",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "idempotency_keys",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "key",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 128
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "requestHash",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 64
+                },
+                {
+                    "key": "resultId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "resultJson",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_user_created",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_created",
+                    "type": "key",
+                    "columns": [
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "domain_events",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "domain_events",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "eventType",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 48
+                },
+                {
+                    "key": "aggregateType",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 32
+                },
+                {
+                    "key": "aggregateId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "actorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "payloadVersion",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 1
+                },
+                {
+                    "key": "payloadJson",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "requestId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 128
+                },
+                {
+                    "key": "occurredAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "pending"
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_aggregate",
+                    "type": "key",
+                    "columns": [
+                        "aggregateType",
+                        "aggregateId",
+                        "occurredAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "occurredAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "audit_events",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "audit_events",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "actorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "action",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 48
+                },
+                {
+                    "key": "resourceType",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 32
+                },
+                {
+                    "key": "resourceId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "reason",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 300
+                },
+                {
+                    "key": "requestId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 128
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_resource",
+                    "type": "key",
+                    "columns": [
+                        "resourceType",
+                        "resourceId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_created",
+                    "type": "key",
+                    "columns": [
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "upload_intents",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "upload_intents",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "purpose",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "bucketId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "fileId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "mimeType",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 128
+                },
+                {
+                    "key": "sizeBytes",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "pending"
+                },
+                {
+                    "key": "expiresAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "fileName",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 255
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_user",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_expires",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "expiresAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "notifications",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "notifications",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "userId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "type",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 32
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 160
+                },
+                {
+                    "key": "body",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 500
+                },
+                {
+                    "key": "href",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 255
+                },
+                {
+                    "key": "refType",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 32
+                },
+                {
+                    "key": "refId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "actorId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "dedupeKey",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "readAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_user_created",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_user_read",
+                    "type": "key",
+                    "columns": [
+                        "userId",
+                        "readAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "uq_dedupe",
+                    "type": "unique",
+                    "columns": [
+                        "dedupeKey"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_created",
+                    "type": "key",
+                    "columns": [
+                        "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
         }
-      ],
-      "indexes": [
+    ],
+    "buckets": [
         {
-          "key": "uq_handle",
-          "type": "unique",
-          "columns": [
-            "handle"
-          ],
-          "orders": []
+            "$id": "avatars",
+            "name": "avatars",
+            "$permissions": [
+                "read(\"any\")",
+                "create(\"users\")"
+            ],
+            "fileSecurity": true,
+            "enabled": true,
+            "maximumFileSize": 2097152,
+            "allowedFileExtensions": [
+                "jpg",
+                "jpeg",
+                "png",
+                "webp"
+            ],
+            "compression": "gzip",
+            "encryption": false,
+            "antivirus": true
         },
         {
-          "key": "ix_email",
-          "type": "key",
-          "columns": [
-            "email"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_status_updated",
-          "type": "key",
-          "columns": [
-            "status",
-            "updatedAt"
-          ],
-          "orders": []
+            "$id": "evidence",
+            "name": "evidence",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "fileSecurity": true,
+            "enabled": true,
+            "maximumFileSize": 26214400,
+            "allowedFileExtensions": [
+                "jpg",
+                "jpeg",
+                "png",
+                "webp",
+                "pdf",
+                "txt",
+                "md",
+                "zip"
+            ],
+            "compression": "gzip",
+            "encryption": true,
+            "antivirus": true
         }
-      ]
-    },
-    {
-      "$id": "role_memberships",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "role_memberships",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "role",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "active",
-          "type": "boolean",
-          "required": false,
-          "array": false,
-          "default": false
-        },
-        {
-          "key": "onboarded",
-          "type": "boolean",
-          "required": false,
-          "array": false,
-          "default": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_user_role",
-          "type": "unique",
-          "columns": [
-            "userId",
-            "role"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_user",
-          "type": "key",
-          "columns": [
-            "userId"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "student_profiles",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "student_profiles",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "headline",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 120,
-          "default": ""
-        },
-        {
-          "key": "goalSummary",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "interests",
-          "type": "varchar",
-          "required": false,
-          "array": true,
-          "size": 64
-        },
-        {
-          "key": "visibility",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "relations"
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_user",
-          "type": "unique",
-          "columns": [
-            "userId"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "teacher_profiles",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "teacher_profiles",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "headline",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 120,
-          "default": ""
-        },
-        {
-          "key": "bio",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "subjects",
-          "type": "varchar",
-          "required": false,
-          "array": true,
-          "size": 64
-        },
-        {
-          "key": "approach",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "acceptingRequests",
-          "type": "boolean",
-          "required": false,
-          "array": false,
-          "default": true
-        },
-        {
-          "key": "visibility",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "public"
-        },
-        {
-          "key": "searchText",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 1024,
-          "default": ""
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_user",
-          "type": "unique",
-          "columns": [
-            "userId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_accepting",
-          "type": "key",
-          "columns": [
-            "acceptingRequests",
-            "updatedAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ft_search",
-          "type": "fulltext",
-          "columns": [
-            "searchText"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_visibility_accepting",
-          "type": "key",
-          "columns": [
-            "visibility",
-            "acceptingRequests",
-            "updatedAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "learning_requests",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "learning_requests",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "kind",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 24
-        },
-        {
-          "key": "studentId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "teacherId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "initiatorId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "goalTitle",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "message",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "pairKey",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 80
-        },
-        {
-          "key": "respondedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_student",
-          "type": "key",
-          "columns": [
-            "studentId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_teacher",
-          "type": "key",
-          "columns": [
-            "teacherId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_pair_status",
-          "type": "key",
-          "columns": [
-            "pairKey",
-            "status"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "learning_relations",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "learning_relations",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "studentId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "teacherId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "sourceRequestId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "conversationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "currentGoalId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "startedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "endedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "version",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 1
-        },
-        {
-          "key": "openTasks",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "evidenceCount",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "lastActivityAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_source",
-          "type": "unique",
-          "columns": [
-            "sourceRequestId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_student",
-          "type": "key",
-          "columns": [
-            "studentId",
-            "status"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_teacher",
-          "type": "key",
-          "columns": [
-            "teacherId",
-            "status"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "learning_goals",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "learning_goals",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "title",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "description",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "createdBy",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_relation",
-          "type": "key",
-          "columns": [
-            "relationId",
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "learning_tasks",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "learning_tasks",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "goalId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "title",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "instructions",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "assignedBy",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "dueAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_relation",
-          "type": "key",
-          "columns": [
-            "relationId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_relation_status",
-          "type": "key",
-          "columns": [
-            "relationId",
-            "status"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "evidence_items",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "evidence_items",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "taskId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "goalId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "authorId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "title",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "body",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "attachmentFileIds",
-          "type": "varchar",
-          "required": false,
-          "array": true,
-          "size": 36
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "version",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 1
-        },
-        {
-          "key": "submittedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "reviewedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_relation",
-          "type": "key",
-          "columns": [
-            "relationId",
-            "submittedAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_task",
-          "type": "key",
-          "columns": [
-            "taskId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_author_submitted",
-          "type": "key",
-          "columns": [
-            "authorId",
-            "submittedAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "feedback_entries",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "feedback_entries",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "evidenceId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "authorId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "body",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "nextStep",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_evidence",
-          "type": "key",
-          "columns": [
-            "evidenceId",
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "proof_records",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "proof_records",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "currentFocus",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 200
-        },
-        {
-          "key": "milestonesJson",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "tasksDone",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "evidenceSubmitted",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "feedbackReceived",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "revisions",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "recentChange",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 300
-        },
-        {
-          "key": "nextStep",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 300
-        },
-        {
-          "key": "computedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_relation",
-          "type": "unique",
-          "columns": [
-            "relationId"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "conversations",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "conversations",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "memberIds",
-          "type": "varchar",
-          "required": true,
-          "array": true,
-          "size": 36
-        },
-        {
-          "key": "pairKey",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 80
-        },
-        {
-          "key": "lastSequence",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "lastMessageAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_pair",
-          "type": "unique",
-          "columns": [
-            "pairKey"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "conversation_members",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "conversation_members",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "conversationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "lastReadSequence",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_member",
-          "type": "unique",
-          "columns": [
-            "conversationId",
-            "userId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_user",
-          "type": "key",
-          "columns": [
-            "userId",
-            "updatedAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "messages",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "messages",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "conversationId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "sequence",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "senderId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "type",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 24
-        },
-        {
-          "key": "payloadVersion",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 1
-        },
-        {
-          "key": "payloadJson",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "clientMessageId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 64
-        },
-        {
-          "key": "dedupeKey",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "removedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_seq",
-          "type": "unique",
-          "columns": [
-            "conversationId",
-            "sequence"
-          ],
-          "orders": []
-        },
-        {
-          "key": "uq_dedupe",
-          "type": "unique",
-          "columns": [
-            "dedupeKey"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_conv_created",
-          "type": "key",
-          "columns": [
-            "conversationId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_sender_created",
-          "type": "key",
-          "columns": [
-            "senderId",
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "connection_requests",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "connection_requests",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "fromUserId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "toUserId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "message",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "source",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "pairKey",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 80
-        },
-        {
-          "key": "respondedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_to",
-          "type": "key",
-          "columns": [
-            "toUserId",
-            "status"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_from",
-          "type": "key",
-          "columns": [
-            "fromUserId",
-            "status"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_pair_status",
-          "type": "key",
-          "columns": [
-            "pairKey",
-            "status"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "contacts",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "contacts",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "contactUserId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "conversationId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "connectedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_pair",
-          "type": "unique",
-          "columns": [
-            "userId",
-            "contactUserId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_user",
-          "type": "key",
-          "columns": [
-            "userId",
-            "connectedAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "blocks",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "blocks",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "blockerId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "blockedId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "uq_pair",
-          "type": "unique",
-          "columns": [
-            "blockerId",
-            "blockedId"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_blocked",
-          "type": "key",
-          "columns": [
-            "blockedId"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "reports",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "reports",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "reporterId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "targetUserId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "reason",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 24
-        },
-        {
-          "key": "details",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "open"
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "resolution",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "resolvedBy",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "resolvedAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "resolutionNote",
-          "type": "text",
-          "required": false,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_target",
-          "type": "key",
-          "columns": [
-            "targetUserId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_status_created",
-          "type": "key",
-          "columns": [
-            "status",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_status_resolved",
-          "type": "key",
-          "columns": [
-            "status",
-            "resolvedAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "idempotency_keys",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "idempotency_keys",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "key",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 128
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "requestHash",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 64
-        },
-        {
-          "key": "resultId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "resultJson",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_user_created",
-          "type": "key",
-          "columns": [
-            "userId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_created",
-          "type": "key",
-          "columns": [
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "domain_events",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "domain_events",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "eventType",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 48
-        },
-        {
-          "key": "aggregateType",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 32
-        },
-        {
-          "key": "aggregateId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "actorId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "payloadVersion",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 1
-        },
-        {
-          "key": "payloadJson",
-          "type": "text",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "requestId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 128
-        },
-        {
-          "key": "occurredAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "pending"
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_aggregate",
-          "type": "key",
-          "columns": [
-            "aggregateType",
-            "aggregateId",
-            "occurredAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_status",
-          "type": "key",
-          "columns": [
-            "status",
-            "occurredAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "audit_events",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "audit_events",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "actorId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "action",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 48
-        },
-        {
-          "key": "resourceType",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 32
-        },
-        {
-          "key": "resourceId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "reason",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 300
-        },
-        {
-          "key": "requestId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 128
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_resource",
-          "type": "key",
-          "columns": [
-            "resourceType",
-            "resourceId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_created",
-          "type": "key",
-          "columns": [
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "upload_intents",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "upload_intents",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "purpose",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 16
-        },
-        {
-          "key": "bucketId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "fileId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "relationId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "mimeType",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 128
-        },
-        {
-          "key": "sizeBytes",
-          "type": "integer",
-          "required": false,
-          "array": false,
-          "default": 0
-        },
-        {
-          "key": "status",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 16,
-          "default": "pending"
-        },
-        {
-          "key": "expiresAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "fileName",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 255
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_user",
-          "type": "key",
-          "columns": [
-            "userId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_status_expires",
-          "type": "key",
-          "columns": [
-            "status",
-            "expiresAt"
-          ],
-          "orders": []
-        }
-      ]
-    },
-    {
-      "$id": "notifications",
-      "$permissions": [],
-      "databaseId": "main",
-      "name": "notifications",
-      "enabled": true,
-      "rowSecurity": true,
-      "columns": [
-        {
-          "key": "userId",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "type",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 32
-        },
-        {
-          "key": "title",
-          "type": "varchar",
-          "required": true,
-          "array": false,
-          "size": 160
-        },
-        {
-          "key": "body",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 500
-        },
-        {
-          "key": "href",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 255
-        },
-        {
-          "key": "refType",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 32
-        },
-        {
-          "key": "refId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "actorId",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 36
-        },
-        {
-          "key": "dedupeKey",
-          "type": "varchar",
-          "required": false,
-          "array": false,
-          "size": 120
-        },
-        {
-          "key": "readAt",
-          "type": "datetime",
-          "required": false,
-          "array": false
-        },
-        {
-          "key": "createdAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        },
-        {
-          "key": "updatedAt",
-          "type": "datetime",
-          "required": true,
-          "array": false
-        }
-      ],
-      "indexes": [
-        {
-          "key": "ix_user_created",
-          "type": "key",
-          "columns": [
-            "userId",
-            "createdAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_user_read",
-          "type": "key",
-          "columns": [
-            "userId",
-            "readAt"
-          ],
-          "orders": []
-        },
-        {
-          "key": "uq_dedupe",
-          "type": "unique",
-          "columns": [
-            "dedupeKey"
-          ],
-          "orders": []
-        },
-        {
-          "key": "ix_created",
-          "type": "key",
-          "columns": [
-            "createdAt"
-          ],
-          "orders": []
-        }
-      ]
-    }
-  ],
-  "buckets": [
-    {
-      "$id": "avatars",
-      "name": "avatars",
-      "$permissions": [
-        "read(\"any\")",
-        "create(\"users\")"
-      ],
-      "fileSecurity": true,
-      "enabled": true,
-      "maximumFileSize": 2097152,
-      "allowedFileExtensions": [
-        "jpg",
-        "jpeg",
-        "png",
-        "webp"
-      ],
-      "compression": "gzip",
-      "encryption": false,
-      "antivirus": true
-    },
-    {
-      "$id": "evidence",
-      "name": "evidence",
-      "$permissions": [
-        "create(\"users\")"
-      ],
-      "fileSecurity": true,
-      "enabled": true,
-      "maximumFileSize": 26214400,
-      "allowedFileExtensions": [
-        "jpg",
-        "jpeg",
-        "png",
-        "webp",
-        "pdf",
-        "txt",
-        "md",
-        "zip"
-      ],
-      "compression": "gzip",
-      "encryption": true,
-      "antivirus": true
-    }
-  ]
+    ]
 }

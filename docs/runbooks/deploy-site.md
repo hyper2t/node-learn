@@ -40,11 +40,48 @@ Console → **Sites** → Create site → Connect a repository：
 
 Root directory 必须填 `site`，否则 Appwrite 会在仓库根目录构建 Expo 应用。
 
-CLI 方式（在 `site/` 下）：
+### CLI 方式（已实测，推荐）
+
+站点已声明在 `appwrite.config.json` 的 `sites` 块中（`$id: node-learn-site`，
+`path: "site"`），属于配置即代码，与 `functions` 的管理方式一致。在**仓库根目录**执行：
 
 ```powershell
-appwrite deploy site
+appwrite push site --all --force
 ```
+
+CLI 会上传 `site/` 源码，在云端跑 `npm install` + `npm run build`，发布 `dist/`。
+整个过程约 54 秒。首次执行已自动创建 proxy rule 与默认域名。
+
+> `path` 字段必须是 `site`。`appwrite pull site` 会把它重置为 `sites/<id>`（不存在的目录），
+> 每次 pull 之后都要改回来，否则推送上去的是空内容。
+> 另外 `appwrite pull site` 默认带 `--code`，会覆盖本地源码——务必加 `--no-code`。
+
+**当前部署地址**：<https://6ab3bc7e000f6444e2f2.appwrite.network>（14 条路由全部实测 200）
+
+### npm 镜像源与云端构建冲突（重要）
+
+本机 `~/.npmrc` 指向 `registry.npmmirror.com`，会把 330 个 mirror URL 写进
+`package-lock.json`。Appwrite 构建沙箱拒绝抓取此类 "remote" tarball，报错：
+
+```
+npm error code EALLOWREMOTE
+npm error Refusing to fetch "zwitch@https://registry.npmmirror.com/..."
+```
+
+因此仓库内置了 `site/.npmrc` 固定使用 `registry.npmjs.org`。**不要删除它。**
+
+若 lockfile 被污染（检查方法：`Select-String -Path site/package-lock.json -Pattern npmmirror`
+应为 0 条），需重新生成。注意本机 npm 会复用镜像缓存、生成不含 `resolved`/`integrity`
+字段的残缺 lockfile，仅靠 `--registry` 参数无法绕过；可靠做法是在干净环境重新生成，
+或先 `npm cache clean --force` 再执行：
+
+```powershell
+cd site
+Remove-Item package-lock.json
+npm install --package-lock-only
+```
+
+生成后校验：`resolved` 与 `registry.npmjs.org` 均应为 330 条，`npmmirror` 为 0。
 
 ---
 
@@ -70,9 +107,41 @@ appwrite deploy site
 
 代码已就绪，但以下操作在 Appwrite Console / DNS / OAuth 服务商侧，**代码改动不会自动生效**：
 
-1. **推送 Function 变量** — `appwrite.config.json` 的 `CORS_ORIGINS` 只是源文件；线上
-   Function 需执行 `npm run api:push-vars` 才会更新（CLI 27.x 的 `push --with-variables` 无效）。
-   未推送前，来自 `https://node-learn.com` 的请求会因缺少 ACAO 头被浏览器拦截。
+1. **注册 Web 平台**（✅ 2026-09-23 已完成）— Appwrite 会校验 OAuth 的 `success` 回调
+   URL 必须属于已注册平台，否则 Google/Notion 登录跳转时报：
+
+   ```
+   Error 400 · general_argument_invalid
+   Invalid `success` param: Invalid URI. Register your new client (app.node-learn.com)
+   as a new Web platform on your project console dashboard
+   ```
+
+   这不是代码问题，`src/infrastructure/appwrite/oauth.ts` 无需改动。补注册即可：
+
+   ```powershell
+   appwrite project create-web-platform `
+     --platform-id web-app-node-learn-com `
+     --name "Node Learn Web (app.node-learn.com)" `
+     --hostname "app.node-learn.com"
+   ```
+
+   查看现有平台：`appwrite project list-platforms`。当前 4 个：apple / android /
+   `node-learn-alpha.vercel.app` / `app.node-learn.com`。
+   **每新增一个可访问应用的域名（含 Vercel 预览域名），都要补一条 Web 平台。**
+
+2. **推送 Function 变量**（✅ 已生效）— `appwrite.config.json` 的 `CORS_ORIGINS` 只是源文件；
+   线上 Function 需执行 `npm run api:push-vars` 才会更新（CLI 27.x 的 `push --with-variables` 无效）。
+   未推送前，来自新域名的请求会因缺少 ACAO 头被浏览器拦截。
+
+   实测验证方法（不要只读配置，变量值在 CLI 里是隐藏的）：
+
+   ```powershell
+   Invoke-WebRequest -Uri "https://6ab25202000c575857b2.appwrite.network/v1/me" -Method Options `
+     -Headers @{ "Origin"="https://app.node-learn.com"; "Access-Control-Request-Method"="GET" } `
+     -UseBasicParsing | ForEach-Object { $_.Headers["Access-Control-Allow-Origin"] }
+   ```
+
+   应返回 `https://app.node-learn.com`。
 2. **Appwrite Sites 自定义域名** — Console → Sites → Domains 绑定 `node-learn.com`，等待
    SSL 签发。
 3. **OAuth redirect** — Google 与 Notion 的 provider 配置需加入新的 `app.node-learn.com`
