@@ -36413,6 +36413,10 @@ var init_learning = __esm({
       startedAt: r.startedAt,
       endedAt: r.endedAt,
       version: r.version,
+      pausedBy: r.pausedBy ?? null,
+      pausedAt: r.pausedAt ?? null,
+      endedBy: r.endedBy ?? null,
+      endReason: r.endReason ?? null,
       student,
       teacher,
       summary: { openTasks: r.openTasks, evidenceCount: r.evidenceCount, lastActivityAt: r.lastActivityAt }
@@ -36824,7 +36828,7 @@ async function getEvidence(relationId, evidenceId) {
   return toEvidence(row, fb, await resolveAttachments(row.attachmentFileIds ?? []));
 }
 async function submitEvidence(rel, authorId, input, requestId2) {
-  if (rel.status !== "active") throw conflict("invalid_state", "This learning relation is not active.");
+  assertRelationWritable(rel);
   const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
   let taskId = input.taskId ?? null;
   if (taskId) {
@@ -36853,6 +36857,7 @@ async function submitEvidence(rel, authorId, input, requestId2) {
   return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
 }
 async function addFeedback(rel, evidenceId, authorId, input, requestId2) {
+  assertRelationWritable(rel);
   const ev = await getRow(TABLES.evidenceItems, evidenceId);
   if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
   const fb = await createRow(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? "" });
@@ -36925,18 +36930,21 @@ var init_proof = __esm({
     init_notifications2();
     init_messaging3();
     init_uploads();
+    init_learning2();
   }
 });
 
 // src/services/learning.ts
 var learning_exports = {};
 __export(learning_exports, {
+  assertRelationWritable: () => assertRelationWritable,
   createGoal: () => createGoal2,
   createTask: () => createTask2,
   getRelation: () => getRelation,
   getWorkspace: () => getWorkspace,
   listRelations: () => listRelations,
   requireRelationMember: () => requireRelationMember,
+  seedGoalId: () => seedGoalId,
   updateGoal: () => updateGoal2,
   updateRelationStatus: () => updateRelationStatus,
   updateTask: () => updateTask2
@@ -36946,6 +36954,9 @@ async function requireRelationMember(relationId, userId) {
   if (!rel) throw notFound("not_found", "This learning relation could not be found.");
   if (rel.studentId !== userId && rel.teacherId !== userId) throw forbidden();
   return rel;
+}
+function assertRelationWritable(rel) {
+  if (rel.status !== "active") throw conflict("invalid_state", rel.status === "paused" ? "This learning relation is paused. Resume it first." : "This learning relation has ended.", { reason: "relation_not_active", status: rel.status });
 }
 async function listRelations(userId, role2, status, limit2, cursor2) {
   const q = [Query.equal(role2 === "student" ? "studentId" : "teacherId", userId), Query.orderDesc("lastActivityAt"), Query.limit(limit2 + 1)];
@@ -36981,19 +36992,39 @@ async function getWorkspace(relationId, userId) {
     proof: proof ? toProof(proof) : null
   };
 }
-async function updateRelationStatus(relationId, userId, status, requestId2) {
+async function updateRelationStatus(relationId, userId, input, requestId2) {
   const rel = await requireRelationMember(relationId, userId);
-  if (rel.status === "ended") throw conflict("invalid_state", "This learning relation has ended.");
-  await updateRow(TABLES.learningRelations, relationId, { status, endedAt: status === "ended" ? (/* @__PURE__ */ new Date()).toISOString() : null, version: rel.version + 1 });
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text: status === "ended" ? "Learning relation ended." : status === "paused" ? "Learning relation paused." : "Learning relation resumed." }, requestId: requestId2 });
-  await emitEvent({ eventType: `relation.${status}`, aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: {}, requestId: requestId2 });
+  const from = rel.status;
+  const to = input.status;
+  if (from === "ended") throw conflict("invalid_state", "This learning relation has ended.");
+  if (!TRANSITIONS[from]?.includes(to)) throw conflict("invalid_state", `This learning relation is already ${from}.`, { from, to });
+  const reason = input.reason?.trim() ?? "";
+  if (to === "ended" && !reason) throw validation("Tell the other person why you are ending this learning relation.", [{ path: "reason", message: "Required" }]);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const patch = { status: to, version: rel.version + 1, lastActivityAt: now };
+  if (to === "paused") Object.assign(patch, { pausedBy: userId, pausedAt: now });
+  if (to === "active") Object.assign(patch, { pausedBy: null, pausedAt: null });
+  if (to === "ended") Object.assign(patch, { endedAt: now, endedBy: userId, endReason: reason.slice(0, 500) });
+  await updateRow(TABLES.learningRelations, relationId, patch);
+  const text = to === "ended" ? `Learning relation ended. Reason: ${reason}` : to === "paused" ? "Learning relation paused." : "Learning relation resumed.";
+  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text }, requestId: requestId2 });
+  await emitEvent({ eventType: `relation.${to === "active" ? "resumed" : to}`, aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { from, reason: to === "ended" ? reason : void 0 }, requestId: requestId2 });
   return getRelation(relationId, userId);
 }
 async function touch(rel, patch = {}) {
   await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
 }
-async function createGoal2(rel, actorId, input, requestId2) {
-  const row = await createRow(TABLES.learningGoals, { relationId: rel.$id, title: input.title, description: input.description ?? "", status: "active", createdBy: actorId });
+async function createGoal2(rel, actorId, input, requestId2, rowId2) {
+  assertRelationWritable(rel);
+  let row;
+  try {
+    row = await createRow(TABLES.learningGoals, { relationId: rel.$id, title: input.title, description: input.description ?? "", status: "active", createdBy: actorId }, rowId2);
+  } catch (err) {
+    if (!rowId2 || !isConflict(err)) throw err;
+    const existing = await getRow(TABLES.learningGoals, rowId2);
+    if (!existing) throw err;
+    return toGoal(existing);
+  }
   await touch(rel, rel.currentGoalId ? {} : { currentGoalId: row.$id });
   await appendMessage({ conversationId: rel.conversationId, senderId: actorId, type: "goal_created", payload: { type: "goal_created", goalId: row.$id, title: row.title }, requestId: requestId2 });
   await emitEvent({ eventType: "goal.created", aggregateType: "learning_relation", aggregateId: rel.$id, actorId, payload: { goalId: row.$id }, requestId: requestId2 });
@@ -37002,8 +37033,10 @@ async function createGoal2(rel, actorId, input, requestId2) {
 }
 async function updateGoal2(relationId, goalId, userId, patch, requestId2) {
   const rel = await requireRelationMember(relationId, userId);
+  assertRelationWritable(rel);
   const goal = await getRow(TABLES.learningGoals, goalId);
   if (!goal || goal.relationId !== relationId) throw notFound("not_found", "This goal could not be found.");
+  if (patch.status && patch.status !== goal.status && userId !== rel.teacherId) throw forbidden("Only the teacher can change a goal's status.");
   const row = await updateRow(TABLES.learningGoals, goalId, patch);
   await touch(rel);
   if (patch.status === "achieved" && goal.status !== "achieved") {
@@ -37014,7 +37047,8 @@ async function updateGoal2(relationId, goalId, userId, patch, requestId2) {
 }
 async function createTask2(relationId, userId, input, requestId2) {
   const rel = await requireRelationMember(relationId, userId);
-  if (rel.status !== "active") throw conflict("invalid_state", "This learning relation is not active.");
+  if (rel.teacherId !== userId) throw forbidden("Only the teacher assigns tasks.");
+  assertRelationWritable(rel);
   const row = await createRow(TABLES.learningTasks, { relationId, goalId: input.goalId ?? rel.currentGoalId, title: input.title, instructions: input.instructions ?? "", status: "open", assignedBy: userId, dueAt: input.dueAt ?? null });
   await touch(rel, { openTasks: rel.openTasks + 1 });
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "task_assigned", payload: { type: "task_assigned", taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId: requestId2 });
@@ -37024,6 +37058,8 @@ async function createTask2(relationId, userId, input, requestId2) {
 }
 async function updateTask2(relationId, taskId, userId, patch) {
   const rel = await requireRelationMember(relationId, userId);
+  if (rel.teacherId !== userId) throw forbidden("Only the teacher can edit tasks.");
+  assertRelationWritable(rel);
   const task = await getRow(TABLES.learningTasks, taskId);
   if (!task || task.relationId !== relationId) throw notFound("not_found", "This task could not be found.");
   const row = await updateRow(TABLES.learningTasks, taskId, patch);
@@ -37033,11 +37069,14 @@ async function updateTask2(relationId, taskId, userId, patch) {
   await recomputeProof(relationId);
   return toTask(row);
 }
+var import_node_crypto2, seedGoalId, TRANSITIONS;
 var init_learning2 = __esm({
   "src/services/learning.ts"() {
     "use strict";
+    import_node_crypto2 = require("node:crypto");
     init_dist();
     init_repo();
+    init_rows();
     init_schema();
     init_errors2();
     init_learning();
@@ -37046,6 +37085,8 @@ var init_learning2 = __esm({
     init_messaging3();
     init_profiles();
     init_proof();
+    seedGoalId = (relationId) => (0, import_node_crypto2.createHash)("sha256").update(`seed-goal:${relationId}`).digest("hex").slice(0, 32);
+    TRANSITIONS = { active: ["paused", "ended"], paused: ["active", "ended"], ended: [] };
   }
 });
 
@@ -39850,7 +39891,7 @@ var createLearningRequest = external_exports.object({ teacherId: trimmed(36), go
 var createTeacherInvitation = external_exports.object({ studentId: trimmed(36), goalTitle: trimmed(120), message: external_exports.string().trim().max(2e3).default("") }).strict();
 var requestList = external_exports.object({ role, status: external_exports.enum(["pending", "accepted", "declined", "cancelled", "expired"]).optional(), cursor, limit });
 var relationList = external_exports.object({ role, status: external_exports.enum(["active", "paused", "ended"]).optional(), cursor, limit });
-var relationStatus = external_exports.object({ status: external_exports.enum(["active", "paused", "ended"]) }).strict();
+var relationStatus = external_exports.object({ status: external_exports.enum(["active", "paused", "ended"]), reason: external_exports.string().trim().max(500).optional() }).strict();
 var createGoal = external_exports.object({ title: trimmed(120), description: external_exports.string().trim().max(2e3).optional() }).strict();
 var updateGoal = external_exports.object({ title: trimmed(120).optional(), description: external_exports.string().trim().max(2e3).optional(), status: external_exports.enum(["active", "achieved", "dropped"]).optional() }).strict();
 var createTask = external_exports.object({ title: trimmed(120), instructions: external_exports.string().trim().max(4e3).optional(), goalId: external_exports.string().max(36).nullable().optional(), dueAt: external_exports.string().datetime().nullable().optional() }).strict();
@@ -39894,7 +39935,7 @@ init_notifications2();
 init_profiles();
 
 // src/services/qa.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 init_repo();
 init_rows();
 init_schema();
@@ -39952,7 +39993,7 @@ function excerpt(text, max = 200) {
 }
 
 // src/services/qa.ts
-var hashId = (...parts) => (0, import_node_crypto2.createHash)("sha256").update(parts.join(":")).digest("hex").slice(0, 32);
+var hashId = (...parts) => (0, import_node_crypto3.createHash)("sha256").update(parts.join(":")).digest("hex").slice(0, 32);
 var answerRowId = (questionId, teacherId) => hashId("qa-answer", questionId, teacherId);
 var clarificationRowId = (answerId) => hashId("qa-clarify", answerId);
 var nowIso2 = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -40353,11 +40394,11 @@ async function resolveReport2(id, adminId, input, requestId2) {
     await getUsers().updateStatus({ userId: row.targetUserId, status: false });
     const active = await listRows(TABLES.learningRelations, [
       Query.or([Query.equal("studentId", row.targetUserId), Query.equal("teacherId", row.targetUserId)]),
-      Query.equal("status", "active"),
+      Query.equal("status", ["active", "paused"]),
       Query.limit(100)
     ]);
     for (const rel of active) {
-      await updateRow(TABLES.learningRelations, rel.$id, { status: "ended", endedAt: now, version: rel.version + 1 });
+      await updateRow(TABLES.learningRelations, rel.$id, { status: "ended", endedAt: now, endedBy: null, endReason: "Ended by moderation: the other member's account was suspended.", version: rel.version + 1 });
       const other = rel.studentId === row.targetUserId ? rel.teacherId : rel.studentId;
       await notify({ userId: other, type: "system", title: "A learning relation was ended by moderation", body: "The other member's account was suspended.", href: `/relations/${rel.$id}`, refType: "learning_relation", refId: rel.$id });
       await emitEvent({ eventType: "relation.ended", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: adminId, payload: { reason: "moderation" }, requestId: requestId2 });
@@ -40383,13 +40424,13 @@ init_errors2();
 init_connections();
 
 // src/services/idempotency.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 init_repo();
 init_rows();
 init_schema();
 init_errors2();
-var rowId = (userId, key) => (0, import_node_crypto3.createHash)("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32);
-var hashOf = (payload) => (0, import_node_crypto3.createHash)("sha256").update(JSON.stringify(payload ?? null)).digest("hex");
+var rowId = (userId, key) => (0, import_node_crypto4.createHash)("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32);
+var hashOf = (payload) => (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify(payload ?? null)).digest("hex");
 async function withIdempotency(userId, key, payload, fn) {
   if (!key) return fn();
   const id = rowId(userId, key);
@@ -40570,7 +40611,7 @@ async function deleteAccount(user, requestId2) {
   }
   for (const col of ["studentId", "teacherId"]) {
     const rels = await listRows(TABLES.learningRelations, [Query.equal(col, userId), Query.equal("status", ["active", "paused"]), Query.limit(200)]);
-    await Promise.all(rels.map((r) => updateRow(TABLES.learningRelations, r.$id, { status: "ended", endedAt: (/* @__PURE__ */ new Date()).toISOString() })));
+    await Promise.all(rels.map((r) => updateRow(TABLES.learningRelations, r.$id, { status: "ended", endedAt: (/* @__PURE__ */ new Date()).toISOString(), endedBy: null, endReason: "The other member deleted their account." })));
   }
   const pend = await listRows(TABLES.learningRequests, [Query.equal("initiatorId", userId), Query.equal("status", "pending"), Query.limit(200)]);
   await Promise.all(pend.map((r) => updateRow(TABLES.learningRequests, r.$id, { status: "cancelled", respondedAt: (/* @__PURE__ */ new Date()).toISOString() })));
@@ -40677,7 +40718,7 @@ relationRoutes.get("/:id", async (c) => ok(c.get("requestId"), await getRelation
 relationRoutes.get("/:id/workspace", async (c) => ok(c.get("requestId"), await getWorkspace(c.req.param("id"), currentUser(c).$id)));
 relationRoutes.post("/:id/status", async (c) => {
   const body2 = await readJsonBody(c, relationStatus);
-  return ok(c.get("requestId"), await updateRelationStatus(c.req.param("id"), currentUser(c).$id, body2.status, c.get("requestId")));
+  return ok(c.get("requestId"), await updateRelationStatus(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
 });
 relationRoutes.post("/:id/goals", async (c) => {
   const user = currentUser(c);
@@ -40742,8 +40783,9 @@ async function assertNoOpenPair(studentId, teacherId) {
   const key = pairKey(studentId, teacherId);
   const dup = await findOne(TABLES.learningRequests, [Query.equal("pairKey", key), Query.equal("status", OPEN)]);
   if (dup) throw conflict("duplicate_request", "There is already an open request between you two.");
-  const active = await findOne(TABLES.learningRelations, [Query.equal("studentId", studentId), Query.equal("teacherId", teacherId), Query.equal("status", "active")]);
-  if (active) throw conflict("duplicate_request", "You already have an active learning relation together.");
+  const open = await findOne(TABLES.learningRelations, [Query.equal("studentId", studentId), Query.equal("teacherId", teacherId), Query.equal("status", ["active", "paused"])]);
+  if (open?.status === "paused") throw conflict("duplicate_request", "You already have a paused learning relation together. Resume it instead.", { reason: "pair_relation_paused", relationId: open.$id });
+  if (open) throw conflict("duplicate_request", "You already have an active learning relation together.", { reason: "pair_relation_active", relationId: open.$id });
 }
 async function createLearningRequest2(student, input, requestId2) {
   if (input.teacherId === student.$id) throw conflict("invalid_state", "You cannot send a request to yourself.");
@@ -40841,10 +40883,11 @@ async function acceptRequest(id, actor, requestId2) {
     relation = await findOne(TABLES.learningRelations, [Query.equal("sourceRequestId", row.$id)]);
   }
   await updateRow(TABLES.conversations, conv.$id, { relationId: relation.$id });
-  const { createGoal: createGoal3 } = await Promise.resolve().then(() => (init_learning2(), learning_exports));
-  await createGoal3(relation, actor.$id, { title: row.goalTitle, description: row.message ?? "" }, requestId2);
+  const { createGoal: createGoal3, seedGoalId: seedGoalId2 } = await Promise.resolve().then(() => (init_learning2(), learning_exports));
+  await createGoal3(relation, actor.$id, { title: row.goalTitle }, requestId2, seedGoalId2(relation.$id));
   const updated = await updateRow(TABLES.learningRequests, row.$id, { status: "accepted", relationId: relation.$id, respondedAt: (/* @__PURE__ */ new Date()).toISOString() });
   await appendMessage({ conversationId: conv.$id, senderId: actor.$id, type: "system", payload: { type: "system", text: "Learning relation started." }, requestId: requestId2 });
+  if (row.message?.trim()) await appendMessage({ conversationId: conv.$id, senderId: row.initiatorId, type: "text", payload: { type: "text", text: row.message.trim() }, requestId: requestId2 });
   await emitEvent({ eventType: "relation.created", aggregateType: "learning_relation", aggregateId: relation.$id, actorId: actor.$id, payload: { sourceRequestId: row.$id }, requestId: requestId2 });
   await notify({ userId: row.initiatorId, type: "request.accepted", title: "Your request was accepted", body: row.goalTitle, href: `/relations/${relation.$id}`, refType: "learning_relation", refId: relation.$id, actorId: actor.$id, dedupeKey: `request.accepted:${row.$id}` });
   return hydrate(updated, actor.$id);

@@ -64,7 +64,7 @@ export async function deleteAccount(user: Models.User, requestId?: string): Prom
   }
   for (const col of ['studentId', 'teacherId'] as const) {
     const rels = await listRows(TABLES.learningRelations, [Query.equal(col, userId), Query.equal('status', ['active', 'paused']), Query.limit(200)]);
-    await Promise.all(rels.map((r) => updateRow(TABLES.learningRelations, r.$id, { status: 'ended', endedAt: new Date().toISOString() })));
+    await Promise.all(rels.map((r) => updateRow(TABLES.learningRelations, r.$id, { status: 'ended', endedAt: new Date().toISOString(), endedBy: null, endReason: 'The other member deleted their account.' })));
   }
   const pend = await listRows(TABLES.learningRequests, [Query.equal('initiatorId', userId), Query.equal('status', 'pending'), Query.limit(200)]);
   await Promise.all(pend.map((r) => updateRow(TABLES.learningRequests, r.$id, { status: 'cancelled', respondedAt: new Date().toISOString() })));

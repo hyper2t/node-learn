@@ -50,10 +50,10 @@ export async function resolveReport(id: string, adminId: string, input: { action
   } else if (input.action === 'suspend') {
     await getUsers().updateStatus({ userId: row.targetUserId, status: false });
     const active = await listRows<LearningRelationRow>(TABLES.learningRelations, [
-      Query.or([Query.equal('studentId', row.targetUserId), Query.equal('teacherId', row.targetUserId)]), Query.equal('status', 'active'), Query.limit(100),
+      Query.or([Query.equal('studentId', row.targetUserId), Query.equal('teacherId', row.targetUserId)]), Query.equal('status', ['active', 'paused']), Query.limit(100),
     ]);
     for (const rel of active) {
-      await updateRow(TABLES.learningRelations, rel.$id, { status: 'ended', endedAt: now, version: rel.version + 1 });
+      await updateRow(TABLES.learningRelations, rel.$id, { status: 'ended', endedAt: now, endedBy: null, endReason: 'Ended by moderation: the other member\'s account was suspended.', version: rel.version + 1 });
       const other = rel.studentId === row.targetUserId ? rel.teacherId : rel.studentId;
       await notify({ userId: other, type: 'system', title: 'A learning relation was ended by moderation', body: 'The other member\'s account was suspended.', href: `/relations/${rel.$id}`, refType: 'learning_relation', refId: rel.$id });
       await emitEvent({ eventType: 'relation.ended', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: adminId, payload: { reason: 'moderation' }, requestId });

@@ -9,7 +9,7 @@ import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, P
 import { fmt, t } from '@/shared/i18n';
 import type { LearningGoal, LearningTask } from '@/types/api';
 
-const confirm = (message: string, onOk: () => void) => { void confirmDialog({ message, destructive: true }).then((ok) => { if (ok) onOk(); }); };
+const confirm = (message: string, onOk: () => void, destructive = true) => { void confirmDialog({ message, destructive }).then((ok) => { if (ok) onOk(); }); };
 
 export default function RelationWorkspace() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,6 +22,7 @@ export default function RelationWorkspace() {
   const updateTask = useUpdateTask(id);
   const setStatus = useSetRelationStatus(id);
   const [goalForm, setGoalForm] = useState<{ title: string; description: string } | null>(null);
+  const [endReason, setEndReason] = useState<string | null>(null);
   const [taskForm, setTaskForm] = useState<{ title: string; instructions: string; goalId: string | null } | null>(null);
   if (ws.isLoading) return <Loading />;
   if (ws.isError || !ws.data) return <ErrorState error={ws.error} onRetry={() => ws.refetch()} />;
@@ -60,7 +61,7 @@ export default function RelationWorkspace() {
           </Card>
         ) : null}
         {goals.length === 0 && !goalForm ? <Text variant="small" tone="secondary">{t('relation.noGoals')}</Text> : null}
-        <View className="gap-2">{goals.map((g) => <GoalRow key={g.id} g={g} current={relation.currentGoalId === g.id} canEdit={active} onAchieve={() => updateGoal.mutate({ goalId: g.id, input: { status: 'achieved' } })} />)}</View>
+        <View className="gap-2">{goals.map((g) => <GoalRow key={g.id} g={g} current={relation.currentGoalId === g.id} canEdit={active && isTeacher} onAchieve={() => updateGoal.mutate({ goalId: g.id, input: { status: 'achieved' } })} />)}</View>
       </Section>
 
       <Section title={t('relation.tasks')} right={active && isTeacher ? <Button size="sm" variant="ghost" title={t('relation.addTask')} onPress={() => setTaskForm({ title: '', instructions: '', goalId: activeGoals[0]?.id ?? null })} /> : undefined}>
@@ -105,12 +106,33 @@ export default function RelationWorkspace() {
         </View>
       </Section>
 
-      <View className="flex-row gap-2 py-6">
-        <InlineError error={setStatus.error} />
-        {relation.status === 'active' ? <Button variant="secondary" className="flex-1" title={t('relation.pause')} loading={setStatus.isPending} onPress={() => setStatus.mutate('paused')} /> : null}
-        {relation.status === 'paused' ? <Button variant="secondary" className="flex-1" title={t('relation.resume')} loading={setStatus.isPending} onPress={() => setStatus.mutate('active')} /> : null}
-        {relation.status !== 'ended' ? <Button variant="danger" className="flex-1" title={t('relation.end')} loading={setStatus.isPending} onPress={() => confirm(t('relation.endConfirm'), () => setStatus.mutate('ended'))} /> : null}
-      </View>
+      {relation.status === 'ended' ? (
+        <Card className="my-4 gap-1">
+          <Text variant="body-strong">{t('relation.endedBanner', { name: relation.endedBy === relation.teacherId ? relation.teacher.displayName : relation.student.displayName, date: relation.endedAt ? fmt.date(relation.endedAt) : '' })}</Text>
+          {relation.endReason ? <Text variant="small" tone="secondary">{relation.endReason}</Text> : null}
+        </Card>
+      ) : null}
+      {relation.status === 'paused' ? <Text variant="small" tone="secondary" className="mt-4">{t('relation.pausedHint')}</Text> : null}
+      {endReason !== null ? (
+        <Card className="my-4 gap-2">
+          <Input label={t('relation.endReason')} value={endReason} onChangeText={setEndReason} multiline maxLength={500} />
+          <InlineError error={setStatus.error} />
+          <View className="flex-row gap-2">
+            <Button variant="secondary" className="flex-1" title={t('common.cancel')} onPress={() => { setEndReason(null); setStatus.reset(); }} />
+            <Button variant="danger" className="flex-1" title={t('relation.end')} loading={setStatus.isPending} disabled={endReason.trim().length < 2}
+              onPress={() => confirm(t('relation.endConfirm'), () => setStatus.mutate({ status: 'ended', reason: endReason.trim() }, { onSuccess: () => setEndReason(null) }))} />
+          </View>
+        </Card>
+      ) : relation.status !== 'ended' ? (
+        <View className="gap-2 py-6">
+          <InlineError error={setStatus.error} />
+          <View className="flex-row gap-2">
+            {relation.status === 'active' ? <Button variant="secondary" className="flex-1" title={t('relation.pause')} loading={setStatus.isPending} onPress={() => confirm(t('relation.pauseConfirm'), () => setStatus.mutate({ status: 'paused' }), false)} /> : null}
+            {relation.status === 'paused' ? <Button variant="secondary" className="flex-1" title={t('relation.resume')} loading={setStatus.isPending} onPress={() => setStatus.mutate({ status: 'active' })} /> : null}
+            <Button variant="danger" className="flex-1" title={t('relation.end')} onPress={() => { setStatus.reset(); setEndReason(''); }} />
+          </View>
+        </View>
+      ) : null}
         </View>}
         aside={<View>
       <Section title={t('relation.proof')}><Card><ProofSummary proof={proof} /></Card></Section>

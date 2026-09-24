@@ -3,12 +3,13 @@ import type { EvidenceItem, Feedback, ProofRecord } from '../contracts/api';
 import { createRow, getRow, listRows, updateRow } from '../db/repo';
 import { isConflict, type EvidenceItemRow, type FeedbackEntryRow, type LearningGoalRow, type LearningRelationRow, type LearningTaskRow, type ProofRecordRow } from '../db/rows';
 import { TABLES } from '../db/schema';
-import { conflict, notFound } from '../errors';
+import { notFound } from '../errors';
 import { toEvidence, toFeedback, toProof } from '../mappers/learning';
 import { emitEvent } from './events';
 import { notify } from './notifications';
 import { appendMessage } from './messaging';
 import { assertEvidenceAttachments, resolveAttachments } from './uploads';
+import { assertRelationWritable } from './learning';
 
 export async function listEvidence(relationId: string, limit: number, cursor?: string): Promise<{ items: EvidenceItem[]; nextCursor: string | null }> {
   const q = [Query.equal('relationId', relationId), Query.orderDesc('submittedAt'), Query.limit(limit + 1)];
@@ -30,7 +31,7 @@ export async function getEvidence(relationId: string, evidenceId: string): Promi
 }
 
 export async function submitEvidence(rel: LearningRelationRow, authorId: string, input: { title: string; body: string; taskId?: string | null; goalId?: string | null; attachmentFileIds?: string[] }, requestId?: string): Promise<EvidenceItem> {
-  if (rel.status !== 'active') throw conflict('invalid_state', 'This learning relation is not active.');
+  assertRelationWritable(rel);
   const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
   let taskId = input.taskId ?? null;
   if (taskId) {
@@ -51,6 +52,7 @@ export async function submitEvidence(rel: LearningRelationRow, authorId: string,
 }
 
 export async function addFeedback(rel: LearningRelationRow, evidenceId: string, authorId: string, input: { body: string; nextStep?: string; markTaskDone?: boolean }, requestId?: string): Promise<Feedback> {
+  assertRelationWritable(rel);
   const ev = await getRow<EvidenceItemRow>(TABLES.evidenceItems, evidenceId);
   if (!ev || ev.relationId !== rel.$id) throw notFound('not_found', 'This evidence could not be found.');
   const fb = await createRow<FeedbackEntryRow>(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? '' });

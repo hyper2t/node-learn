@@ -139,6 +139,12 @@ export type LearningRelation = {
   currentGoalId: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** Who paused the relation (null unless paused). */
+  pausedBy: string | null;
+  pausedAt: string | null;
+  endedBy: string | null;
+  /** Required when ending; visible to both members. */
+  endReason: string | null;
   version: number;
   student: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
   teacher: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };

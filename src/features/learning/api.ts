@@ -11,7 +11,7 @@ export const learningApi = {
   list: (role: Role, status?: RelationStatus) => api.get<Page<LearningRelation>>('/v1/relations', { query: { role, status, limit: 50 } }),
   get: (id: string) => api.get<LearningRelation>(`/v1/relations/${id}`),
   workspace: (id: string) => api.get<RelationWorkspace>(`/v1/relations/${id}/workspace`),
-  setStatus: (id: string, status: RelationStatus) => api.post<LearningRelation>(`/v1/relations/${id}/status`, { status }, idem()),
+  setStatus: (id: string, input: { status: RelationStatus; reason?: string }) => api.post<LearningRelation>(`/v1/relations/${id}/status`, input, idem()),
   createGoal: (id: string, input: CreateGoalInput) => api.post<LearningGoal>(`/v1/relations/${id}/goals`, input, idem()),
   updateGoal: (id: string, goalId: string, input: UpdateGoalInput) => api.patch<LearningGoal>(`/v1/relations/${id}/goals/${goalId}`, input),
   createTask: (id: string, input: CreateTaskInput) => api.post<LearningTask>(`/v1/relations/${id}/tasks`, input, idem()),
@@ -45,7 +45,7 @@ function useRelationInvalidate(id: string) {
     void qc.invalidateQueries({ queryKey: ['conversations'] });
   };
 }
-export function useSetRelationStatus(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (s: RelationStatus) => learningApi.setStatus(id, s), onSuccess: inv }); }
+export function useSetRelationStatus(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (i: { status: RelationStatus; reason?: string }) => learningApi.setStatus(id, i), onSuccess: inv }); }
 export function useCreateGoal(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (i: CreateGoalInput) => learningApi.createGoal(id, i), onSuccess: inv }); }
 export function useUpdateGoal(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { goalId: string; input: UpdateGoalInput }) => learningApi.updateGoal(id, p.goalId, p.input), onSuccess: inv }); }
 export function useCreateTask(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (i: CreateTaskInput) => learningApi.createTask(id, i), onSuccess: inv }); }

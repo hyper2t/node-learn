@@ -32,7 +32,7 @@ export const createTeacherInvitation = z.object({ studentId: trimmed(36), goalTi
 export const requestList = z.object({ role, status: z.enum(['pending', 'accepted', 'declined', 'cancelled', 'expired']).optional(), cursor, limit });
 
 export const relationList = z.object({ role, status: z.enum(['active', 'paused', 'ended']).optional(), cursor, limit });
-export const relationStatus = z.object({ status: z.enum(['active', 'paused', 'ended']) }).strict();
+export const relationStatus = z.object({ status: z.enum(['active', 'paused', 'ended']), reason: z.string().trim().max(500).optional() }).strict();
 export const createGoal = z.object({ title: trimmed(120), description: z.string().trim().max(2000).optional() }).strict();
 export const updateGoal = z.object({ title: trimmed(120).optional(), description: z.string().trim().max(2000).optional(), status: z.enum(['active', 'achieved', 'dropped']).optional() }).strict();
 export const createTask = z.object({ title: trimmed(120), instructions: z.string().trim().max(4000).optional(), goalId: z.string().max(36).nullable().optional(), dueAt: z.string().datetime().nullable().optional() }).strict();

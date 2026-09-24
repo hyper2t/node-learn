@@ -72,6 +72,7 @@ export const en = {
   },
   relation: {
     title: 'Learning', workspace: 'Workspace', goals: 'Goals', tasks: 'Tasks', evidence: 'Evidence', proof: 'Progress', addGoal: 'Add goal', addTask: 'Assign task', submitEvidence: 'Submit evidence',
+    pauseConfirm: 'Pause this learning relation? While paused, neither of you can add goals, assign tasks, submit evidence or give feedback. Messages still work.', pausedHint: 'This learning relation is paused. Resume it to continue working together.', endReason: 'Why are you ending it? (visible to both of you)', endedBanner: 'Ended by {name} on {date}',
     giveFeedback: 'Give feedback', markAchieved: 'Mark achieved', openTasks: '{n} open tasks', evidenceCount: '{n} pieces of evidence', status: { active: 'Active', paused: 'Paused', ended: 'Ended' },
     taskStatus: { open: 'Open', submitted: 'Submitted', reviewed: 'Reviewed', done: 'Done', dropped: 'Dropped' }, goalStatus: { active: 'Active', achieved: 'Achieved', dropped: 'Dropped' },
     evidenceTitle: 'Title', evidenceBody: 'What did you do, and what do you now understand differently?', forTask: 'For task', feedbackBody: 'What did you notice?', nextStep: 'Suggested next step',

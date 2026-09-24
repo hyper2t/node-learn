@@ -804,6 +804,33 @@
                     "array": false
                 },
                 {
+                    "key": "pausedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "pausedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "endedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "endReason",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 500
+                },
+                {
                     "key": "version",
                     "type": "integer",
                     "required": false,

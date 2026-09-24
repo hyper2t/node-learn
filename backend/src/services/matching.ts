@@ -17,8 +17,9 @@ async function assertNoOpenPair(studentId: string, teacherId: string): Promise<v
   const key = pairKey(studentId, teacherId);
   const dup = await findOne<LearningRequestRow>(TABLES.learningRequests, [Query.equal('pairKey', key), Query.equal('status', OPEN)]);
   if (dup) throw conflict('duplicate_request', 'There is already an open request between you two.');
-  const active = await findOne<LearningRelationRow>(TABLES.learningRelations, [Query.equal('studentId', studentId), Query.equal('teacherId', teacherId), Query.equal('status', 'active')]);
-  if (active) throw conflict('duplicate_request', 'You already have an active learning relation together.');
+  const open = await findOne<LearningRelationRow>(TABLES.learningRelations, [Query.equal('studentId', studentId), Query.equal('teacherId', teacherId), Query.equal('status', ['active', 'paused'])]);
+  if (open?.status === 'paused') throw conflict('duplicate_request', 'You already have a paused learning relation together. Resume it instead.', { reason: 'pair_relation_paused', relationId: open.$id });
+  if (open) throw conflict('duplicate_request', 'You already have an active learning relation together.', { reason: 'pair_relation_active', relationId: open.$id });
 }
 
 export async function createLearningRequest(student: Models.User, input: { teacherId: string; goalTitle: string; message: string }, requestId?: string): Promise<LearningRequest> {
@@ -99,10 +100,13 @@ export async function acceptRequest(id: string, actor: Models.User, requestId?: 
   }
   await updateRow(TABLES.conversations, conv.$id, { relationId: relation.$id });
   // Seed the first goal from the request title so the workspace is never empty.
-  const { createGoal } = await import('./learning');
-  await createGoal(relation, actor.$id, { title: row.goalTitle, description: row.message ?? '' }, requestId);
+  // The first goal has a deterministic id so a retried accept never creates a duplicate.
+  // The request message stays on the request and is replayed into the chat instead of becoming the goal description.
+  const { createGoal, seedGoalId } = await import('./learning');
+  await createGoal(relation, actor.$id, { title: row.goalTitle }, requestId, seedGoalId(relation.$id));
   const updated = await updateRow<LearningRequestRow>(TABLES.learningRequests, row.$id, { status: 'accepted', relationId: relation.$id, respondedAt: new Date().toISOString() });
   await appendMessage({ conversationId: conv.$id, senderId: actor.$id, type: 'system', payload: { type: 'system', text: 'Learning relation started.' }, requestId });
+  if (row.message?.trim()) await appendMessage({ conversationId: conv.$id, senderId: row.initiatorId, type: 'text', payload: { type: 'text', text: row.message.trim() }, requestId });
   await emitEvent({ eventType: 'relation.created', aggregateType: 'learning_relation', aggregateId: relation.$id, actorId: actor.$id, payload: { sourceRequestId: row.$id }, requestId });
   await notify({ userId: row.initiatorId, type: 'request.accepted', title: 'Your request was accepted', body: row.goalTitle, href: `/relations/${relation.$id}`, refType: 'learning_relation', refId: relation.$id, actorId: actor.$id, dedupeKey: `request.accepted:${row.$id}` });
   return hydrate(updated, actor.$id);

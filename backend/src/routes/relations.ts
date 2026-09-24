@@ -18,7 +18,7 @@ relationRoutes.get('/:id', async (c) => ok(c.get('requestId'), await getRelation
 relationRoutes.get('/:id/workspace', async (c) => ok(c.get('requestId'), await getWorkspace(c.req.param('id'), currentUser(c).$id)));
 relationRoutes.post('/:id/status', async (c) => {
   const body = await readJsonBody(c, S.relationStatus);
-  return ok(c.get('requestId'), await updateRelationStatus(c.req.param('id'), currentUser(c).$id, body.status, c.get('requestId')));
+  return ok(c.get('requestId'), await updateRelationStatus(c.req.param('id'), currentUser(c).$id, body, c.get('requestId')));
 });
 
 relationRoutes.post('/:id/goals', async (c) => {

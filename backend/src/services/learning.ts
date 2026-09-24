@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { Query } from 'node-appwrite';
 import type { LearningGoal, LearningRelation, LearningTask, RelationWorkspace } from '../contracts/api';
 import { createRow, getRow, listRows, updateRow } from '../db/repo';
-import type { EvidenceItemRow, FeedbackEntryRow, LearningGoalRow, LearningRelationRow, LearningTaskRow, ProofRecordRow } from '../db/rows';
+import { isConflict, type EvidenceItemRow, type FeedbackEntryRow, type LearningGoalRow, type LearningRelationRow, type LearningTaskRow, type ProofRecordRow } from '../db/rows';
 import { TABLES } from '../db/schema';
-import { conflict, forbidden, notFound } from '../errors';
+import { conflict, forbidden, notFound, validation } from '../errors';
 import { toEvidence, toGoal, toProof, toRelation, toTask } from '../mappers/learning';
 import { emitEvent } from './events';
 import { notify } from './notifications';
@@ -17,6 +18,17 @@ export async function requireRelationMember(relationId: string, userId: string):
   if (rel.studentId !== userId && rel.teacherId !== userId) throw forbidden();
   return rel;
 }
+
+/** Every write inside a relation (goals, tasks, evidence, feedback) requires it to be active. */
+export function assertRelationWritable(rel: LearningRelationRow): void {
+  if (rel.status !== 'active') throw conflict('invalid_state', rel.status === 'paused' ? 'This learning relation is paused. Resume it first.' : 'This learning relation has ended.', { reason: 'relation_not_active', status: rel.status });
+}
+
+/** Deterministic id for the goal seeded from the accepted request, so a retried accept never duplicates it. */
+export const seedGoalId = (relationId: string) => createHash('sha256').update(`seed-goal:${relationId}`).digest('hex').slice(0, 32);
+
+type RelStatus = 'active' | 'paused' | 'ended';
+const TRANSITIONS: Record<RelStatus, RelStatus[]> = { active: ['paused', 'ended'], paused: ['active', 'ended'], ended: [] };
 
 export async function listRelations(userId: string, role: 'student' | 'teacher', status: string | undefined, limit: number, cursor?: string): Promise<{ items: LearningRelation[]; nextCursor: string | null }> {
   const q = [Query.equal(role === 'student' ? 'studentId' : 'teacherId', userId), Query.orderDesc('lastActivityAt'), Query.limit(limit + 1)];
@@ -55,12 +67,23 @@ export async function getWorkspace(relationId: string, userId: string): Promise<
   };
 }
 
-export async function updateRelationStatus(relationId: string, userId: string, status: 'active' | 'paused' | 'ended', requestId?: string): Promise<LearningRelation> {
+export async function updateRelationStatus(relationId: string, userId: string, input: { status: RelStatus; reason?: string }, requestId?: string): Promise<LearningRelation> {
   const rel = await requireRelationMember(relationId, userId);
-  if (rel.status === 'ended') throw conflict('invalid_state', 'This learning relation has ended.');
-  await updateRow(TABLES.learningRelations, relationId, { status, endedAt: status === 'ended' ? new Date().toISOString() : null, version: rel.version + 1 });
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'system', payload: { type: 'system', text: status === 'ended' ? 'Learning relation ended.' : status === 'paused' ? 'Learning relation paused.' : 'Learning relation resumed.' }, requestId });
-  await emitEvent({ eventType: `relation.${status}`, aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: {}, requestId });
+  const from = rel.status as RelStatus;
+  const to = input.status;
+  if (from === 'ended') throw conflict('invalid_state', 'This learning relation has ended.');
+  if (!TRANSITIONS[from]?.includes(to)) throw conflict('invalid_state', `This learning relation is already ${from}.`, { from, to });
+  const reason = input.reason?.trim() ?? '';
+  if (to === 'ended' && !reason) throw validation('Tell the other person why you are ending this learning relation.', [{ path: 'reason', message: 'Required' }]);
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status: to, version: rel.version + 1, lastActivityAt: now };
+  if (to === 'paused') Object.assign(patch, { pausedBy: userId, pausedAt: now });
+  if (to === 'active') Object.assign(patch, { pausedBy: null, pausedAt: null });
+  if (to === 'ended') Object.assign(patch, { endedAt: now, endedBy: userId, endReason: reason.slice(0, 500) });
+  await updateRow(TABLES.learningRelations, relationId, patch);
+  const text = to === 'ended' ? `Learning relation ended. Reason: ${reason}` : to === 'paused' ? 'Learning relation paused.' : 'Learning relation resumed.';
+  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'system', payload: { type: 'system', text }, requestId });
+  await emitEvent({ eventType: `relation.${to === 'active' ? 'resumed' : to}`, aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { from, reason: to === 'ended' ? reason : undefined }, requestId });
   return getRelation(relationId, userId);
 }
 
@@ -70,8 +93,18 @@ async function touch(rel: LearningRelationRow, patch: Record<string, unknown> = 
 
 // --- goals ---------------------------------------------------------------
 
-export async function createGoal(rel: LearningRelationRow, actorId: string, input: { title: string; description?: string }, requestId?: string): Promise<LearningGoal> {
-  const row = await createRow<LearningGoalRow>(TABLES.learningGoals, { relationId: rel.$id, title: input.title, description: input.description ?? '', status: 'active', createdBy: actorId });
+export async function createGoal(rel: LearningRelationRow, actorId: string, input: { title: string; description?: string }, requestId?: string, rowId?: string): Promise<LearningGoal> {
+  assertRelationWritable(rel);
+  let row: LearningGoalRow;
+  try {
+    row = await createRow<LearningGoalRow>(TABLES.learningGoals, { relationId: rel.$id, title: input.title, description: input.description ?? '', status: 'active', createdBy: actorId }, rowId);
+  } catch (err) {
+    // Retried seed: the goal already exists, so skip the side effects that ran the first time.
+    if (!rowId || !isConflict(err)) throw err;
+    const existing = await getRow<LearningGoalRow>(TABLES.learningGoals, rowId);
+    if (!existing) throw err;
+    return toGoal(existing);
+  }
   await touch(rel, rel.currentGoalId ? {} : { currentGoalId: row.$id });
   await appendMessage({ conversationId: rel.conversationId, senderId: actorId, type: 'goal_created', payload: { type: 'goal_created', goalId: row.$id, title: row.title }, requestId });
   await emitEvent({ eventType: 'goal.created', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId, payload: { goalId: row.$id }, requestId });
@@ -81,8 +114,10 @@ export async function createGoal(rel: LearningRelationRow, actorId: string, inpu
 
 export async function updateGoal(relationId: string, goalId: string, userId: string, patch: { title?: string; description?: string; status?: string }, requestId?: string): Promise<LearningGoal> {
   const rel = await requireRelationMember(relationId, userId);
+  assertRelationWritable(rel);
   const goal = await getRow<LearningGoalRow>(TABLES.learningGoals, goalId);
   if (!goal || goal.relationId !== relationId) throw notFound('not_found', 'This goal could not be found.');
+  if (patch.status && patch.status !== goal.status && userId !== rel.teacherId) throw forbidden('Only the teacher can change a goal\'s status.');
   const row = await updateRow<LearningGoalRow>(TABLES.learningGoals, goalId, patch);
   await touch(rel);
   if (patch.status === 'achieved' && goal.status !== 'achieved') {
@@ -96,7 +131,8 @@ export async function updateGoal(relationId: string, goalId: string, userId: str
 
 export async function createTask(relationId: string, userId: string, input: { title: string; instructions?: string; goalId?: string | null; dueAt?: string | null }, requestId?: string): Promise<LearningTask> {
   const rel = await requireRelationMember(relationId, userId);
-  if (rel.status !== 'active') throw conflict('invalid_state', 'This learning relation is not active.');
+  if (rel.teacherId !== userId) throw forbidden('Only the teacher assigns tasks.');
+  assertRelationWritable(rel);
   const row = await createRow<LearningTaskRow>(TABLES.learningTasks, { relationId, goalId: input.goalId ?? rel.currentGoalId, title: input.title, instructions: input.instructions ?? '', status: 'open', assignedBy: userId, dueAt: input.dueAt ?? null });
   await touch(rel, { openTasks: rel.openTasks + 1 });
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'task_assigned', payload: { type: 'task_assigned', taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId });
@@ -107,6 +143,8 @@ export async function createTask(relationId: string, userId: string, input: { ti
 
 export async function updateTask(relationId: string, taskId: string, userId: string, patch: { title?: string; instructions?: string; status?: string; dueAt?: string | null }): Promise<LearningTask> {
   const rel = await requireRelationMember(relationId, userId);
+  if (rel.teacherId !== userId) throw forbidden('Only the teacher can edit tasks.');
+  assertRelationWritable(rel);
   const task = await getRow<LearningTaskRow>(TABLES.learningTasks, taskId);
   if (!task || task.relationId !== relationId) throw notFound('not_found', 'This task could not be found.');
   const row = await updateRow<LearningTaskRow>(TABLES.learningTasks, taskId, patch);

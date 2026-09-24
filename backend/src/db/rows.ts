@@ -19,7 +19,8 @@ export type LearningRequestRow = Stamped & {
 };
 export type LearningRelationRow = Stamped & {
   studentId: string; teacherId: string; sourceRequestId: string; status: string; conversationId: string; currentGoalId: string | null;
-  startedAt: string; endedAt: string | null; version: number; openTasks: number; evidenceCount: number; lastActivityAt: string | null;
+  startedAt: string; endedAt: string | null; version: number;
+  pausedBy?: string | null; pausedAt?: string | null; endedBy?: string | null; endReason?: string | null; openTasks: number; evidenceCount: number; lastActivityAt: string | null;
 };
 export type LearningGoalRow = Stamped & { relationId: string; title: string; description: string | null; status: string; createdBy: string };
 export type LearningTaskRow = Stamped & { relationId: string; goalId: string | null; title: string; instructions: string | null; status: string; assignedBy: string; dueAt: string | null };
