@@ -10,6 +10,7 @@ export const qk = {
   requests: { list: (role: Role, status?: string) => ['requests', role, status ?? 'all'] as const, detail: (id: string) => ['requests', 'detail', id] as const },
   relations: { list: (role: Role, status?: string) => ['relations', role, status ?? 'all'] as const, workspace: (id: string) => ['relations', id, 'workspace'] as const, evidence: (id: string) => ['relations', id, 'evidence'] as const, reviewQueue: ['relations', 'review-queue'] as const, summary: (id: string) => ['relations', id, 'summary'] as const },
   conversations: { list: ['conversations'] as const, detail: (id: string) => ['conversations', id] as const, messages: (id: string) => ['conversations', id, 'messages'] as const },
+  reviews: { relation: (id: string) => ['reviews', 'relation', id] as const, teacher: (id: string) => ['reviews', 'teacher', id] as const },
   notifications: { summary: ['notifications', 'summary'] as const, list: (unreadOnly: boolean) => ['notifications', 'list', unreadOnly ? 'unread' : 'all'] as const },
   admin: { reports: (status: string) => ['admin', 'reports', status] as const },
   qa: {

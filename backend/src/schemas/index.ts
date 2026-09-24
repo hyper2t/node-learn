@@ -42,6 +42,11 @@ export const createEvidence = z.object({ title: trimmed(120), body: z.string().t
 export const createFeedback = z.object({ body: trimmed(4000), nextStep: z.string().trim().max(300).optional(), markTaskDone: z.boolean().optional(), outcome: z.enum(['approved', 'needs_revision']).optional() }).strict();
 export const reviseEvidence = z.object({ title: trimmed(120).optional(), body: z.string().trim().max(8000).optional(), attachmentFileIds: z.array(z.string().max(36)).max(5).optional() }).strict()
   .refine((v) => v.title !== undefined || v.body !== undefined || v.attachmentFileIds !== undefined, { message: 'Change at least one field.' });
+export const upsertReview = z.object({
+  rating: z.number().int().min(1).max(5), body: z.string().trim().max(800).optional(),
+  tags: z.array(z.enum(['clear', 'responsive', 'patient'])).max(3).optional(), anonymous: z.boolean().optional(),
+}).strict();
+export const reviewReply = z.object({ reply: z.string().trim().max(500) }).strict();
 export const closingNote = z.object({ note: z.string().trim().max(1000) }).strict();
 export const declineGoalCompletion = z.object({ note: z.string().trim().max(300).optional() }).strict();
 export const paged = z.object({ cursor, limit });

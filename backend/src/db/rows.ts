@@ -11,7 +11,7 @@ export type RoleMembershipRow = Stamped & { userId: string; role: string; active
 export type StudentProfileRow = Stamped & { userId: string; headline: string | null; goalSummary: string | null; interests: string[] | null; visibility: string | null };
 export type TeacherProfileRow = Stamped & {
   userId: string; headline: string | null; bio: string | null; subjects: string[] | null; approach: string | null;
-  acceptingRequests: boolean; visibility: string | null; searchText: string | null;
+  acceptingRequests: boolean; visibility: string | null; searchText: string | null; reviewCount?: number | null; ratingSum?: number | null;
 };
 export type LearningRequestRow = Stamped & {
   kind: string; studentId: string; teacherId: string; initiatorId: string; goalTitle: string; message: string | null;
@@ -29,6 +29,10 @@ export type EvidenceItemRow = Stamped & {
   attachmentFileIds: string[] | null; status: string; version: number; submittedAt: string; reviewedAt: string | null;
 };
 export type FeedbackEntryRow = Stamped & { evidenceId: string; relationId: string; authorId: string; body: string | null; nextStep: string | null; outcome?: string | null };
+export type TeacherReviewRow = Stamped & {
+  relationId: string; teacherId: string; studentId: string; rating: number; body: string | null; tags: string[] | null; anonymous: boolean;
+  studentIsMinor: boolean; reply: string | null; replyAt: string | null; editableUntil: string; removedAt: string | null; removedBy: string | null;
+};
 export type RelationSummaryRow = Stamped & {
   relationId: string; studentId: string; teacherId: string; startedAt: string; endedAt: string; endedBy: string | null; endReason: string | null;
   goalsJson: string; countsJson: string; milestonesJson: string; closingNote: string | null; closingNoteAt: string | null;

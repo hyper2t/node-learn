@@ -35882,7 +35882,8 @@ var init_schema = __esm({
       qaQuestions: "qa_questions",
       qaAnswers: "qa_answers",
       evidenceRevisions: "evidence_revisions",
-      relationSummaries: "relation_summaries"
+      relationSummaries: "relation_summaries",
+      teacherReviews: "teacher_reviews"
     };
   }
 });
@@ -35924,6 +35925,34 @@ var init_roles = __esm({
     init_schema();
     ROLES = ["student", "teacher"];
     isRole = (v) => ROLES.includes(v);
+  }
+});
+
+// src/contracts/api.ts
+var REVIEW_MIN_FOR_AVERAGE, REVIEW_ELIGIBLE_AFTER_DAYS, REVIEW_EDITABLE_DAYS, REVIEW_TAGS, QA_TOPICS, QA_AUTO_CLOSE_DAYS, QA_MAX_ATTACHMENTS;
+var init_api = __esm({
+  "src/contracts/api.ts"() {
+    "use strict";
+    REVIEW_MIN_FOR_AVERAGE = 3;
+    REVIEW_ELIGIBLE_AFTER_DAYS = 30;
+    REVIEW_EDITABLE_DAYS = 30;
+    REVIEW_TAGS = ["clear", "responsive", "patient"];
+    QA_TOPICS = [
+      { slug: "programming", label: "Programming" },
+      { slug: "math", label: "Math" },
+      { slug: "physics", label: "Physics" },
+      { slug: "languages", label: "Languages" },
+      { slug: "writing", label: "Writing" },
+      { slug: "music", label: "Music" },
+      { slug: "art-design", label: "Art & design" },
+      { slug: "science", label: "Science" },
+      { slug: "history", label: "History" },
+      { slug: "exam-prep", label: "Exam prep" },
+      { slug: "public-speaking", label: "Public speaking" },
+      { slug: "learning-how-to-learn", label: "Learning how to learn" }
+    ];
+    QA_AUTO_CLOSE_DAYS = 14;
+    QA_MAX_ATTACHMENTS = 5;
   }
 });
 
@@ -36050,14 +36079,18 @@ function toTeacherProfile(p, t, emailVerified, signals) {
     emailVerified,
     acceptingRequests: t.acceptingRequests,
     visibility: t.visibility ?? "public",
-    signals,
+    signals: { ...signals, ...ratingSignals(t.reviewCount ?? 0, t.ratingSum ?? 0) },
     updatedAt: t.updatedAt
   };
+}
+function ratingSignals(count, sum) {
+  return { reviewCount: count, avgRating: count >= REVIEW_MIN_FOR_AVERAGE ? Math.round(sum / count * 10) / 10 : null };
 }
 var ROLES2, asRole;
 var init_profile = __esm({
   "src/mappers/profile.ts"() {
     "use strict";
+    init_api();
     ROLES2 = ["student", "teacher"];
     asRole = (r) => ROLES2.includes(r) ? r : null;
   }
@@ -40125,26 +40158,7 @@ function idempotencyKeyOf(c) {
 
 // src/schemas/index.ts
 init_zod();
-
-// src/contracts/api.ts
-var QA_TOPICS = [
-  { slug: "programming", label: "Programming" },
-  { slug: "math", label: "Math" },
-  { slug: "physics", label: "Physics" },
-  { slug: "languages", label: "Languages" },
-  { slug: "writing", label: "Writing" },
-  { slug: "music", label: "Music" },
-  { slug: "art-design", label: "Art & design" },
-  { slug: "science", label: "Science" },
-  { slug: "history", label: "History" },
-  { slug: "exam-prep", label: "Exam prep" },
-  { slug: "public-speaking", label: "Public speaking" },
-  { slug: "learning-how-to-learn", label: "Learning how to learn" }
-];
-var QA_AUTO_CLOSE_DAYS = 14;
-var QA_MAX_ATTACHMENTS = 5;
-
-// src/schemas/index.ts
+init_api();
 var trimmed = (max, min = 1) => external_exports.string().trim().min(min).max(max);
 var cursor = external_exports.string().min(1).max(64).optional();
 var limit = external_exports.coerce.number().int().min(1).max(50).default(20);
@@ -40186,6 +40200,13 @@ var updateTask = external_exports.object({ title: trimmed(120).optional(), instr
 var createEvidence = external_exports.object({ title: trimmed(120), body: external_exports.string().trim().max(8e3), taskId: external_exports.string().max(36).nullable().optional(), goalId: external_exports.string().max(36).nullable().optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict();
 var createFeedback = external_exports.object({ body: trimmed(4e3), nextStep: external_exports.string().trim().max(300).optional(), markTaskDone: external_exports.boolean().optional(), outcome: external_exports.enum(["approved", "needs_revision"]).optional() }).strict();
 var reviseEvidence = external_exports.object({ title: trimmed(120).optional(), body: external_exports.string().trim().max(8e3).optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict().refine((v) => v.title !== void 0 || v.body !== void 0 || v.attachmentFileIds !== void 0, { message: "Change at least one field." });
+var upsertReview = external_exports.object({
+  rating: external_exports.number().int().min(1).max(5),
+  body: external_exports.string().trim().max(800).optional(),
+  tags: external_exports.array(external_exports.enum(["clear", "responsive", "patient"])).max(3).optional(),
+  anonymous: external_exports.boolean().optional()
+}).strict();
+var reviewReply = external_exports.object({ reply: external_exports.string().trim().max(500) }).strict();
 var closingNote = external_exports.object({ note: external_exports.string().trim().max(1e3) }).strict();
 var declineGoalCompletion = external_exports.object({ note: external_exports.string().trim().max(300).optional() }).strict();
 var paged = external_exports.object({ cursor, limit });
@@ -40226,6 +40247,7 @@ init_profiles();
 
 // src/services/qa.ts
 var import_node_crypto4 = require("node:crypto");
+init_api();
 init_repo();
 init_rows();
 init_schema();
@@ -40235,6 +40257,7 @@ init_notifications2();
 init_uploads();
 
 // src/services/qa-policy.ts
+init_api();
 var QA_DAILY_QUESTION_LIMIT = 5;
 var QA_DAILY_ANSWER_LIMIT = 30;
 var DAY_MS = 24 * 60 * 60 * 1e3;
@@ -40640,7 +40663,189 @@ async function contentContext(targetType, id) {
   return a ? { excerpt: excerpt(a.body), href: `/qa/${a.questionId}` } : { excerpt: null, href: null };
 }
 
+// src/services/reviews.ts
+init_dist();
+init_api();
+init_repo();
+init_rows();
+init_schema();
+init_errors2();
+init_profile();
+init_events();
+init_learning2();
+init_notifications2();
+init_profiles();
+
+// src/services/review-policy.ts
+init_api();
+var DAY_MS2 = 24 * 36e5;
+function reviewEligibleFrom(rel) {
+  if (rel.status === "ended") return rel.endedAt ?? rel.startedAt;
+  if (rel.status !== "active" && rel.status !== "paused") return null;
+  const byTime = new Date(Date.parse(rel.startedAt) + REVIEW_ELIGIBLE_AFTER_DAYS * DAY_MS2).toISOString();
+  return byTime;
+}
+function canWriteReview(rel, existing, nowMs) {
+  if (existing) return !existing.removedAt && Date.parse(existing.editableUntil) > nowMs;
+  const from = reviewEligibleFrom(rel);
+  return from !== null && Date.parse(from) <= nowMs;
+}
+function cleanTags(tags) {
+  return [...new Set((tags ?? []).filter((t) => REVIEW_TAGS.includes(t)))];
+}
+function toTeacherReview(row, author, privileged) {
+  const hideName = !privileged && (row.anonymous || row.studentIsMinor);
+  return {
+    id: row.$id,
+    relationId: row.relationId,
+    teacherId: row.teacherId,
+    author: hideName || !author ? ANONYMOUS_STUDENT : author,
+    rating: row.rating,
+    body: !privileged && row.studentIsMinor ? null : row.body || null,
+    tags: cleanTags(row.tags),
+    anonymous: row.anonymous,
+    reply: row.reply || null,
+    replyAt: row.replyAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    editableUntil: row.editableUntil
+  };
+}
+
+// src/services/reviews.ts
+var DAY_MS3 = 24 * 36e5;
+var isMinorBand = (b) => b === "under_16" || b === "16_17";
+async function recomputeTeacherRating(teacherId) {
+  const rows = await listRows(TABLES.teacherReviews, [Query.equal("teacherId", teacherId), Query.isNull("removedAt"), Query.select(["rating"]), Query.limit(5e3)]);
+  const tp = await findOne(TABLES.teacherProfiles, [Query.equal("userId", teacherId)]);
+  if (tp) await updateRow(TABLES.teacherProfiles, tp.$id, { reviewCount: rows.length, ratingSum: rows.reduce((n, r) => n + r.rating, 0) });
+}
+async function withAuthors(rows, viewerId) {
+  const refs = await personRefs(rows.map((r) => r.studentId));
+  return rows.map((r) => toTeacherReview(r, refs.get(r.studentId), viewerId === r.teacherId || viewerId === r.studentId));
+}
+async function getRelationReview(relationId, viewerId) {
+  const rel = await requireRelationMember(relationId, viewerId);
+  const row = await getRow(TABLES.teacherReviews, relationId);
+  const visible = row && !row.removedAt ? row : null;
+  const isStudent = rel.studentId === viewerId;
+  return {
+    review: visible ? (await withAuthors([visible], viewerId))[0] : null,
+    canWrite: isStudent && canWriteReview(rel, row, Date.now()),
+    eligibleFrom: isStudent ? reviewEligibleFrom(rel) : null
+  };
+}
+async function upsertReview2(relationId, studentId, input, requestId2) {
+  const rel = await requireRelationMember(relationId, studentId);
+  if (rel.studentId !== studentId) throw forbidden("Only the learner can review this teacher.");
+  const existing = await getRow(TABLES.teacherReviews, relationId);
+  if (!canWriteReview(rel, existing, Date.now())) {
+    throw conflict("invalid_state", existing ? "This review can no longer be edited." : "You can review this teacher after 30 days together or when the relation ends.");
+  }
+  const data = { rating: input.rating, body: input.body ?? "", tags: cleanTags(input.tags), anonymous: input.anonymous ?? false };
+  let created = false;
+  if (existing) {
+    await updateRow(TABLES.teacherReviews, relationId, data);
+  } else {
+    const profile = await getRow(TABLES.profiles, studentId);
+    try {
+      await createRow(TABLES.teacherReviews, {
+        ...data,
+        relationId,
+        teacherId: rel.teacherId,
+        studentId,
+        studentIsMinor: isMinorBand(profile?.ageBand),
+        reply: null,
+        replyAt: null,
+        editableUntil: new Date(Date.now() + REVIEW_EDITABLE_DAYS * DAY_MS3).toISOString(),
+        removedAt: null,
+        removedBy: null
+      }, relationId);
+      created = true;
+    } catch (err) {
+      if (!isConflict(err)) throw err;
+      await updateRow(TABLES.teacherReviews, relationId, data);
+    }
+  }
+  await recomputeTeacherRating(rel.teacherId);
+  if (created) {
+    await notify({
+      userId: rel.teacherId,
+      type: "review.received",
+      title: "You received a review",
+      body: `${input.rating}/5`,
+      href: `/teachers/${rel.teacherId}`,
+      refType: "teacher_review",
+      refId: relationId,
+      actorId: data.anonymous ? null : studentId,
+      dedupeKey: `review.received:${relationId}`
+    });
+  }
+  await emitEvent({ eventType: created ? "review.created" : "review.updated", aggregateType: "teacher_review", aggregateId: relationId, actorId: studentId, payload: { rating: input.rating }, requestId: requestId2 });
+  return getRelationReview(relationId, studentId);
+}
+async function replyToReview(reviewId, teacherId, reply, requestId2) {
+  const row = await getRow(TABLES.teacherReviews, reviewId);
+  if (!row || row.removedAt) throw notFound("not_found", "This review could not be found.");
+  if (row.teacherId !== teacherId) throw forbidden("Only the reviewed teacher can reply.");
+  const first = !row.reply && !!reply;
+  const updated = await updateRow(TABLES.teacherReviews, reviewId, { reply, replyAt: reply ? (/* @__PURE__ */ new Date()).toISOString() : null });
+  if (first) {
+    await notify({
+      userId: row.studentId,
+      type: "review.replied",
+      title: "Your teacher replied to your review",
+      body: excerpt(reply, 120),
+      href: `/relations/${row.relationId}`,
+      refType: "teacher_review",
+      refId: reviewId,
+      actorId: teacherId,
+      dedupeKey: `review.replied:${reviewId}`
+    });
+  }
+  await emitEvent({ eventType: "review.replied", aggregateType: "teacher_review", aggregateId: reviewId, actorId: teacherId, payload: {}, requestId: requestId2 });
+  return (await withAuthors([updated], teacherId))[0];
+}
+async function listTeacherReviews(teacherId, viewerId, p) {
+  const q = [Query.equal("teacherId", teacherId), Query.isNull("removedAt"), Query.orderDesc("createdAt"), Query.limit(p.limit + 1)];
+  if (p.cursor) q.push(Query.cursorAfter(p.cursor));
+  const [fetched, tp] = await Promise.all([
+    listRows(TABLES.teacherReviews, q),
+    findOne(TABLES.teacherProfiles, [Query.equal("userId", teacherId)])
+  ]);
+  const rows = fetched.slice(0, p.limit);
+  const s = ratingSignals(tp?.reviewCount ?? 0, tp?.ratingSum ?? 0);
+  return { items: await withAuthors(rows, viewerId), nextCursor: fetched.length > p.limit ? rows[rows.length - 1].$id : null, summary: { count: s.reviewCount, avgRating: s.avgRating } };
+}
+async function reportReview(reporterId, reviewId, input) {
+  const row = await getRow(TABLES.teacherReviews, reviewId);
+  if (!row || row.removedAt) throw notFound("not_found", "This review could not be found.");
+  if (row.studentId === reporterId) throw conflict("invalid_state", "You cannot report your own review.");
+  await createRow(TABLES.reports, {
+    reporterId,
+    targetUserId: row.studentId,
+    reason: input.reason,
+    details: input.details ?? "",
+    status: "open",
+    targetType: "teacher_review",
+    targetId: reviewId
+  });
+  return { reported: true };
+}
+async function removeReview(reviewId, adminId) {
+  const row = await getRow(TABLES.teacherReviews, reviewId);
+  if (!row || row.removedAt) return;
+  await updateRow(TABLES.teacherReviews, reviewId, { removedAt: (/* @__PURE__ */ new Date()).toISOString(), removedBy: adminId });
+  await recomputeTeacherRating(row.teacherId);
+}
+async function reviewContext(id) {
+  const row = await getRow(TABLES.teacherReviews, id);
+  if (!row) return { excerpt: null, href: null };
+  return { excerpt: excerpt(`${row.rating}/5 \u2014 ${row.body ?? ""}`), href: row.removedAt ? null : `/teachers/${row.teacherId}` };
+}
+
 // src/services/admin.ts
+var contextOf = (type, id) => type === "teacher_review" && id ? reviewContext(id) : contentContext(type, id);
 async function listReports(p) {
   const q = [Query.orderDesc("createdAt"), Query.limit(p.limit + 1)];
   if (p.status) q.push(Query.equal("status", p.status));
@@ -40649,7 +40854,7 @@ async function listReports(p) {
   const hasMore = rows.length > p.limit;
   const page = hasMore ? rows.slice(0, p.limit) : rows;
   const refs = await personRefs(page.flatMap((r) => [r.reporterId, r.targetUserId]));
-  const contexts = await Promise.all(page.map((r) => contentContext(r.targetType, r.targetId)));
+  const contexts = await Promise.all(page.map((r) => contextOf(r.targetType, r.targetId)));
   const last = page[page.length - 1];
   return { items: page.map((r, i) => toReportItem(r, refs.get(r.reporterId), refs.get(r.targetUserId), contexts[i])), nextCursor: hasMore && last ? last.$id : null };
 }
@@ -40659,8 +40864,10 @@ async function resolveReport2(id, adminId, input, requestId2) {
   if (row.status === "resolved") throw conflict("invalid_state", "This report is already resolved.");
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (input.action === "remove_content") {
-    if (row.targetType !== "qa_question" && row.targetType !== "qa_answer" || !row.targetId) throw conflict("invalid_state", "This report is not about a post.");
-    await removeContent(row.targetType, row.targetId, adminId);
+    if (!row.targetId) throw conflict("invalid_state", "This report is not about a post.");
+    if (row.targetType === "teacher_review") await removeReview(row.targetId, adminId);
+    else if (row.targetType === "qa_question" || row.targetType === "qa_answer") await removeContent(row.targetType, row.targetId, adminId);
+    else throw conflict("invalid_state", "This report is not about a post.");
     await notify({
       userId: row.targetUserId,
       type: "system",
@@ -40698,7 +40905,7 @@ async function resolveReport2(id, adminId, input, requestId2) {
   await audit({ actorId: adminId, action: `report.${input.action}`, resourceType: "report", resourceId: id, reason: input.note, requestId: requestId2 });
   await emitEvent({ eventType: "report.resolved", aggregateType: "report", aggregateId: id, actorId: adminId, payload: { action: input.action, targetUserId: row.targetUserId }, requestId: requestId2 });
   const refs = await personRefs([updated.reporterId, updated.targetUserId]);
-  return toReportItem(updated, refs.get(updated.reporterId), refs.get(updated.targetUserId), await contentContext(updated.targetType, updated.targetId));
+  return toReportItem(updated, refs.get(updated.reporterId), refs.get(updated.targetUserId), await contextOf(updated.targetType, updated.targetId));
 }
 
 // src/routes/admin.ts
@@ -40868,7 +41075,7 @@ async function unlinkIdentity(user, identityId) {
 }
 async function exportData(userId) {
   const by = (table, col) => listRows(table, [Query.equal(col, userId), Query.limit(500)]);
-  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions, summariesS, summariesT] = await Promise.all([
+  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions, summariesS, summariesT, reviewsW, reviewsR] = await Promise.all([
     getRow(TABLES.profiles, userId),
     by(TABLES.roleMemberships, "userId"),
     by(TABLES.studentProfiles, "userId"),
@@ -40883,10 +41090,12 @@ async function exportData(userId) {
     by(TABLES.blocks, "blockerId"),
     by(TABLES.evidenceRevisions, "authorId"),
     by(TABLES.relationSummaries, "studentId"),
-    by(TABLES.relationSummaries, "teacherId")
+    by(TABLES.relationSummaries, "teacherId"),
+    by(TABLES.teacherReviews, "studentId"),
+    by(TABLES.teacherReviews, "teacherId")
   ]);
   const messages = await by(TABLES.messages, "senderId");
-  return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, learningSummaries: [...summariesS, ...summariesT], feedback, messagesSent: messages, contacts, blocks };
+  return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, learningSummaries: [...summariesS, ...summariesT], reviewsWritten: reviewsW, reviewsReceived: reviewsR, feedback, messagesSent: messages, contacts, blocks };
 }
 async function deleteAvatarFile(fileId) {
   if (!fileId) return;
@@ -41015,6 +41224,11 @@ relationRoutes.post("/:id/status", async (c) => {
   return ok(c.get("requestId"), await updateRelationStatus(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
 });
 relationRoutes.get("/:id/summary", async (c) => ok(c.get("requestId"), await getSummary(c.req.param("id"), currentUser(c).$id)));
+relationRoutes.get("/:id/review", async (c) => ok(c.get("requestId"), await getRelationReview(c.req.param("id"), currentUser(c).$id)));
+relationRoutes.put("/:id/review", async (c) => {
+  const body2 = await readJsonBody(c, upsertReview);
+  return ok(c.get("requestId"), await upsertReview2(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
+});
 relationRoutes.put("/:id/summary/closing-note", async (c) => {
   const body2 = await readJsonBody(c, closingNote);
   return ok(c.get("requestId"), await setClosingNote(c.req.param("id"), currentUser(c).$id, body2.note, c.get("requestId")));
@@ -41291,6 +41505,15 @@ teacherRoutes.get("/", async (c) => {
   return ok(c.get("requestId"), body2);
 });
 teacherRoutes.get("/:userId", async (c) => ok(c.get("requestId"), await getTeacherProfile(c.req.param("userId"), c.get("user"))));
+teacherRoutes.get("/:userId/reviews", async (c) => {
+  const q = readQuery(c, paged);
+  return ok(c.get("requestId"), await listTeacherReviews(c.req.param("userId"), currentUser(c).$id, q));
+});
+teacherRoutes.put("/reviews/:id/reply", async (c) => {
+  const body2 = await readJsonBody(c, reviewReply);
+  return ok(c.get("requestId"), await replyToReview(c.req.param("id"), currentUser(c).$id, body2.reply, c.get("requestId")));
+});
+teacherRoutes.post("/reviews/:id/report", async (c) => ok(c.get("requestId"), await reportReview(currentUser(c).$id, c.req.param("id"), await readJsonBody(c, qaReport)), 201));
 
 // src/routes/uploads.ts
 init_errors2();

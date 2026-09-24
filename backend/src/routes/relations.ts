@@ -6,6 +6,7 @@ import { currentUser } from '../middleware/auth';
 import * as S from '../schemas';
 import { withIdempotency } from '../services/idempotency';
 import { getSummary, setClosingNote } from '../services/summary';
+import { getRelationReview, upsertReview } from '../services/reviews';
 import { createGoal, createTask, declineGoalCompletion, requestGoalCompletion, getRelation, getWorkspace, listRelations, requireRelationMember, updateGoal, updateRelationStatus, updateTask } from '../services/learning';
 import { addFeedback, getEvidence, listEvidence, recomputeProof, reviseEvidence, submitEvidence } from '../services/proof';
 
@@ -23,6 +24,11 @@ relationRoutes.post('/:id/status', async (c) => {
 });
 
 relationRoutes.get('/:id/summary', async (c) => ok(c.get('requestId'), await getSummary(c.req.param('id'), currentUser(c).$id)));
+relationRoutes.get('/:id/review', async (c) => ok(c.get('requestId'), await getRelationReview(c.req.param('id'), currentUser(c).$id)));
+relationRoutes.put('/:id/review', async (c) => {
+  const body = await readJsonBody(c, S.upsertReview);
+  return ok(c.get('requestId'), await upsertReview(c.req.param('id'), currentUser(c).$id, body, c.get('requestId')));
+});
 relationRoutes.put('/:id/summary/closing-note', async (c) => {
   const body = await readJsonBody(c, S.closingNote);
   return ok(c.get('requestId'), await setClosingNote(c.req.param('id'), currentUser(c).$id, body.note, c.get('requestId')));

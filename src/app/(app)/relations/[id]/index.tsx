@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useCreateGoal, useCreateTask, useDeclineGoalCompletion, useRequestGoalCompletion, useSetRelationStatus, useUpdateGoal, useUpdateTask, useWorkspace } from '@/features/learning/api';
 import { ProofSummary, daysFromNow, evidenceTone, isOverdue, nextActionText, parseDueDate, toDateField } from '@/features/learning/components';
+import { RelationReviewCard } from '@/features/reviews/components';
 import { Screen, Section, TwoColumn } from '@/shared/layout/screen';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text, confirm as confirmDialog } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
@@ -155,6 +156,7 @@ export default function RelationWorkspace() {
           <Button size="sm" className="mt-2 self-start" title={t('summary.view')} onPress={() => router.push(`/(app)/relations/${id}/summary`)} />
         </Card>
       ) : null}
+      <RelationReviewCard relationId={relation.id} teacherId={relation.teacherId} isStudent={me.data?.userId === relation.studentId} />
       {relation.status === 'paused' ? <Text variant="small" tone="secondary" className="mt-4">{t('relation.pausedHint')}</Text> : null}
       {endReason !== null ? (
         <Card className="my-4 gap-2">

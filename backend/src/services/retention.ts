@@ -5,6 +5,7 @@ import type { AuditEventRow, EvidenceItemRow, EvidenceRevisionRow, IdempotencyKe
 import { autoCloseCutoff } from './qa-policy';
 import { TABLES, type TableId } from '../db/schema';
 import { log } from '../log';
+import { purgeAuthoredReviews } from './reviews';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_BATCH_SIZE = 100;
@@ -29,6 +30,7 @@ export type RetentionPurgeStats = {
   evidenceAttachmentRefsCleared: number;
   deletedMemberQaQuestionsDeleted: number;
   deletedMemberQaAnswersDeleted: number;
+  deletedMemberReviewsDeleted: number;
   qaQuestionsAutoClosed: number;
   qaOrphanUploadsDeleted: number;
 };
@@ -46,7 +48,7 @@ function blankStats(): RetentionPurgeStats {
     deletedMemberUploadIntentsDeleted: 0,
     evidenceAttachmentRefsCleared: 0,
     deletedMemberQaQuestionsDeleted: 0,
-    deletedMemberQaAnswersDeleted: 0,
+    deletedMemberQaAnswersDeleted: 0, deletedMemberReviewsDeleted: 0,
     qaQuestionsAutoClosed: 0,
     qaOrphanUploadsDeleted: 0,
   };
@@ -150,6 +152,9 @@ async function purgeDeletedMemberData(stats: RetentionPurgeStats, now: Date, opt
       stats.deletedMemberQaAnswersDeleted += await deleteRows<QaAnswerRow>(TABLES.qaAnswers, [Query.equal('questionId', question.$id)], options);
     });
     stats.deletedMemberQaAnswersDeleted += await deleteRows<QaAnswerRow>(TABLES.qaAnswers, [Query.equal('authorId', userId)], options);
+
+    // Reviews they wrote go; the reviewed teachers' counters are recomputed.
+    stats.deletedMemberReviewsDeleted += await purgeAuthoredReviews(userId);
 
     stats.deletedMemberUploadIntentsDeleted += await deleteRows<UploadIntentRow>(
       TABLES.uploadIntents,

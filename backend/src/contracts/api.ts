@@ -87,7 +87,8 @@ export type TeacherProfile = {
   acceptingRequests: boolean;
   visibility: Visibility;
   /** Explainable trust signals only; no composite score. */
-  signals: { activeRelations: number; evidenceReviewed: number; memberSince: string };
+  /** `avgRating` is null until the teacher has at least REVIEW_MIN_FOR_AVERAGE reviews. */
+  signals: { activeRelations: number; evidenceReviewed: number; memberSince: string; reviewCount: number; avgRating: number | null };
   updatedAt: string;
 };
 
@@ -192,6 +193,36 @@ export type CreateGoalInput = { title: string; description?: string };
 export type UpdateGoalInput = Partial<{ title: string; description: string; status: GoalStatus }>;
 export type CreateTaskInput = { title: string; instructions?: string; goalId?: string | null; dueAt?: string | null };
 export type UpdateTaskInput = Partial<{ title: string; instructions: string; status: TaskStatus; dueAt: string | null }>;
+
+// ---------------------------------------------------------------- teacher reviews (L4.3)
+
+export const REVIEW_MIN_FOR_AVERAGE = 3;
+export const REVIEW_ELIGIBLE_AFTER_DAYS = 30;
+export const REVIEW_EDITABLE_DAYS = 30;
+export const REVIEW_TAGS = ['clear', 'responsive', 'patient'] as const;
+export type ReviewTag = (typeof REVIEW_TAGS)[number];
+
+export type TeacherReview = {
+  id: string;
+  relationId: string;
+  teacherId: string;
+  /** "A student" for minors and anonymous reviews, except when the teacher views their own reviews. */
+  author: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
+  rating: number;
+  /** Null in public views when the author is a minor. */
+  body: string | null;
+  tags: ReviewTag[];
+  anonymous: boolean;
+  reply: string | null;
+  replyAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  editableUntil: string;
+};
+export type TeacherReviewPage = Page<TeacherReview> & { summary: { count: number; avgRating: number | null } };
+/** The relation's review as seen by one of its members, plus whether the learner may write/edit it now. */
+export type RelationReviewState = { review: TeacherReview | null; canWrite: boolean; eligibleFrom: string | null };
+export type UpsertReviewInput = { rating: number; body?: string; tags?: ReviewTag[]; anonymous?: boolean };
 
 /** End-of-relation snapshot (L4.2). Frozen when the relation ends; only the teacher's closing note changes later. */
 export type RelationSummary = {
@@ -404,6 +435,8 @@ export type NotificationType =
   | 'task.due_soon'
   | 'task.overdue'
   | 'relation.closing_note'
+  | 'review.received'
+  | 'review.replied'
   | 'connection.received'
   | 'connection.accepted'
   | 'qa.answered'
@@ -433,7 +466,7 @@ export type NotificationSummary = { unread: number };
 
 export type ReportStatus = 'open' | 'resolved';
 export type ReportAction = 'dismiss' | 'warn' | 'suspend' | 'remove_content';
-export type ReportTargetType = 'user' | 'qa_question' | 'qa_answer';
+export type ReportTargetType = 'user' | 'qa_question' | 'qa_answer' | 'teacher_review';
 
 export type ReportItem = {
   id: string;

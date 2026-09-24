@@ -30748,7 +30748,8 @@ var TABLES = {
   qaQuestions: "qa_questions",
   qaAnswers: "qa_answers",
   evidenceRevisions: "evidence_revisions",
-  relationSummaries: "relation_summaries"
+  relationSummaries: "relation_summaries",
+  teacherReviews: "teacher_reviews"
 };
 
 // src/services/notifications.ts

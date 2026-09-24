@@ -10,6 +10,9 @@ import { audit, emitEvent } from './events';
 import { notify } from './notifications';
 import { personRefs } from './profiles';
 import { contentContext, removeContent } from './qa';
+import { removeReview, reviewContext } from './reviews';
+
+const contextOf = (type: string | null, id: string | null) => (type === 'teacher_review' && id ? reviewContext(id) : contentContext(type, id));
 
 export async function listReports(p: { status?: 'open' | 'resolved'; limit: number; cursor?: string }): Promise<{ items: ReportItem[]; nextCursor: string | null }> {
   const q = [Query.orderDesc('createdAt'), Query.limit(p.limit + 1)];
@@ -19,7 +22,7 @@ export async function listReports(p: { status?: 'open' | 'resolved'; limit: numb
   const hasMore = rows.length > p.limit;
   const page = hasMore ? rows.slice(0, p.limit) : rows;
   const refs = await personRefs(page.flatMap((r) => [r.reporterId, r.targetUserId]));
-  const contexts = await Promise.all(page.map((r) => contentContext(r.targetType, r.targetId)));
+  const contexts = await Promise.all(page.map((r) => contextOf(r.targetType, r.targetId)));
   const last = page[page.length - 1];
   return { items: page.map((r, i) => toReportItem(r, refs.get(r.reporterId)!, refs.get(r.targetUserId)!, contexts[i])), nextCursor: hasMore && last ? last.$id : null };
 }
@@ -36,8 +39,10 @@ export async function resolveReport(id: string, adminId: string, input: { action
   const now = new Date().toISOString();
 
   if (input.action === 'remove_content') {
-    if (row.targetType !== 'qa_question' && row.targetType !== 'qa_answer' || !row.targetId) throw conflict('invalid_state', 'This report is not about a post.');
-    await removeContent(row.targetType, row.targetId, adminId);
+    if (!row.targetId) throw conflict('invalid_state', 'This report is not about a post.');
+    if (row.targetType === 'teacher_review') await removeReview(row.targetId, adminId);
+    else if (row.targetType === 'qa_question' || row.targetType === 'qa_answer') await removeContent(row.targetType, row.targetId, adminId);
+    else throw conflict('invalid_state', 'This report is not about a post.');
     await notify({
       userId: row.targetUserId, type: 'system', title: 'A moderator removed one of your posts',
       body: input.note?.trim() || 'It did not meet our community guidelines.', href: null, refType: 'report', refId: row.$id,
@@ -64,5 +69,5 @@ export async function resolveReport(id: string, adminId: string, input: { action
   await audit({ actorId: adminId, action: `report.${input.action}`, resourceType: 'report', resourceId: id, reason: input.note, requestId });
   await emitEvent({ eventType: 'report.resolved', aggregateType: 'report', aggregateId: id, actorId: adminId, payload: { action: input.action, targetUserId: row.targetUserId }, requestId });
   const refs = await personRefs([updated.reporterId, updated.targetUserId]);
-  return toReportItem(updated, refs.get(updated.reporterId)!, refs.get(updated.targetUserId)!, await contentContext(updated.targetType, updated.targetId));
+  return toReportItem(updated, refs.get(updated.reporterId)!, refs.get(updated.targetUserId)!, await contextOf(updated.targetType, updated.targetId));
 }

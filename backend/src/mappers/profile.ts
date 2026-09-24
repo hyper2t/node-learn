@@ -1,5 +1,6 @@
 import type { Models } from 'node-appwrite';
 import type { AgeBand, Me, Role, StudentProfile, TeacherProfile, Visibility } from '../contracts/api';
+import { REVIEW_MIN_FOR_AVERAGE } from '../contracts/api';
 import type { ProfileRow, RoleMembershipRow, StudentProfileRow, TeacherProfileRow } from '../db/rows';
 
 export type PersonRef = { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
@@ -47,7 +48,7 @@ export function toStudentProfile(p: ProfileRow, s: StudentProfileRow | null): St
   };
 }
 
-export function toTeacherProfile(p: ProfileRow, t: TeacherProfileRow, emailVerified: boolean, signals: TeacherProfile['signals']): TeacherProfile {
+export function toTeacherProfile(p: ProfileRow, t: TeacherProfileRow, emailVerified: boolean, signals: Omit<TeacherProfile['signals'], 'reviewCount' | 'avgRating'>): TeacherProfile {
   return {
     ...toPersonRef(p),
     headline: t.headline ?? '',
@@ -58,7 +59,12 @@ export function toTeacherProfile(p: ProfileRow, t: TeacherProfileRow, emailVerif
     emailVerified,
     acceptingRequests: t.acceptingRequests,
     visibility: (t.visibility as Visibility | null) ?? 'public',
-    signals,
+    signals: { ...signals, ...ratingSignals(t.reviewCount ?? 0, t.ratingSum ?? 0) },
     updatedAt: t.updatedAt,
   };
+}
+
+/** Average is hidden (null) until there are enough reviews to mean something; one decimal. */
+export function ratingSignals(count: number, sum: number): { reviewCount: number; avgRating: number | null } {
+  return { reviewCount: count, avgRating: count >= REVIEW_MIN_FOR_AVERAGE ? Math.round((sum / count) * 10) / 10 : null };
 }

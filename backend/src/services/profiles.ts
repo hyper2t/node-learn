@@ -102,7 +102,7 @@ export async function upsertStudentProfile(user: Models.User, patch: UpdateStude
 
 // --- teacher ----------------------------------------------------------------
 
-async function teacherSignals(userId: string): Promise<TeacherProfile['signals']> {
+async function teacherSignals(userId: string): Promise<Omit<TeacherProfile['signals'], 'reviewCount' | 'avgRating'>> {
   const relations = await listRows(TABLES.learningRelations, [Query.equal('teacherId', userId), Query.equal('status', 'active'), Query.limit(1)]);
   const reviewed = await listRows(TABLES.feedbackEntries, [Query.equal('authorId', userId), Query.limit(1)]);
   const profile = await getRow<ProfileRow>(TABLES.profiles, userId);

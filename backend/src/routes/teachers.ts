@@ -6,6 +6,9 @@ import { readQuery } from '../lib/body';
 import { toTeacherProfile } from '../mappers/profile';
 import * as S from '../schemas';
 import { getTeacherProfile, searchTeachers } from '../services/profiles';
+import { listTeacherReviews, replyToReview, reportReview } from '../services/reviews';
+import { currentUser } from '../middleware/auth';
+import { readJsonBody } from '../lib/body';
 
 export const teacherRoutes = new Hono<AppEnv>();
 
@@ -22,3 +25,13 @@ teacherRoutes.get('/', async (c) => {
 });
 
 teacherRoutes.get('/:userId', async (c) => ok(c.get('requestId'), await getTeacherProfile(c.req.param('userId'), c.get('user'))));
+
+teacherRoutes.get('/:userId/reviews', async (c) => {
+  const q = readQuery(c, S.paged);
+  return ok(c.get('requestId'), await listTeacherReviews(c.req.param('userId'), currentUser(c).$id, q));
+});
+teacherRoutes.put('/reviews/:id/reply', async (c) => {
+  const body = await readJsonBody(c, S.reviewReply);
+  return ok(c.get('requestId'), await replyToReview(c.req.param('id'), currentUser(c).$id, body.reply, c.get('requestId')));
+});
+teacherRoutes.post('/reviews/:id/report', async (c) => ok(c.get('requestId'), await reportReview(currentUser(c).$id, c.req.param('id'), await readJsonBody(c, S.qaReport)), 201));

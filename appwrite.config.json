@@ -615,6 +615,20 @@
                     "default": ""
                 },
                 {
+                    "key": "reviewCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
+                    "key": "ratingSum",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "default": 0
+                },
+                {
                     "key": "createdAt",
                     "type": "datetime",
                     "required": true,
@@ -2968,6 +2982,132 @@
                     "type": "key",
                     "columns": [
                         "teacherId"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "teacher_reviews",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "teacher_reviews",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "teacherId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "studentId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "rating",
+                    "type": "integer",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "tags",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 16
+                },
+                {
+                    "key": "anonymous",
+                    "type": "boolean",
+                    "required": false,
+                    "array": false,
+                    "default": false
+                },
+                {
+                    "key": "studentIsMinor",
+                    "type": "boolean",
+                    "required": false,
+                    "array": false,
+                    "default": false
+                },
+                {
+                    "key": "reply",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "replyAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "editableUntil",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "removedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "removedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_teacher_created",
+                    "type": "key",
+                    "columns": [
+                        "teacherId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_student",
+                    "type": "key",
+                    "columns": [
+                        "studentId"
                     ],
                     "orders": []
                 }

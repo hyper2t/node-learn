@@ -5,6 +5,7 @@ import { useTeacher } from '@/features/teachers/api';
 import { useCreateRequest } from '@/features/requests/api';
 import { useAcceptedAnswers } from '@/features/qa/api';
 import { MathText, topicLabel } from '@/features/qa/components';
+import { TeacherReviewsSection } from '@/features/reviews/components';
 import { useMe, useStudentProfile } from '@/features/identity/api';
 import { Screen, Section } from '@/shared/layout/screen';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text } from '@/shared/ui';
@@ -53,6 +54,7 @@ export default function TeacherDetail() {
           <Badge label={tp.acceptingRequests ? t('teachers.accepting') : t('teachers.notAccepting')} tone={tp.acceptingRequests ? 'success' : 'neutral'} />
         </View>
         <Text variant="caption" tone="tertiary">
+          {tp.signals.reviewCount ? `${tp.signals.avgRating !== null ? t('reviews.signal', { avg: tp.signals.avgRating.toFixed(1), n: tp.signals.reviewCount }) : t('reviews.signalCount', { n: tp.signals.reviewCount })} · ` : ''}
           {t('teachers.activeRelations', { n: tp.signals.activeRelations })} · {t('teachers.memberSince', { date: fmt.date(tp.signals.memberSince, { year: 'numeric', month: 'short' }) })}
         </Text>
         {tp.subjects.length ? <Section title={t('onboarding.subjects')}><View className="flex-row flex-wrap gap-1">{tp.subjects.map((s) => <Badge key={s} label={s} tone="primary" />)}</View></Section> : null}
@@ -71,6 +73,7 @@ export default function TeacherDetail() {
             </View>
           </Section>
         ) : null}
+        <TeacherReviewsSection teacherId={tp.userId} viewerId={me.data?.userId} />
         {canRequest && !open ? <Button title={t('teachers.request')} disabled={!tp.acceptingRequests} onPress={openForm} /> : null}
         {open && canRequest ? (
           <Card className="gap-3">

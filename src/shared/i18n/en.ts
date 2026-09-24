@@ -104,6 +104,15 @@ export const en = {
     sending: 'Sending…', failed: 'Not sent. Tap to retry.', queued: 'Waiting for connection', system: 'System', goalCreated: 'New goal: {title}', taskAssigned: 'Task assigned: {title}',
     evidenceSubmitted: 'Evidence submitted: {title}', feedbackAdded: 'Feedback added', milestone: 'Milestone reached: {title}', open: 'Open',
   },
+  reviews: {
+    title: 'Reviews ({n})', starsLabel: '{n} out of 5 stars', averageHidden: 'An average is shown once there are 3 reviews.', more: 'More reviews',
+    writeTitle: 'Review your teacher', yourReview: 'Your review', fromLearner: 'Review from your learner', body: 'What was it like? (optional)',
+    anonymous: 'Post anonymously (your teacher still sees your name)', privacyHint: 'Reviews appear on the teacher\'s public profile. If you are under 18, only your stars and tags are public.',
+    submit: 'Post review', editableUntil: 'You can edit this until {date}.', availableFrom: 'You can review your teacher from {date}.',
+    postedAnonymously: 'Shown as “A student” to others', teacherReply: 'Teacher\'s reply', reply: 'Reply', editReply: 'Edit reply', yourReply: 'Your reply',
+    tags: { clear: 'Explains clearly', responsive: 'Responds quickly', patient: 'Patient' },
+    signal: '{avg} ★ · {n} reviews', signalCount: '{n} reviews',
+  },
   summary: {
     title: 'Learning summary', view: 'View learning summary', period: '{from} – {to} · {weeks} weeks', achieved: 'Goals achieved', dropped: 'Dropped goals', open: 'Not finished',
     numbers: 'In numbers', tasksDone: 'Tasks done', evidence: 'Evidence submitted', feedback: 'Feedback received', revisions: 'Revisions', milestones: 'Milestones',
@@ -125,7 +134,7 @@ export const en = {
     open: 'Open', resolved: 'Resolved', empty: 'No reports here.', reportedBy: 'Reported by {name}', note: 'Note to the member (optional)',
     actions: { dismiss: 'Dismiss', warn: 'Warn', suspend: 'Suspend', remove_content: 'Remove post' }, suspend: 'Suspend account', suspendConfirm: 'Suspend this account? They will be signed out and all their active learning relations will end.',
     resolvedAs: 'Resolved: {action}',
-    targets: { user: 'Account', qa_question: 'Question', qa_answer: 'Answer' }, viewContent: 'View post', removedContent: 'This post is no longer available.',
+    targets: { user: 'Account', qa_question: 'Question', qa_answer: 'Answer', teacher_review: 'Teacher review' }, viewContent: 'View post', removedContent: 'This post is no longer available.',
     removeConfirm: 'Remove this post? The author will be notified.',
   },
   attachments: {

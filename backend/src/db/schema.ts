@@ -27,6 +27,7 @@ export const TABLES = {
   qaAnswers: 'qa_answers',
   evidenceRevisions: 'evidence_revisions',
   relationSummaries: 'relation_summaries',
+  teacherReviews: 'teacher_reviews',
 } as const;
 
 export type TableId = (typeof TABLES)[keyof typeof TABLES];
