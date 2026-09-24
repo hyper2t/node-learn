@@ -8,7 +8,7 @@ import { withIdempotency } from '../services/idempotency';
 import { getSummary, setClosingNote } from '../services/summary';
 import { getRelationReview, upsertReview } from '../services/reviews';
 import { createGoal, createTask, declineGoalCompletion, requestGoalCompletion, getRelation, getWorkspace, listRelations, requireRelationMember, updateGoal, updateRelationStatus, updateTask } from '../services/learning';
-import { addFeedback, getEvidence, listEvidence, recomputeProof, reviseEvidence, submitEvidence } from '../services/proof';
+import { addFeedback, getEvidence, getProof, listEvidence, reviseEvidence, submitEvidence } from '../services/proof';
 
 export const relationRoutes = new Hono<AppEnv>();
 
@@ -91,5 +91,5 @@ relationRoutes.post('/:id/evidence/:evidenceId/feedback', async (c) => {
 });
 relationRoutes.get('/:id/proof', async (c) => {
   await requireRelationMember(c.req.param('id'), currentUser(c).$id);
-  return ok(c.get('requestId'), await recomputeProof(c.req.param('id')));
+  return ok(c.get('requestId'), await getProof(c.req.param('id')));
 });

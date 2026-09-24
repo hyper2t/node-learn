@@ -1,6 +1,7 @@
 import { getConfig, resetConfigCache } from './config';
 import { resetClients } from './db/client';
 import { log, setLogLevel } from './log';
+import { reconcileRecentProofs } from './services/proof-projection';
 import { runTaskReminders } from './services/reminders';
 
 type AppwriteRequest = { headers?: Record<string, string> };
@@ -27,7 +28,9 @@ export default async ({ req, res }: { req: AppwriteRequest; res: AppwriteRespons
   try {
     setLogLevel(getConfig().logLevel);
     const stats = await runTaskReminders();
-    return res.send(JSON.stringify({ ok: true, durationMs: Date.now() - started, stats }), 200, jsonHeaders);
+    // Independent of reminders: a failure here must not hide reminder stats.
+    const proofs = await reconcileRecentProofs().catch((err: unknown) => { log('error', 'proof_reconcile_failure', { message: err instanceof Error ? err.message : String(err) }); return null; });
+    return res.send(JSON.stringify({ ok: true, durationMs: Date.now() - started, stats, proofs }), 200, jsonHeaders);
   } catch (err) {
     log('error', 'reminders_function_failure', { message: err instanceof Error ? err.message : String(err) });
     return res.send(JSON.stringify({ ok: false, error: 'reminders_failed' }), 500, jsonHeaders);

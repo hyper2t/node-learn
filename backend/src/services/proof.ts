@@ -1,16 +1,17 @@
 import { createHash } from 'node:crypto';
 import { Query } from 'node-appwrite';
-import type { EvidenceItem, Feedback, ProofRecord } from '../contracts/api';
-import { createRow, getRow, listRows, updateRow } from '../db/repo';
-import { isConflict, type EvidenceItemRow, type EvidenceRevisionRow, type FeedbackEntryRow, type LearningGoalRow, type LearningRelationRow, type LearningTaskRow, type ProofRecordRow } from '../db/rows';
+import type { EvidenceItem, Feedback } from '../contracts/api';
+import { createRow, getRow, incrementColumn, listRows, updateRow } from '../db/repo';
+import { isConflict, type EvidenceItemRow, type EvidenceRevisionRow, type FeedbackEntryRow, type LearningRelationRow, type LearningTaskRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound } from '../errors';
-import { toEvidence, toFeedback, toProof, toRevision } from '../mappers/learning';
+import { toEvidence, toFeedback, toRevision } from '../mappers/learning';
 import { emitEvent } from './events';
 import { notify } from './notifications';
 import { appendMessage } from './messaging';
 import { assertEvidenceAttachments, resolveAttachments } from './uploads';
 import { assertRelationWritable } from './learning';
+import { applyProofEvent, bumpColumn, nextStepDisplay, taskDeltas } from './proof-projection';
 
 export async function listEvidence(relationId: string, limit: number, cursor?: string): Promise<{ items: EvidenceItem[]; nextCursor: string | null }> {
   const q = [Query.equal('relationId', relationId), Query.orderDesc('submittedAt'), Query.limit(limit + 1)];
@@ -47,11 +48,12 @@ export async function submitEvidence(rel: LearningRelationRow, authorId: string,
     relationId: rel.$id, taskId, goalId: input.goalId ?? rel.currentGoalId, authorId, title: input.title, body: input.body,
     attachmentFileIds, status: 'submitted', version: 1, submittedAt: new Date().toISOString(), reviewedAt: null,
   });
-  await updateRow(TABLES.learningRelations, rel.$id, { evidenceCount: rel.evidenceCount + 1, lastActivityAt: row.submittedAt });
+  await incrementColumn(TABLES.learningRelations, rel.$id, 'evidenceCount', 1);
+  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: row.submittedAt });
   await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: 'evidence_submitted', payload: { type: 'evidence_submitted', evidenceId: row.$id, title: row.title, taskId }, requestId });
   await emitEvent({ eventType: 'evidence.submitted', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: authorId, payload: { evidenceId: row.$id }, requestId });
   await notify({ userId: authorId === rel.studentId ? rel.teacherId : rel.studentId, type: 'evidence.submitted', title: 'New evidence to review', body: row.title, href: `/relations/${rel.$id}/evidence/${row.$id}`, refType: 'evidence_item', refId: row.$id, actorId: authorId, dedupeKey: `evidence.submitted:${row.$id}` });
-  await recomputeProof(rel.$id);
+  await applyProofEvent(rel.$id, { evidenceSubmitted: 1 }, { recentChange: `Submitted "${row.title}"` });
   return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
 }
 
@@ -64,22 +66,23 @@ export async function addFeedback(rel: LearningRelationRow, evidenceId: string, 
   const outcome = input.outcome ?? 'approved';
   const fb = await createRow<FeedbackEntryRow>(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? '', outcome });
   await updateRow(TABLES.evidenceItems, evidenceId, { status: outcome === 'approved' ? 'reviewed' : 'needs_revision', reviewedAt: fb.createdAt });
-  let openDelta = 0;
+  let taskDelta = { tasksDone: 0, openTasks: 0 };
   if (ev.taskId && outcome === 'approved') {
     const task = await getRow<LearningTaskRow>(TABLES.learningTasks, ev.taskId);
     if (task && task.status !== 'done' && task.status !== 'dropped') {
       const next = input.markTaskDone ? 'done' : 'reviewed';
       await updateRow(TABLES.learningTasks, ev.taskId, { status: next });
-      if (next === 'done') openDelta = -1;
+      taskDelta = taskDeltas(task.status, next);
     }
   }
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt, openTasks: Math.max(0, rel.openTasks + openDelta) });
+  await bumpColumn(TABLES.learningRelations, rel.$id, 'openTasks', taskDelta.openTasks);
+  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt });
   await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: 'feedback_added', payload: { type: 'feedback_added', feedbackId: fb.$id, evidenceId, excerpt: input.body.slice(0, 140) }, requestId });
   await emitEvent({ eventType: outcome === 'approved' ? 'feedback.added' : 'evidence.revision_requested', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: authorId, payload: { feedbackId: fb.$id, evidenceId, outcome }, requestId });
   await notify(outcome === 'approved'
     ? { userId: ev.authorId, type: 'feedback.added', title: 'You received feedback', body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: 'feedback_entry', refId: fb.$id, actorId: authorId, dedupeKey: `feedback.added:${fb.$id}` }
     : { userId: ev.authorId, type: 'evidence.revision_requested', title: 'Your teacher asked for a revision', body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: 'feedback_entry', refId: fb.$id, actorId: authorId, dedupeKey: `evidence.revision_requested:${fb.$id}` });
-  await recomputeProof(rel.$id);
+  await applyProofEvent(rel.$id, { feedbackReceived: 1, tasksDone: taskDelta.tasksDone }, { recentChange: `Feedback on "${ev.title}"`, ...(await nextStepDisplay(rel.$id)) });
   return toFeedback(fb);
 }
 
@@ -112,47 +115,8 @@ export async function reviseEvidence(rel: LearningRelationRow, evidenceId: strin
   await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: 'evidence_submitted', payload: { type: 'evidence_submitted', evidenceId, title: row.title, taskId: row.taskId }, requestId });
   await emitEvent({ eventType: 'evidence.revised', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId: authorId, payload: { evidenceId, version: row.version }, requestId });
   await notify({ userId: rel.teacherId, type: 'evidence.revised', title: 'Revised evidence to review', body: row.title, href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: 'evidence_item', refId: evidenceId, actorId: authorId, dedupeKey: `evidence.revised:${evidenceId}:${row.version}` });
-  await recomputeProof(rel.$id);
+  await applyProofEvent(rel.$id, { revisions: 1 }, { recentChange: `Submitted "${row.title}"` });
   return getEvidence(rel.$id, evidenceId);
 }
 
-/** Explainable projection: plain counts + milestones that each point at real records. No composite score. */
-export async function recomputeProof(relationId: string): Promise<ProofRecord> {
-  const [rel, goals, tasks, evidence, feedback] = await Promise.all([
-    getRow<LearningRelationRow>(TABLES.learningRelations, relationId),
-    listRows<LearningGoalRow>(TABLES.learningGoals, [Query.equal('relationId', relationId), Query.limit(100)]),
-    listRows<LearningTaskRow>(TABLES.learningTasks, [Query.equal('relationId', relationId), Query.limit(200)]),
-    listRows<EvidenceItemRow>(TABLES.evidenceItems, [Query.equal('relationId', relationId), Query.orderDesc('submittedAt'), Query.limit(200)]),
-    listRows<FeedbackEntryRow>(TABLES.feedbackEntries, [Query.equal('relationId', relationId), Query.orderDesc('createdAt'), Query.limit(200)]),
-  ]);
-  if (!rel) throw notFound('not_found', 'This learning relation could not be found.');
-  const current = goals.find((g) => g.$id === rel.currentGoalId) ?? goals.find((g) => g.status === 'active') ?? null;
-  const milestones = goals.filter((g) => g.status === 'achieved').slice(0, 5).map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }));
-  const latestFb = feedback[0];
-  const latestEv = evidence[0];
-  const nextOpen = tasks.filter((t) => t.status === 'open').sort((a, b) => (a.dueAt ?? '9') < (b.dueAt ?? '9') ? -1 : 1)[0];
-  const data = {
-    relationId,
-    currentFocus: current?.title ?? null,
-    milestonesJson: JSON.stringify(milestones),
-    tasksDone: tasks.filter((t) => t.status === 'done').length,
-    evidenceSubmitted: evidence.length,
-    feedbackReceived: feedback.length,
-    revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0),
-    recentChange: latestFb ? `Feedback on "${evidence.find((e) => e.$id === latestFb.evidenceId)?.title ?? 'evidence'}"` : latestEv ? `Submitted "${latestEv.title}"` : null,
-    nextStep: latestFb?.nextStep || nextOpen?.title || null,
-    computedAt: new Date().toISOString(),
-  };
-  let row: ProofRecordRow;
-  const existing = await getRow<ProofRecordRow>(TABLES.proofRecords, relationId);
-  if (existing) row = await updateRow<ProofRecordRow>(TABLES.proofRecords, relationId, data);
-  else {
-    try {
-      row = await createRow<ProofRecordRow>(TABLES.proofRecords, data, relationId);
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-      row = await updateRow<ProofRecordRow>(TABLES.proofRecords, relationId, data);
-    }
-  }
-  return toProof(row);
-}
+export { getProof, recomputeProof } from './proof-projection';

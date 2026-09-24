@@ -46,4 +46,9 @@ export async function incrementColumn<T extends Models.Row>(tableId: TableId, ro
   return getTablesDB().incrementRowColumn<T>({ databaseId: getDatabaseId(), tableId, rowId, column, value });
 }
 
+/** Atomic decrement that never goes below `min` (default 0). */
+export async function decrementColumn<T extends Models.Row>(tableId: TableId, rowId: string, column: string, value = 1, min = 0): Promise<T> {
+  return getTablesDB().decrementRowColumn<T>({ databaseId: getDatabaseId(), tableId, rowId, column, value, min });
+}
+
 export { ID, Query };

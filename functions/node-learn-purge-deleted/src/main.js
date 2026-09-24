@@ -31504,43 +31504,27 @@ var init_messaging3 = __esm({
   }
 });
 
-// src/services/uploads.ts
-var DOCS, LIMITS, TOKEN_TTL_MS;
-var init_uploads = __esm({
-  "src/services/uploads.ts"() {
+// src/db/paginate.ts
+var init_paginate = __esm({
+  "src/db/paginate.ts"() {
     "use strict";
     init_dist();
-    init_config();
     init_repo();
-    init_schema();
-    init_client2();
-    init_errors2();
-    init_learning2();
-    DOCS = /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/;
-    LIMITS = {
-      avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/ },
-      evidence: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
-      qa: { maxBytes: 25 * 1024 * 1024, mime: DOCS }
-    };
-    TOKEN_TTL_MS = 30 * 6e4;
   }
 });
 
-// src/services/proof.ts
-var init_proof = __esm({
-  "src/services/proof.ts"() {
+// src/services/proof-projection.ts
+var init_proof_projection = __esm({
+  "src/services/proof-projection.ts"() {
     "use strict";
     init_dist();
+    init_paginate();
     init_repo();
     init_rows();
     init_schema();
     init_errors2();
+    init_log();
     init_learning();
-    init_events();
-    init_notifications2();
-    init_messaging3();
-    init_uploads();
-    init_learning2();
   }
 });
 
@@ -31558,7 +31542,7 @@ var init_learning2 = __esm({
     init_notifications2();
     init_messaging3();
     init_profiles();
-    init_proof();
+    init_proof_projection();
   }
 });
 

@@ -4,7 +4,7 @@ import type {
   PersonRef, QaAcceptedAnswer, QaAnswer, QaQuestion, QaQuestionDetail, QaQuestionStatus, QaTopicSlug, QaTopicSummary, ReportInput, Role,
 } from '../contracts/api';
 import { QA_MAX_ATTACHMENTS, QA_TOPICS } from '../contracts/api';
-import { createRow, findOne, getRow, incrementColumn, listRows, Query, updateRow } from '../db/repo';
+import { createRow, decrementColumn, findOne, getRow, incrementColumn, listRows, Query, updateRow } from '../db/repo';
 import { isConflict, type BlockRow, type ProfileRow, type QaAnswerRow, type QaQuestionRow, type ReportRow, type TeacherProfileRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict, forbidden, HttpError, notFound, roleRequired } from '../errors';
@@ -343,9 +343,9 @@ export async function removeContent(targetType: 'qa_question' | 'qa_answer', id:
   if (a.kind === 'answer') {
     const q = await getRow<QaQuestionRow>(TABLES.qaQuestions, a.questionId);
     if (q) {
-      const answerCount = Math.max(0, (q.answerCount ?? 0) - 1);
+      // Atomic, floored at 0; status follows the value the database returned.
+      const answerCount = (await decrementColumn<QaQuestionRow>(TABLES.qaQuestions, q.$id, 'answerCount', 1, 0)).answerCount ?? 0;
       await updateRow(TABLES.qaQuestions, q.$id, {
-        answerCount,
         acceptedAnswerId: q.acceptedAnswerId === id ? null : q.acceptedAnswerId,
         status: q.status === 'closed' ? 'closed' : answerCount > 0 ? 'answered' : 'open',
       });

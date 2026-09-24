@@ -35841,6 +35841,9 @@ async function findOne(tableId, queries) {
 async function incrementColumn(tableId, rowId2, column, value = 1) {
   return getTablesDB().incrementRowColumn({ databaseId: getDatabaseId(), tableId, rowId: rowId2, column, value });
 }
+async function decrementColumn(tableId, rowId2, column, value = 1, min = 0) {
+  return getTablesDB().decrementRowColumn({ databaseId: getDatabaseId(), tableId, rowId: rowId2, column, value, min });
+}
 var init_repo = __esm({
   "src/db/repo.ts"() {
     "use strict";
@@ -36848,146 +36851,126 @@ var init_messaging3 = __esm({
   }
 });
 
-// src/services/proof.ts
-async function listEvidence(relationId, limit2, cursor2) {
-  const q = [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(limit2 + 1)];
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const rows = await listRows(TABLES.evidenceItems, q);
-  const hasMore = rows.length > limit2;
-  const page = hasMore ? rows.slice(0, limit2) : rows;
-  const fb = page.length ? await listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", page.map((e) => e.$id)), Query.orderAsc("createdAt"), Query.limit(200)]) : [];
-  const last = page[page.length - 1];
-  const items = await Promise.all(page.map(async (e) => toEvidence(e, fb.filter((f) => f.evidenceId === e.$id), await resolveAttachments(e.attachmentFileIds ?? []))));
-  return { items, nextCursor: hasMore && last ? last.$id : null };
-}
-async function getEvidence(relationId, evidenceId) {
-  const row = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!row || row.relationId !== relationId) throw notFound("not_found", "This evidence could not be found.");
-  const [fb, revisions] = await Promise.all([
-    listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", evidenceId), Query.orderAsc("createdAt"), Query.limit(100)]),
-    row.version > 1 ? listRows(TABLES.evidenceRevisions, [Query.equal("evidenceId", evidenceId), Query.orderDesc("version"), Query.limit(20)]) : Promise.resolve([])
-  ]);
-  return { ...toEvidence(row, fb, await resolveAttachments(row.attachmentFileIds ?? [])), revisions: revisions.map(toRevision) };
-}
-async function submitEvidence(rel, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
-  let taskId = input.taskId ?? null;
-  if (taskId) {
-    const task = await getRow(TABLES.learningTasks, taskId);
-    if (!task || task.relationId !== rel.$id) throw notFound("not_found", "This task could not be found.");
-    if (task.status === "open" || task.status === "reviewed") await updateRow(TABLES.learningTasks, taskId, { status: "submitted" });
+// src/db/paginate.ts
+async function listAllRows(tableId, queries, cap = 2e4) {
+  const out = [];
+  let cursor2 = null;
+  for (; ; ) {
+    const page = await listRows(tableId, [...queries, Query.orderAsc("$id"), Query.limit(PAGE), ...cursor2 ? [Query.cursorAfter(cursor2)] : []]);
+    out.push(...page);
+    if (page.length < PAGE || out.length >= cap) return out;
+    cursor2 = page[page.length - 1].$id;
   }
-  const row = await createRow(TABLES.evidenceItems, {
-    relationId: rel.$id,
-    taskId,
-    goalId: input.goalId ?? rel.currentGoalId,
-    authorId,
-    title: input.title,
-    body: input.body,
-    attachmentFileIds,
-    status: "submitted",
-    version: 1,
-    submittedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    reviewedAt: null
-  });
-  await updateRow(TABLES.learningRelations, rel.$id, { evidenceCount: rel.evidenceCount + 1, lastActivityAt: row.submittedAt });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId: row.$id, title: row.title, taskId }, requestId: requestId2 });
-  await emitEvent({ eventType: "evidence.submitted", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId: row.$id }, requestId: requestId2 });
-  await notify({ userId: authorId === rel.studentId ? rel.teacherId : rel.studentId, type: "evidence.submitted", title: "New evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${row.$id}`, refType: "evidence_item", refId: row.$id, actorId: authorId, dedupeKey: `evidence.submitted:${row.$id}` });
-  await recomputeProof(rel.$id);
-  return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
 }
-async function addFeedback(rel, evidenceId, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const ev = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
-  if (ev.status === "reviewed") throw conflict("invalid_state", "This evidence has already been reviewed.", { reason: "evidence_reviewed" });
-  if (ev.status === "needs_revision") throw conflict("invalid_state", "Waiting for the learner to revise this evidence.", { reason: "evidence_awaiting_revision" });
-  const outcome = input.outcome ?? "approved";
-  const fb = await createRow(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? "", outcome });
-  await updateRow(TABLES.evidenceItems, evidenceId, { status: outcome === "approved" ? "reviewed" : "needs_revision", reviewedAt: fb.createdAt });
-  let openDelta = 0;
-  if (ev.taskId && outcome === "approved") {
-    const task = await getRow(TABLES.learningTasks, ev.taskId);
-    if (task && task.status !== "done" && task.status !== "dropped") {
-      const next = input.markTaskDone ? "done" : "reviewed";
-      await updateRow(TABLES.learningTasks, ev.taskId, { status: next });
-      if (next === "done") openDelta = -1;
-    }
+var PAGE;
+var init_paginate = __esm({
+  "src/db/paginate.ts"() {
+    "use strict";
+    init_dist();
+    init_repo();
+    PAGE = 500;
   }
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt, openTasks: Math.max(0, rel.openTasks + openDelta) });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "feedback_added", payload: { type: "feedback_added", feedbackId: fb.$id, evidenceId, excerpt: input.body.slice(0, 140) }, requestId: requestId2 });
-  await emitEvent({ eventType: outcome === "approved" ? "feedback.added" : "evidence.revision_requested", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { feedbackId: fb.$id, evidenceId, outcome }, requestId: requestId2 });
-  await notify(outcome === "approved" ? { userId: ev.authorId, type: "feedback.added", title: "You received feedback", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `feedback.added:${fb.$id}` } : { userId: ev.authorId, type: "evidence.revision_requested", title: "Your teacher asked for a revision", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `evidence.revision_requested:${fb.$id}` });
-  await recomputeProof(rel.$id);
-  return toFeedback(fb);
+});
+
+// src/services/proof-projection.ts
+function taskDeltas(before, after) {
+  return {
+    tasksDone: (after === "done" ? 1 : 0) - (before === "done" ? 1 : 0),
+    openTasks: (isOpenTask(after) ? 1 : 0) - (isOpenTask(before) ? 1 : 0)
+  };
 }
-async function reviseEvidence2(rel, evidenceId, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const ev = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
-  if (ev.authorId !== authorId) throw forbidden("Only the learner who submitted this evidence can revise it.");
-  if (ev.status !== "needs_revision") throw conflict("invalid_state", "This evidence is not waiting for a revision.", { reason: "evidence_not_revisable" });
-  const attachmentFileIds = input.attachmentFileIds !== void 0 ? await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds.filter((id) => !(ev.attachmentFileIds ?? []).includes(id))).then((fresh) => [...input.attachmentFileIds.filter((id) => (ev.attachmentFileIds ?? []).includes(id)), ...fresh]) : ev.attachmentFileIds ?? [];
+async function bumpColumn(table, rowId2, column, delta) {
+  if (!delta) return;
+  if (delta > 0) await incrementColumn(table, rowId2, column, delta);
+  else await decrementColumn(table, rowId2, column, -delta, 0);
+}
+async function ensureProofRow(relationId) {
+  if (await getRow(TABLES.proofRecords, relationId)) return true;
+  const hasHistory = (await listRows(TABLES.evidenceItems, [Query.equal("relationId", relationId), Query.limit(1)])).length > 0 || (await listRows(TABLES.learningTasks, [Query.equal("relationId", relationId), Query.limit(1)])).length > 0;
+  if (hasHistory) {
+    await recomputeProof(relationId);
+    return false;
+  }
   try {
-    await createRow(TABLES.evidenceRevisions, {
-      evidenceId,
-      relationId: rel.$id,
-      authorId,
-      version: ev.version,
-      title: ev.title,
-      body: ev.body ?? "",
-      attachmentFileIds: ev.attachmentFileIds ?? []
-    }, revisionRowId(evidenceId, ev.version));
+    await createRow(TABLES.proofRecords, { relationId, ...EMPTY, computedAt: (/* @__PURE__ */ new Date()).toISOString() }, relationId);
   } catch (err) {
     if (!isConflict(err)) throw err;
   }
-  const row = await updateRow(TABLES.evidenceItems, evidenceId, {
-    title: input.title ?? ev.title,
-    body: input.body ?? ev.body ?? "",
-    attachmentFileIds,
-    status: "revised",
-    version: ev.version + 1,
-    reviewedAt: null
-  });
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: now });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId, title: row.title, taskId: row.taskId }, requestId: requestId2 });
-  await emitEvent({ eventType: "evidence.revised", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId, version: row.version }, requestId: requestId2 });
-  await notify({ userId: rel.teacherId, type: "evidence.revised", title: "Revised evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "evidence_item", refId: evidenceId, actorId: authorId, dedupeKey: `evidence.revised:${evidenceId}:${row.version}` });
-  await recomputeProof(rel.$id);
-  return getEvidence(rel.$id, evidenceId);
+  return true;
 }
-async function recomputeProof(relationId) {
-  const [rel, goals, tasks, evidence, feedback] = await Promise.all([
+async function applyProofEvent(relationId, delta, display = {}) {
+  try {
+    const fresh = await ensureProofRow(relationId);
+    if (fresh) for (const [col, n] of Object.entries(delta)) await bumpColumn(TABLES.proofRecords, relationId, col, n ?? 0);
+    await updateRow(TABLES.proofRecords, relationId, { ...display, computedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  } catch (err) {
+    log("warn", "proof_event_failed", { relationId, message: err instanceof Error ? err.message : String(err) });
+  }
+}
+async function goalDisplay(relationId) {
+  const [rel, goals] = await Promise.all([
+    getRow(TABLES.learningRelations, relationId),
+    listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.limit(100)])
+  ]);
+  const achieved = goals.filter((g) => g.status === "achieved").slice(0, 5);
+  const ev = achieved.length ? await listRows(TABLES.evidenceItems, [Query.equal("relationId", relationId), Query.equal("goalId", achieved.map((g) => g.$id)), Query.select(["$id", "goalId"]), Query.limit(100)]) : [];
+  return focusAndMilestones(rel?.currentGoalId ?? null, goals, ev);
+}
+function focusAndMilestones(currentGoalId, goals, evidence) {
+  const current = goals.find((g) => g.$id === currentGoalId) ?? goals.find((g) => g.status === "active") ?? null;
+  const milestones = goals.filter((g) => g.status === "achieved").slice(0, 5).map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }));
+  return { currentFocus: current?.title ?? null, milestonesJson: JSON.stringify(milestones) };
+}
+async function nextStepDisplay(relationId) {
+  const [fb] = await listRows(TABLES.feedbackEntries, [Query.equal("relationId", relationId), Query.orderDesc("createdAt"), Query.limit(1)]);
+  if (fb?.nextStep) return { nextStep: fb.nextStep };
+  const [task] = await listRows(TABLES.learningTasks, [Query.equal("relationId", relationId), Query.equal("status", "open"), Query.orderAsc("dueAt"), Query.limit(1)]);
+  return { nextStep: task?.title ?? null };
+}
+async function rebuildRelation(relationId) {
+  const [rel, goals, tasks, evidence, feedback, before] = await Promise.all([
     getRow(TABLES.learningRelations, relationId),
     listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.limit(100)]),
-    listRows(TABLES.learningTasks, [Query.equal("relationId", relationId), Query.limit(200)]),
-    listRows(TABLES.evidenceItems, [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(200)]),
-    listRows(TABLES.feedbackEntries, [Query.equal("relationId", relationId), Query.orderDesc("createdAt"), Query.limit(200)])
+    listAllRows(TABLES.learningTasks, [Query.equal("relationId", relationId)]),
+    listAllRows(TABLES.evidenceItems, [Query.equal("relationId", relationId)]),
+    listAllRows(TABLES.feedbackEntries, [Query.equal("relationId", relationId)]),
+    getRow(TABLES.proofRecords, relationId)
   ]);
   if (!rel) throw notFound("not_found", "This learning relation could not be found.");
-  const current = goals.find((g) => g.$id === rel.currentGoalId) ?? goals.find((g) => g.status === "active") ?? null;
-  const milestones = goals.filter((g) => g.status === "achieved").slice(0, 5).map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }));
-  const latestFb = feedback[0];
-  const latestEv = evidence[0];
+  const latestFb = [...feedback].sort((a, b) => a.createdAt < b.createdAt ? 1 : -1)[0];
+  const latestEv = [...evidence].sort((a, b) => a.submittedAt < b.submittedAt ? 1 : -1)[0];
   const nextOpen = tasks.filter((t) => t.status === "open").sort((a, b) => (a.dueAt ?? "9") < (b.dueAt ?? "9") ? -1 : 1)[0];
-  const data = {
-    relationId,
-    currentFocus: current?.title ?? null,
-    milestonesJson: JSON.stringify(milestones),
+  const counts = {
     tasksDone: tasks.filter((t) => t.status === "done").length,
     evidenceSubmitted: evidence.length,
     feedbackReceived: feedback.length,
-    revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0),
+    revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0)
+  };
+  const data = {
+    relationId,
+    ...counts,
+    ...focusAndMilestones(rel.currentGoalId, goals, evidence),
     recentChange: latestFb ? `Feedback on "${evidence.find((e) => e.$id === latestFb.evidenceId)?.title ?? "evidence"}"` : latestEv ? `Submitted "${latestEv.title}"` : null,
     nextStep: latestFb?.nextStep || nextOpen?.title || null,
     computedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
+  const drift = [];
+  if (before) {
+    for (const k of Object.keys(counts)) if (before[k] !== counts[k]) drift.push(`proof.${k}`);
+  }
+  const openTasks = tasks.filter((t) => isOpenTask(t.status)).length;
+  const relFix = {};
+  if (rel.openTasks !== openTasks) {
+    relFix.openTasks = openTasks;
+    drift.push("relation.openTasks");
+  }
+  if (rel.evidenceCount !== evidence.length) {
+    relFix.evidenceCount = evidence.length;
+    drift.push("relation.evidenceCount");
+  }
+  if (Object.keys(relFix).length) await updateRow(TABLES.learningRelations, relationId, relFix);
   let row;
-  const existing = await getRow(TABLES.proofRecords, relationId);
-  if (existing) row = await updateRow(TABLES.proofRecords, relationId, data);
+  if (before) row = await updateRow(TABLES.proofRecords, relationId, data);
   else {
     try {
       row = await createRow(TABLES.proofRecords, data, relationId);
@@ -36996,25 +36979,30 @@ async function recomputeProof(relationId) {
       row = await updateRow(TABLES.proofRecords, relationId, data);
     }
   }
-  return toProof(row);
+  return { proof: toProof(row), drift };
 }
-var import_node_crypto2, revisionRowId;
-var init_proof = __esm({
-  "src/services/proof.ts"() {
+async function recomputeProof(relationId) {
+  return (await rebuildRelation(relationId)).proof;
+}
+async function getProof(relationId) {
+  const row = await getRow(TABLES.proofRecords, relationId);
+  return row ? toProof(row) : recomputeProof(relationId);
+}
+var OPEN_TASK, isOpenTask, EMPTY;
+var init_proof_projection = __esm({
+  "src/services/proof-projection.ts"() {
     "use strict";
-    import_node_crypto2 = require("node:crypto");
     init_dist();
+    init_paginate();
     init_repo();
     init_rows();
     init_schema();
     init_errors2();
+    init_log();
     init_learning();
-    init_events();
-    init_notifications2();
-    init_messaging3();
-    init_uploads();
-    init_learning2();
-    revisionRowId = (evidenceId, version) => (0, import_node_crypto2.createHash)("sha256").update(`evidence-rev:${evidenceId}:${version}`).digest("hex").slice(0, 32);
+    OPEN_TASK = /* @__PURE__ */ new Set(["open", "submitted", "reviewed"]);
+    isOpenTask = (status) => OPEN_TASK.has(status ?? "");
+    EMPTY = { currentFocus: null, milestonesJson: "[]", tasksDone: 0, evidenceSubmitted: 0, feedbackReceived: 0, revisions: 0, recentChange: null, nextStep: null };
   }
 });
 
@@ -37306,7 +37294,7 @@ async function createGoal2(rel, actorId, input, requestId2, rowId2) {
     const other = actorId === rel.teacherId ? rel.studentId : rel.teacherId;
     await notify({ userId: other, type: "goal.created", title: actorId === rel.studentId ? "Your learner proposed a new goal" : "New learning goal", body: row.title, href: `/relations/${rel.$id}`, refType: "learning_goal", refId: row.$id, actorId, dedupeKey: `goal.created:${row.$id}` });
   }
-  await recomputeProof(rel.$id);
+  await applyProofEvent(rel.$id, {}, await goalDisplay(rel.$id));
   return toGoal(row);
 }
 async function nextFocus(relationId, excludeGoalId) {
@@ -37334,7 +37322,7 @@ async function updateGoal2(relationId, goalId, userId, patch, requestId2) {
     await emitEvent({ eventType: "goal.achieved", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { goalId }, requestId: requestId2 });
     await notify({ userId: rel.studentId, type: "goal.achieved", title: "Goal achieved", body: row.title, href: `/relations/${relationId}`, refType: "learning_goal", refId: goalId, actorId: userId, dedupeKey: `goal.achieved:${goalId}` });
   }
-  await recomputeProof(relationId);
+  await applyProofEvent(relationId, {}, await goalDisplay(relationId));
   return toGoal(row);
 }
 async function requestGoalCompletion(relationId, goalId, userId, requestId2) {
@@ -37370,10 +37358,12 @@ async function createTask2(relationId, userId, input, requestId2) {
   if (rel.teacherId !== userId) throw forbidden("Only the teacher assigns tasks.");
   assertRelationWritable(rel);
   const row = await createRow(TABLES.learningTasks, { relationId, goalId: input.goalId ?? rel.currentGoalId, title: input.title, instructions: input.instructions ?? "", status: "open", assignedBy: userId, dueAt: input.dueAt ?? null });
-  await touch(rel, { openTasks: rel.openTasks + 1 });
+  await incrementColumn(TABLES.learningRelations, relationId, "openTasks", 1);
+  await touch(rel);
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "task_assigned", payload: { type: "task_assigned", taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId: requestId2 });
   await emitEvent({ eventType: "task.assigned", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { taskId: row.$id }, requestId: requestId2 });
   await notify({ userId: userId === rel.teacherId ? rel.studentId : rel.teacherId, type: "task.assigned", title: "New task", body: row.title, href: `/relations/${relationId}`, refType: "learning_task", refId: row.$id, actorId: userId, dedupeKey: `task.assigned:${row.$id}` });
+  await applyProofEvent(relationId, {}, await nextStepDisplay(relationId));
   return toTask(row);
 }
 async function updateTask2(relationId, taskId, userId, patch) {
@@ -37383,17 +37373,17 @@ async function updateTask2(relationId, taskId, userId, patch) {
   const task = await getRow(TABLES.learningTasks, taskId);
   if (!task || task.relationId !== relationId) throw notFound("not_found", "This task could not be found.");
   const row = await updateRow(TABLES.learningTasks, taskId, patch);
-  const wasOpen = task.status === "open" || task.status === "submitted" || task.status === "reviewed";
-  const isOpen = row.status === "open" || row.status === "submitted" || row.status === "reviewed";
-  await touch(rel, wasOpen !== isOpen ? { openTasks: Math.max(0, rel.openTasks + (isOpen ? 1 : -1)) } : {});
-  await recomputeProof(relationId);
+  const d = taskDeltas(task.status, row.status);
+  await bumpColumn(TABLES.learningRelations, relationId, "openTasks", d.openTasks);
+  await touch(rel);
+  await applyProofEvent(relationId, { tasksDone: d.tasksDone }, await nextStepDisplay(relationId));
   return toTask(row);
 }
-var import_node_crypto3, seedGoalId, TRANSITIONS;
+var import_node_crypto2, seedGoalId, TRANSITIONS;
 var init_learning2 = __esm({
   "src/services/learning.ts"() {
     "use strict";
-    import_node_crypto3 = require("node:crypto");
+    import_node_crypto2 = require("node:crypto");
     init_dist();
     init_repo();
     init_rows();
@@ -37404,143 +37394,9 @@ var init_learning2 = __esm({
     init_notifications2();
     init_messaging3();
     init_profiles();
-    init_proof();
-    seedGoalId = (relationId) => (0, import_node_crypto3.createHash)("sha256").update(`seed-goal:${relationId}`).digest("hex").slice(0, 32);
+    init_proof_projection();
+    seedGoalId = (relationId) => (0, import_node_crypto2.createHash)("sha256").update(`seed-goal:${relationId}`).digest("hex").slice(0, 32);
     TRANSITIONS = { active: ["paused", "ended"], paused: ["active", "ended"], ended: [] };
-  }
-});
-
-// src/services/uploads.ts
-async function createIntent(userId, input) {
-  const lim = LIMITS[input.purpose];
-  if (input.sizeBytes > lim.maxBytes) throw validation("This file is too large.", [{ path: "sizeBytes", message: `max ${lim.maxBytes}` }]);
-  if (!lim.mime.test(input.mimeType)) throw validation("This file type is not supported.", [{ path: "mimeType", message: "unsupported" }]);
-  if (input.purpose === "evidence") {
-    if (!input.relationId) throw validation("Evidence uploads need a learning relation.", [{ path: "relationId", message: "required" }]);
-    await requireRelationMember(input.relationId, userId);
-  }
-  const cfg = getConfig().appwrite;
-  const bucketId = input.purpose === "avatar" ? cfg.avatarBucketId : input.purpose === "qa" ? cfg.qaBucketId : cfg.evidenceBucketId;
-  const fileId = ID.unique();
-  const expiresAt = new Date(Date.now() + 15 * 6e4).toISOString();
-  await createRow(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, fileName: input.fileName.slice(0, 255), mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "pending", expiresAt }, fileId);
-  return { bucketId, fileId, expiresAt };
-}
-async function completeIntent(userId, fileId) {
-  const intent = await getRow(TABLES.uploadIntents, fileId);
-  if (!intent) throw notFound("not_found", "Upload not found.");
-  if (intent.userId !== userId) throw forbidden();
-  if (intent.status === "complete" || intent.status === INTENT_ATTACHED) return { fileId, bucketId: intent.bucketId };
-  if (new Date(intent.expiresAt).getTime() < Date.now()) throw conflict("invalid_state", "This upload has expired. Start again.");
-  const storage2 = getStorage();
-  const file = await storage2.getFile({ bucketId: intent.bucketId, fileId }).catch(() => null);
-  if (!file) throw conflict("invalid_state", "The file has not been uploaded yet.");
-  if (file.sizeOriginal > intent.sizeBytes * 1.05 + 1024) {
-    await storage2.deleteFile({ bucketId: intent.bucketId, fileId });
-    throw validation("Uploaded file does not match the declared size.");
-  }
-  const readers = [Permission.read(Role.user(userId))];
-  if (intent.purpose === "avatar") readers.push(Permission.read(Role.any()));
-  if (intent.purpose === "qa") readers.push(Permission.read(Role.users()));
-  if (intent.relationId) {
-    const rel = await requireRelationMember(intent.relationId, userId);
-    const other = rel.studentId === userId ? rel.teacherId : rel.studentId;
-    readers.push(Permission.read(Role.user(other)));
-  }
-  await storage2.updateFile({ bucketId: intent.bucketId, fileId, permissions: [...readers, Permission.delete(Role.user(userId))] });
-  await updateRow(TABLES.uploadIntents, fileId, { status: "complete" });
-  if (intent.purpose === "avatar") {
-    const profile = await getRow(TABLES.profiles, userId);
-    await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
-    if (profile?.avatarFileId && profile.avatarFileId !== fileId) {
-      await storage2.deleteFile({ bucketId: getConfig().appwrite.avatarBucketId, fileId: profile.avatarFileId }).catch(() => void 0);
-    }
-  }
-  return { fileId, bucketId: intent.bucketId };
-}
-async function assertEvidenceAttachments(userId, relationId, fileIds) {
-  const ids = Array.from(new Set(fileIds)).slice(0, 5);
-  if (!ids.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
-  for (const id of ids) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row || row.userId !== userId || row.purpose !== "evidence" || row.relationId !== relationId || row.status !== "complete") {
-      throw validation("One of the attachments is not a completed upload for this relation.", [{ path: "attachmentFileIds", message: id }]);
-    }
-  }
-  return ids;
-}
-async function assertQaAttachments(userId, fileIds, max = 5) {
-  const ids = Array.from(new Set(fileIds ?? []));
-  if (ids.length > max) throw validation(`You can attach up to ${max} files.`, [{ path: "attachmentFileIds", message: `max ${max}` }]);
-  if (!ids.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
-  for (const id of ids) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row || row.userId !== userId || row.purpose !== "qa" || row.status !== "complete" && row.status !== INTENT_ATTACHED) {
-      throw validation("One of the attachments is not a finished upload of yours.", [{ path: "attachmentFileIds", message: id }]);
-    }
-  }
-  return ids;
-}
-async function markAttached(fileIds) {
-  await Promise.all(fileIds.map((id) => updateRow(TABLES.uploadIntents, id, { status: INTENT_ATTACHED }).catch(() => void 0)));
-}
-async function deleteUploads(fileIds) {
-  if (!fileIds.length) return;
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
-  const storage2 = getStorage();
-  await Promise.all(rows.map(async (r) => {
-    await storage2.deleteFile({ bucketId: r.bucketId, fileId: r.fileId }).catch(() => void 0);
-    await deleteRow(TABLES.uploadIntents, r.$id).catch(() => void 0);
-  }));
-}
-async function resolveAttachments(fileIds) {
-  if (!fileIds.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
-  const cfg = getConfig().appwrite;
-  const tokens = new Tokens(getAdminClient());
-  const now = Date.now();
-  const out = [];
-  for (const id of fileIds) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row) continue;
-    let tok = tokenCache.get(id);
-    if (!tok || tok.expiresAt - 6e4 < now) {
-      const expiresAt = now + TOKEN_TTL_MS;
-      try {
-        const t = await tokens.createFileToken({ bucketId: row.bucketId, fileId: id, expire: new Date(expiresAt).toISOString() });
-        tok = { secret: t.secret, expiresAt };
-        tokenCache.set(id, tok);
-      } catch {
-        continue;
-      }
-    }
-    const url = `${cfg.endpoint}/storage/buckets/${row.bucketId}/files/${id}/view?project=${cfg.projectId}&token=${tok.secret}`;
-    out.push({ fileId: id, fileName: row.fileName ?? "attachment", mimeType: row.mimeType, sizeBytes: row.sizeBytes, url, expiresAt: new Date(tok.expiresAt).toISOString() });
-  }
-  return out;
-}
-var DOCS, LIMITS, INTENT_ATTACHED, TOKEN_TTL_MS, tokenCache;
-var init_uploads = __esm({
-  "src/services/uploads.ts"() {
-    "use strict";
-    init_dist();
-    init_config();
-    init_repo();
-    init_schema();
-    init_client2();
-    init_errors2();
-    init_learning2();
-    DOCS = /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/;
-    LIMITS = {
-      avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/ },
-      evidence: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
-      qa: { maxBytes: 25 * 1024 * 1024, mime: DOCS }
-    };
-    INTENT_ATTACHED = "attached";
-    TOKEN_TTL_MS = 30 * 6e4;
-    tokenCache = /* @__PURE__ */ new Map();
   }
 });
 
@@ -40246,7 +40102,7 @@ init_notifications2();
 init_profiles();
 
 // src/services/qa.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 init_api();
 init_repo();
 init_rows();
@@ -40254,7 +40110,134 @@ init_schema();
 init_errors2();
 init_events();
 init_notifications2();
-init_uploads();
+
+// src/services/uploads.ts
+init_dist();
+init_config();
+init_repo();
+init_schema();
+init_client2();
+init_errors2();
+init_learning2();
+var DOCS = /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/;
+var LIMITS = {
+  avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/ },
+  evidence: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
+  qa: { maxBytes: 25 * 1024 * 1024, mime: DOCS }
+};
+var INTENT_ATTACHED = "attached";
+async function createIntent(userId, input) {
+  const lim = LIMITS[input.purpose];
+  if (input.sizeBytes > lim.maxBytes) throw validation("This file is too large.", [{ path: "sizeBytes", message: `max ${lim.maxBytes}` }]);
+  if (!lim.mime.test(input.mimeType)) throw validation("This file type is not supported.", [{ path: "mimeType", message: "unsupported" }]);
+  if (input.purpose === "evidence") {
+    if (!input.relationId) throw validation("Evidence uploads need a learning relation.", [{ path: "relationId", message: "required" }]);
+    await requireRelationMember(input.relationId, userId);
+  }
+  const cfg = getConfig().appwrite;
+  const bucketId = input.purpose === "avatar" ? cfg.avatarBucketId : input.purpose === "qa" ? cfg.qaBucketId : cfg.evidenceBucketId;
+  const fileId = ID.unique();
+  const expiresAt = new Date(Date.now() + 15 * 6e4).toISOString();
+  await createRow(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, fileName: input.fileName.slice(0, 255), mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "pending", expiresAt }, fileId);
+  return { bucketId, fileId, expiresAt };
+}
+async function completeIntent(userId, fileId) {
+  const intent = await getRow(TABLES.uploadIntents, fileId);
+  if (!intent) throw notFound("not_found", "Upload not found.");
+  if (intent.userId !== userId) throw forbidden();
+  if (intent.status === "complete" || intent.status === INTENT_ATTACHED) return { fileId, bucketId: intent.bucketId };
+  if (new Date(intent.expiresAt).getTime() < Date.now()) throw conflict("invalid_state", "This upload has expired. Start again.");
+  const storage2 = getStorage();
+  const file = await storage2.getFile({ bucketId: intent.bucketId, fileId }).catch(() => null);
+  if (!file) throw conflict("invalid_state", "The file has not been uploaded yet.");
+  if (file.sizeOriginal > intent.sizeBytes * 1.05 + 1024) {
+    await storage2.deleteFile({ bucketId: intent.bucketId, fileId });
+    throw validation("Uploaded file does not match the declared size.");
+  }
+  const readers = [Permission.read(Role.user(userId))];
+  if (intent.purpose === "avatar") readers.push(Permission.read(Role.any()));
+  if (intent.purpose === "qa") readers.push(Permission.read(Role.users()));
+  if (intent.relationId) {
+    const rel = await requireRelationMember(intent.relationId, userId);
+    const other = rel.studentId === userId ? rel.teacherId : rel.studentId;
+    readers.push(Permission.read(Role.user(other)));
+  }
+  await storage2.updateFile({ bucketId: intent.bucketId, fileId, permissions: [...readers, Permission.delete(Role.user(userId))] });
+  await updateRow(TABLES.uploadIntents, fileId, { status: "complete" });
+  if (intent.purpose === "avatar") {
+    const profile = await getRow(TABLES.profiles, userId);
+    await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
+    if (profile?.avatarFileId && profile.avatarFileId !== fileId) {
+      await storage2.deleteFile({ bucketId: getConfig().appwrite.avatarBucketId, fileId: profile.avatarFileId }).catch(() => void 0);
+    }
+  }
+  return { fileId, bucketId: intent.bucketId };
+}
+async function assertEvidenceAttachments(userId, relationId, fileIds) {
+  const ids = Array.from(new Set(fileIds)).slice(0, 5);
+  if (!ids.length) return [];
+  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
+  for (const id of ids) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row || row.userId !== userId || row.purpose !== "evidence" || row.relationId !== relationId || row.status !== "complete") {
+      throw validation("One of the attachments is not a completed upload for this relation.", [{ path: "attachmentFileIds", message: id }]);
+    }
+  }
+  return ids;
+}
+async function assertQaAttachments(userId, fileIds, max = 5) {
+  const ids = Array.from(new Set(fileIds ?? []));
+  if (ids.length > max) throw validation(`You can attach up to ${max} files.`, [{ path: "attachmentFileIds", message: `max ${max}` }]);
+  if (!ids.length) return [];
+  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
+  for (const id of ids) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row || row.userId !== userId || row.purpose !== "qa" || row.status !== "complete" && row.status !== INTENT_ATTACHED) {
+      throw validation("One of the attachments is not a finished upload of yours.", [{ path: "attachmentFileIds", message: id }]);
+    }
+  }
+  return ids;
+}
+async function markAttached(fileIds) {
+  await Promise.all(fileIds.map((id) => updateRow(TABLES.uploadIntents, id, { status: INTENT_ATTACHED }).catch(() => void 0)));
+}
+async function deleteUploads(fileIds) {
+  if (!fileIds.length) return;
+  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
+  const storage2 = getStorage();
+  await Promise.all(rows.map(async (r) => {
+    await storage2.deleteFile({ bucketId: r.bucketId, fileId: r.fileId }).catch(() => void 0);
+    await deleteRow(TABLES.uploadIntents, r.$id).catch(() => void 0);
+  }));
+}
+var TOKEN_TTL_MS = 30 * 6e4;
+var tokenCache = /* @__PURE__ */ new Map();
+async function resolveAttachments(fileIds) {
+  if (!fileIds.length) return [];
+  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
+  const cfg = getConfig().appwrite;
+  const tokens = new Tokens(getAdminClient());
+  const now = Date.now();
+  const out = [];
+  for (const id of fileIds) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row) continue;
+    let tok = tokenCache.get(id);
+    if (!tok || tok.expiresAt - 6e4 < now) {
+      const expiresAt = now + TOKEN_TTL_MS;
+      try {
+        const t = await tokens.createFileToken({ bucketId: row.bucketId, fileId: id, expire: new Date(expiresAt).toISOString() });
+        tok = { secret: t.secret, expiresAt };
+        tokenCache.set(id, tok);
+      } catch {
+        continue;
+      }
+    }
+    const url = `${cfg.endpoint}/storage/buckets/${row.bucketId}/files/${id}/view?project=${cfg.projectId}&token=${tok.secret}`;
+    out.push({ fileId: id, fileName: row.fileName ?? "attachment", mimeType: row.mimeType, sizeBytes: row.sizeBytes, url, expiresAt: new Date(tok.expiresAt).toISOString() });
+  }
+  return out;
+}
 
 // src/services/qa-policy.ts
 init_api();
@@ -40306,7 +40289,7 @@ function excerpt(text, max = 200) {
 }
 
 // src/services/qa.ts
-var hashId = (...parts) => (0, import_node_crypto4.createHash)("sha256").update(parts.join(":")).digest("hex").slice(0, 32);
+var hashId = (...parts) => (0, import_node_crypto3.createHash)("sha256").update(parts.join(":")).digest("hex").slice(0, 32);
 var answerRowId = (questionId, teacherId) => hashId("qa-answer", questionId, teacherId);
 var clarificationRowId = (answerId) => hashId("qa-clarify", answerId);
 var nowIso2 = () => (/* @__PURE__ */ new Date()).toISOString();
@@ -40644,9 +40627,8 @@ async function removeContent(targetType, id, adminId) {
   if (a.kind === "answer") {
     const q = await getRow(TABLES.qaQuestions, a.questionId);
     if (q) {
-      const answerCount = Math.max(0, (q.answerCount ?? 0) - 1);
+      const answerCount = (await decrementColumn(TABLES.qaQuestions, q.$id, "answerCount", 1, 0)).answerCount ?? 0;
       await updateRow(TABLES.qaQuestions, q.$id, {
-        answerCount,
         acceptedAnswerId: q.acceptedAnswerId === id ? null : q.acceptedAnswerId,
         status: q.status === "closed" ? "closed" : answerCount > 0 ? "answered" : "open"
       });
@@ -40921,13 +40903,13 @@ init_errors2();
 init_connections();
 
 // src/services/idempotency.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 init_repo();
 init_rows();
 init_schema();
 init_errors2();
-var rowId = (userId, key) => (0, import_node_crypto5.createHash)("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32);
-var hashOf = (payload) => (0, import_node_crypto5.createHash)("sha256").update(JSON.stringify(payload ?? null)).digest("hex");
+var rowId = (userId, key) => (0, import_node_crypto4.createHash)("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32);
+var hashOf = (payload) => (0, import_node_crypto4.createHash)("sha256").update(JSON.stringify(payload ?? null)).digest("hex");
 async function withIdempotency(userId, key, payload, fn) {
   if (!key) return fn();
   const id = rowId(userId, key);
@@ -41211,7 +41193,136 @@ qaWriteRoutes.post("/answers/:id/report", async (c) => ok(rid(c), await reportCo
 init_errors2();
 init_summary();
 init_learning2();
-init_proof();
+
+// src/services/proof.ts
+var import_node_crypto5 = require("node:crypto");
+init_dist();
+init_repo();
+init_rows();
+init_schema();
+init_errors2();
+init_learning();
+init_events();
+init_notifications2();
+init_messaging3();
+init_learning2();
+init_proof_projection();
+init_proof_projection();
+async function listEvidence(relationId, limit2, cursor2) {
+  const q = [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(limit2 + 1)];
+  if (cursor2) q.push(Query.cursorAfter(cursor2));
+  const rows = await listRows(TABLES.evidenceItems, q);
+  const hasMore = rows.length > limit2;
+  const page = hasMore ? rows.slice(0, limit2) : rows;
+  const fb = page.length ? await listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", page.map((e) => e.$id)), Query.orderAsc("createdAt"), Query.limit(200)]) : [];
+  const last = page[page.length - 1];
+  const items = await Promise.all(page.map(async (e) => toEvidence(e, fb.filter((f) => f.evidenceId === e.$id), await resolveAttachments(e.attachmentFileIds ?? []))));
+  return { items, nextCursor: hasMore && last ? last.$id : null };
+}
+async function getEvidence(relationId, evidenceId) {
+  const row = await getRow(TABLES.evidenceItems, evidenceId);
+  if (!row || row.relationId !== relationId) throw notFound("not_found", "This evidence could not be found.");
+  const [fb, revisions] = await Promise.all([
+    listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", evidenceId), Query.orderAsc("createdAt"), Query.limit(100)]),
+    row.version > 1 ? listRows(TABLES.evidenceRevisions, [Query.equal("evidenceId", evidenceId), Query.orderDesc("version"), Query.limit(20)]) : Promise.resolve([])
+  ]);
+  return { ...toEvidence(row, fb, await resolveAttachments(row.attachmentFileIds ?? [])), revisions: revisions.map(toRevision) };
+}
+async function submitEvidence(rel, authorId, input, requestId2) {
+  assertRelationWritable(rel);
+  const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
+  let taskId = input.taskId ?? null;
+  if (taskId) {
+    const task = await getRow(TABLES.learningTasks, taskId);
+    if (!task || task.relationId !== rel.$id) throw notFound("not_found", "This task could not be found.");
+    if (task.status === "open" || task.status === "reviewed") await updateRow(TABLES.learningTasks, taskId, { status: "submitted" });
+  }
+  const row = await createRow(TABLES.evidenceItems, {
+    relationId: rel.$id,
+    taskId,
+    goalId: input.goalId ?? rel.currentGoalId,
+    authorId,
+    title: input.title,
+    body: input.body,
+    attachmentFileIds,
+    status: "submitted",
+    version: 1,
+    submittedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    reviewedAt: null
+  });
+  await incrementColumn(TABLES.learningRelations, rel.$id, "evidenceCount", 1);
+  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: row.submittedAt });
+  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId: row.$id, title: row.title, taskId }, requestId: requestId2 });
+  await emitEvent({ eventType: "evidence.submitted", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId: row.$id }, requestId: requestId2 });
+  await notify({ userId: authorId === rel.studentId ? rel.teacherId : rel.studentId, type: "evidence.submitted", title: "New evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${row.$id}`, refType: "evidence_item", refId: row.$id, actorId: authorId, dedupeKey: `evidence.submitted:${row.$id}` });
+  await applyProofEvent(rel.$id, { evidenceSubmitted: 1 }, { recentChange: `Submitted "${row.title}"` });
+  return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
+}
+async function addFeedback(rel, evidenceId, authorId, input, requestId2) {
+  assertRelationWritable(rel);
+  const ev = await getRow(TABLES.evidenceItems, evidenceId);
+  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
+  if (ev.status === "reviewed") throw conflict("invalid_state", "This evidence has already been reviewed.", { reason: "evidence_reviewed" });
+  if (ev.status === "needs_revision") throw conflict("invalid_state", "Waiting for the learner to revise this evidence.", { reason: "evidence_awaiting_revision" });
+  const outcome = input.outcome ?? "approved";
+  const fb = await createRow(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? "", outcome });
+  await updateRow(TABLES.evidenceItems, evidenceId, { status: outcome === "approved" ? "reviewed" : "needs_revision", reviewedAt: fb.createdAt });
+  let taskDelta = { tasksDone: 0, openTasks: 0 };
+  if (ev.taskId && outcome === "approved") {
+    const task = await getRow(TABLES.learningTasks, ev.taskId);
+    if (task && task.status !== "done" && task.status !== "dropped") {
+      const next = input.markTaskDone ? "done" : "reviewed";
+      await updateRow(TABLES.learningTasks, ev.taskId, { status: next });
+      taskDelta = taskDeltas(task.status, next);
+    }
+  }
+  await bumpColumn(TABLES.learningRelations, rel.$id, "openTasks", taskDelta.openTasks);
+  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt });
+  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "feedback_added", payload: { type: "feedback_added", feedbackId: fb.$id, evidenceId, excerpt: input.body.slice(0, 140) }, requestId: requestId2 });
+  await emitEvent({ eventType: outcome === "approved" ? "feedback.added" : "evidence.revision_requested", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { feedbackId: fb.$id, evidenceId, outcome }, requestId: requestId2 });
+  await notify(outcome === "approved" ? { userId: ev.authorId, type: "feedback.added", title: "You received feedback", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `feedback.added:${fb.$id}` } : { userId: ev.authorId, type: "evidence.revision_requested", title: "Your teacher asked for a revision", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `evidence.revision_requested:${fb.$id}` });
+  await applyProofEvent(rel.$id, { feedbackReceived: 1, tasksDone: taskDelta.tasksDone }, { recentChange: `Feedback on "${ev.title}"`, ...await nextStepDisplay(rel.$id) });
+  return toFeedback(fb);
+}
+var revisionRowId = (evidenceId, version) => (0, import_node_crypto5.createHash)("sha256").update(`evidence-rev:${evidenceId}:${version}`).digest("hex").slice(0, 32);
+async function reviseEvidence2(rel, evidenceId, authorId, input, requestId2) {
+  assertRelationWritable(rel);
+  const ev = await getRow(TABLES.evidenceItems, evidenceId);
+  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
+  if (ev.authorId !== authorId) throw forbidden("Only the learner who submitted this evidence can revise it.");
+  if (ev.status !== "needs_revision") throw conflict("invalid_state", "This evidence is not waiting for a revision.", { reason: "evidence_not_revisable" });
+  const attachmentFileIds = input.attachmentFileIds !== void 0 ? await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds.filter((id) => !(ev.attachmentFileIds ?? []).includes(id))).then((fresh) => [...input.attachmentFileIds.filter((id) => (ev.attachmentFileIds ?? []).includes(id)), ...fresh]) : ev.attachmentFileIds ?? [];
+  try {
+    await createRow(TABLES.evidenceRevisions, {
+      evidenceId,
+      relationId: rel.$id,
+      authorId,
+      version: ev.version,
+      title: ev.title,
+      body: ev.body ?? "",
+      attachmentFileIds: ev.attachmentFileIds ?? []
+    }, revisionRowId(evidenceId, ev.version));
+  } catch (err) {
+    if (!isConflict(err)) throw err;
+  }
+  const row = await updateRow(TABLES.evidenceItems, evidenceId, {
+    title: input.title ?? ev.title,
+    body: input.body ?? ev.body ?? "",
+    attachmentFileIds,
+    status: "revised",
+    version: ev.version + 1,
+    reviewedAt: null
+  });
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: now });
+  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId, title: row.title, taskId: row.taskId }, requestId: requestId2 });
+  await emitEvent({ eventType: "evidence.revised", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId, version: row.version }, requestId: requestId2 });
+  await notify({ userId: rel.teacherId, type: "evidence.revised", title: "Revised evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "evidence_item", refId: evidenceId, actorId: authorId, dedupeKey: `evidence.revised:${evidenceId}:${row.version}` });
+  await applyProofEvent(rel.$id, { revisions: 1 }, { recentChange: `Submitted "${row.title}"` });
+  return getEvidence(rel.$id, evidenceId);
+}
+
+// src/routes/relations.ts
 var relationRoutes = new Hono2();
 relationRoutes.get("/", async (c) => {
   const q = readQuery(c, relationList);
@@ -41284,7 +41395,7 @@ relationRoutes.post("/:id/evidence/:evidenceId/feedback", async (c) => {
 });
 relationRoutes.get("/:id/proof", async (c) => {
   await requireRelationMember(c.req.param("id"), currentUser(c).$id);
-  return ok(c.get("requestId"), await recomputeProof(c.req.param("id")));
+  return ok(c.get("requestId"), await getProof(c.req.param("id")));
 });
 
 // src/routes/review-queue.ts
@@ -41517,7 +41628,6 @@ teacherRoutes.post("/reviews/:id/report", async (c) => ok(c.get("requestId"), aw
 
 // src/routes/uploads.ts
 init_errors2();
-init_uploads();
 var uploadRoutes = new Hono2();
 uploadRoutes.post("/intents", async (c) => ok(c.get("requestId"), await createIntent(currentUser(c).$id, await readJsonBody(c, uploadIntent)), 201));
 uploadRoutes.post("/complete", async (c) => {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Query } from 'node-appwrite';
 import type { LearningGoal, LearningRelation, LearningTask, RelationNextAction, RelationWorkspace } from '../contracts/api';
-import { createRow, getRow, listRows, updateRow } from '../db/repo';
+import { createRow, getRow, incrementColumn, listRows, updateRow } from '../db/repo';
 import { isConflict, type EvidenceItemRow, type FeedbackEntryRow, type LearningGoalRow, type LearningRelationRow, type LearningTaskRow, type ProofRecordRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound, validation } from '../errors';
@@ -10,7 +10,7 @@ import { emitEvent } from './events';
 import { notify } from './notifications';
 import { appendMessage } from './messaging';
 import { personRefs } from './profiles';
-import { recomputeProof } from './proof';
+import { applyProofEvent, bumpColumn, goalDisplay, nextStepDisplay, taskDeltas } from './proof-projection';
 
 export async function requireRelationMember(relationId: string, userId: string): Promise<LearningRelationRow> {
   const rel = await getRow<LearningRelationRow>(TABLES.learningRelations, relationId);
@@ -171,7 +171,7 @@ export async function createGoal(rel: LearningRelationRow, actorId: string, inpu
     const other = actorId === rel.teacherId ? rel.studentId : rel.teacherId;
     await notify({ userId: other, type: 'goal.created', title: actorId === rel.studentId ? 'Your learner proposed a new goal' : 'New learning goal', body: row.title, href: `/relations/${rel.$id}`, refType: 'learning_goal', refId: row.$id, actorId, dedupeKey: `goal.created:${row.$id}` });
   }
-  await recomputeProof(rel.$id);
+  await applyProofEvent(rel.$id, {}, await goalDisplay(rel.$id));
   return toGoal(row);
 }
 
@@ -203,7 +203,7 @@ export async function updateGoal(relationId: string, goalId: string, userId: str
     await emitEvent({ eventType: 'goal.achieved', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { goalId }, requestId });
     await notify({ userId: rel.studentId, type: 'goal.achieved', title: 'Goal achieved', body: row.title, href: `/relations/${relationId}`, refType: 'learning_goal', refId: goalId, actorId: userId, dedupeKey: `goal.achieved:${goalId}` });
   }
-  await recomputeProof(relationId);
+  await applyProofEvent(relationId, {}, await goalDisplay(relationId));
   return toGoal(row);
 }
 
@@ -246,10 +246,12 @@ export async function createTask(relationId: string, userId: string, input: { ti
   if (rel.teacherId !== userId) throw forbidden('Only the teacher assigns tasks.');
   assertRelationWritable(rel);
   const row = await createRow<LearningTaskRow>(TABLES.learningTasks, { relationId, goalId: input.goalId ?? rel.currentGoalId, title: input.title, instructions: input.instructions ?? '', status: 'open', assignedBy: userId, dueAt: input.dueAt ?? null });
-  await touch(rel, { openTasks: rel.openTasks + 1 });
+  await incrementColumn(TABLES.learningRelations, relationId, 'openTasks', 1);
+  await touch(rel);
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'task_assigned', payload: { type: 'task_assigned', taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId });
   await emitEvent({ eventType: 'task.assigned', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { taskId: row.$id }, requestId });
   await notify({ userId: userId === rel.teacherId ? rel.studentId : rel.teacherId, type: 'task.assigned', title: 'New task', body: row.title, href: `/relations/${relationId}`, refType: 'learning_task', refId: row.$id, actorId: userId, dedupeKey: `task.assigned:${row.$id}` });
+  await applyProofEvent(relationId, {}, await nextStepDisplay(relationId));
   return toTask(row);
 }
 
@@ -260,9 +262,9 @@ export async function updateTask(relationId: string, taskId: string, userId: str
   const task = await getRow<LearningTaskRow>(TABLES.learningTasks, taskId);
   if (!task || task.relationId !== relationId) throw notFound('not_found', 'This task could not be found.');
   const row = await updateRow<LearningTaskRow>(TABLES.learningTasks, taskId, patch);
-  const wasOpen = task.status === 'open' || task.status === 'submitted' || task.status === 'reviewed';
-  const isOpen = row.status === 'open' || row.status === 'submitted' || row.status === 'reviewed';
-  await touch(rel, wasOpen !== isOpen ? { openTasks: Math.max(0, rel.openTasks + (isOpen ? 1 : -1)) } : {});
-  await recomputeProof(relationId);
+  const d = taskDeltas(task.status, row.status);
+  await bumpColumn(TABLES.learningRelations, relationId, 'openTasks', d.openTasks);
+  await touch(rel);
+  await applyProofEvent(relationId, { tasksDone: d.tasksDone }, await nextStepDisplay(relationId));
   return toTask(row);
 }

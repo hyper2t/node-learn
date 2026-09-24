@@ -33,6 +33,12 @@ vi.mock('../src/db/repo', () => {
       table(t).set(id, row);
       return row;
     },
+    incrementColumn: async (t: string, id: string, col: string, v = 1) => {
+      const row = table(t).get(id)!; row[col] = ((row[col] as number) ?? 0) + v; return row;
+    },
+    decrementColumn: async (t: string, id: string, col: string, v = 1, min = 0) => {
+      const row = table(t).get(id)!; row[col] = Math.max(min, ((row[col] as number) ?? 0) - v); return row;
+    },
     listRows: async (t: string, q: string[]) => list(t, q),
     findOne: async (t: string, q: string[]) => list(t, q)[0] ?? null,
   };
@@ -423,5 +429,58 @@ describe('L4.2 relation summary', () => {
     expect(db.notes.map((n) => [n.userId, n.type])).toEqual([[S, 'relation.closing_note']]);
     const late = new Date(endedAt + 15 * 24 * 3_600_000);
     expect(await errorOf(setClosingNote('rel1', T, 'too late', undefined, late))).toMatchObject({ status: 409, details: { reason: 'closing_note_window_passed' } });
+  });
+});
+
+describe('L5 write-time proof and atomic counters', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  it('concurrent writes with a stale relation row do not lose counter updates', async () => {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const P = await import('../src/services/proof');
+    const [t1] = await Promise.all([L.createTask('rel1', T, { title: 'A' }), L.createTask('rel1', T, { title: 'B' })]);
+    await Promise.all([
+      P.submitEvidence(rel as never, S, { title: 'E1', body: 'x', taskId: t1.id }),
+      P.submitEvidence(rel as never, S, { title: 'E2', body: 'y' }),
+    ]);
+    const { getRow } = await import('../src/db/repo');
+    const { TABLES } = await import('../src/db/schema');
+    const row = await getRow(TABLES.learningRelations, 'rel1') as unknown as { openTasks: number; evidenceCount: number };
+    expect(row).toMatchObject({ openTasks: 2, evidenceCount: 2 });
+    expect((await P.getProof('rel1')).counts).toMatchObject({ evidenceSubmitted: 2, tasksDone: 0 });
+  });
+
+  it('incremental proof matches a full rebuild; feedback moves tasksDone and nextStep', async () => {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const P = await import('../src/services/proof');
+    const { rebuildRelation } = await import('../src/services/proof-projection');
+    await L.createGoal(rel as never, T, { title: 'Fractions' });
+    const task = await L.createTask('rel1', T, { title: 'Worksheet' });
+    const ev = await P.submitEvidence(rel as never, S, { title: 'Sheet', body: 'done', taskId: task.id });
+    await P.addFeedback(rel as never, ev.id, T, { body: 'Nice', nextStep: 'Try decimals', markTaskDone: true });
+    const inc = await P.getProof('rel1');
+    expect(inc).toMatchObject({ currentFocus: 'Fractions', nextStep: 'Try decimals', recentChange: 'Feedback on "Sheet"', counts: { tasksDone: 1, evidenceSubmitted: 1, feedbackReceived: 1, revisions: 0 } });
+    const { proof, drift } = await rebuildRelation('rel1');
+    expect(drift).toEqual([]);
+    expect(proof.counts).toEqual(inc.counts);
+    // Reopening the done task takes it back off tasksDone.
+    await L.updateTask('rel1', task.id, T, { status: 'open' });
+    expect((await P.getProof('rel1')).counts.tasksDone).toBe(0);
+  });
+
+  it('hourly reconciliation repairs drift and reports it', async () => {
+    await seedRelation();
+    const L = await import('../src/services/learning');
+    await L.createTask('rel1', T, { title: 'A' });
+    const { updateRow, getRow } = await import('../src/db/repo');
+    const { TABLES } = await import('../src/db/schema');
+    await updateRow(TABLES.learningRelations, 'rel1', { openTasks: 9, lastActivityAt: new Date().toISOString() });
+    await updateRow(TABLES.proofRecords, 'rel1', { tasksDone: 4 });
+    const { reconcileRecentProofs } = await import('../src/services/proof-projection');
+    expect(await reconcileRecentProofs()).toEqual({ scanned: 1, drifted: 1, failed: 0 });
+    expect(await getRow(TABLES.learningRelations, 'rel1')).toMatchObject({ openTasks: 1 });
+    expect(await getRow(TABLES.proofRecords, 'rel1')).toMatchObject({ tasksDone: 0 });
   });
 });

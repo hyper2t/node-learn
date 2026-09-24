@@ -30682,7 +30682,10 @@ function log(level, message, meta) {
   else console.log(text);
 }
 
-// src/services/reminders.ts
+// src/services/proof-projection.ts
+init_dist();
+
+// src/db/paginate.ts
 init_dist();
 
 // src/db/repo.ts
@@ -30715,9 +30718,26 @@ async function createRow(tableId, data, rowId = ID.unique(), permissions) {
   const payload = { createdAt: ts, updatedAt: ts, ...data };
   return getTablesDB().createRow({ databaseId: getDatabaseId(), tableId, rowId, data: payload, permissions });
 }
+async function updateRow(tableId, rowId, data) {
+  const payload = { ...data, updatedAt: nowIso() };
+  return getTablesDB().updateRow({ databaseId: getDatabaseId(), tableId, rowId, data: payload });
+}
 async function listRows(tableId, queries) {
   const res = await getTablesDB().listRows({ databaseId: getDatabaseId(), tableId, queries });
   return res.rows;
+}
+
+// src/db/paginate.ts
+var PAGE = 500;
+async function listAllRows(tableId, queries, cap = 2e4) {
+  const out = [];
+  let cursor = null;
+  for (; ; ) {
+    const page = await listRows(tableId, [...queries, Query.orderAsc("$id"), Query.limit(PAGE), ...cursor ? [Query.cursorAfter(cursor)] : []]);
+    out.push(...page);
+    if (page.length < PAGE || out.length >= cap) return out;
+    cursor = page[page.length - 1].$id;
+  }
 }
 
 // src/db/schema.ts
@@ -30751,6 +30771,126 @@ var TABLES = {
   relationSummaries: "relation_summaries",
   teacherReviews: "teacher_reviews"
 };
+
+// src/errors.ts
+var HttpError = class extends Error {
+  status;
+  code;
+  details;
+  headers;
+  constructor(status, code, message, opts = {}) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+    this.code = code;
+    this.details = opts.details;
+    this.headers = opts.headers ?? {};
+  }
+};
+var notFound = (code, message) => new HttpError(404, code, message);
+
+// src/mappers/learning.ts
+function toProof(p) {
+  let milestones = [];
+  try {
+    milestones = JSON.parse(p.milestonesJson ?? "[]");
+  } catch {
+    milestones = [];
+  }
+  return {
+    relationId: p.relationId,
+    currentFocus: p.currentFocus,
+    milestones,
+    counts: { tasksDone: p.tasksDone, evidenceSubmitted: p.evidenceSubmitted, feedbackReceived: p.feedbackReceived, revisions: p.revisions },
+    recentChange: p.recentChange,
+    nextStep: p.nextStep,
+    computedAt: p.computedAt
+  };
+}
+
+// src/services/proof-projection.ts
+var OPEN_TASK = /* @__PURE__ */ new Set(["open", "submitted", "reviewed"]);
+var isOpenTask = (status) => OPEN_TASK.has(status ?? "");
+function focusAndMilestones(currentGoalId, goals, evidence) {
+  const current = goals.find((g) => g.$id === currentGoalId) ?? goals.find((g) => g.status === "active") ?? null;
+  const milestones = goals.filter((g) => g.status === "achieved").slice(0, 5).map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }));
+  return { currentFocus: current?.title ?? null, milestonesJson: JSON.stringify(milestones) };
+}
+async function rebuildRelation(relationId) {
+  const [rel, goals, tasks, evidence, feedback, before] = await Promise.all([
+    getRow(TABLES.learningRelations, relationId),
+    listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.limit(100)]),
+    listAllRows(TABLES.learningTasks, [Query.equal("relationId", relationId)]),
+    listAllRows(TABLES.evidenceItems, [Query.equal("relationId", relationId)]),
+    listAllRows(TABLES.feedbackEntries, [Query.equal("relationId", relationId)]),
+    getRow(TABLES.proofRecords, relationId)
+  ]);
+  if (!rel) throw notFound("not_found", "This learning relation could not be found.");
+  const latestFb = [...feedback].sort((a, b) => a.createdAt < b.createdAt ? 1 : -1)[0];
+  const latestEv = [...evidence].sort((a, b) => a.submittedAt < b.submittedAt ? 1 : -1)[0];
+  const nextOpen = tasks.filter((t) => t.status === "open").sort((a, b) => (a.dueAt ?? "9") < (b.dueAt ?? "9") ? -1 : 1)[0];
+  const counts = {
+    tasksDone: tasks.filter((t) => t.status === "done").length,
+    evidenceSubmitted: evidence.length,
+    feedbackReceived: feedback.length,
+    revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0)
+  };
+  const data = {
+    relationId,
+    ...counts,
+    ...focusAndMilestones(rel.currentGoalId, goals, evidence),
+    recentChange: latestFb ? `Feedback on "${evidence.find((e) => e.$id === latestFb.evidenceId)?.title ?? "evidence"}"` : latestEv ? `Submitted "${latestEv.title}"` : null,
+    nextStep: latestFb?.nextStep || nextOpen?.title || null,
+    computedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const drift = [];
+  if (before) {
+    for (const k of Object.keys(counts)) if (before[k] !== counts[k]) drift.push(`proof.${k}`);
+  }
+  const openTasks = tasks.filter((t) => isOpenTask(t.status)).length;
+  const relFix = {};
+  if (rel.openTasks !== openTasks) {
+    relFix.openTasks = openTasks;
+    drift.push("relation.openTasks");
+  }
+  if (rel.evidenceCount !== evidence.length) {
+    relFix.evidenceCount = evidence.length;
+    drift.push("relation.evidenceCount");
+  }
+  if (Object.keys(relFix).length) await updateRow(TABLES.learningRelations, relationId, relFix);
+  let row;
+  if (before) row = await updateRow(TABLES.proofRecords, relationId, data);
+  else {
+    try {
+      row = await createRow(TABLES.proofRecords, data, relationId);
+    } catch (err) {
+      if (!isConflict(err)) throw err;
+      row = await updateRow(TABLES.proofRecords, relationId, data);
+    }
+  }
+  return { proof: toProof(row), drift };
+}
+async function reconcileRecentProofs(now = /* @__PURE__ */ new Date(), windowMs = 2 * 36e5, batch = 200) {
+  const since = new Date(now.getTime() - windowMs).toISOString();
+  const rels = await listRows(TABLES.learningRelations, [Query.greaterThan("lastActivityAt", since), Query.orderDesc("lastActivityAt"), Query.select(["$id"]), Query.limit(batch)]);
+  const stats = { scanned: rels.length, drifted: 0, failed: 0 };
+  for (const r of rels) {
+    try {
+      const { drift } = await rebuildRelation(r.$id);
+      if (drift.length) {
+        stats.drifted++;
+        log("warn", "proof_drift", { relationId: r.$id, fields: drift });
+      }
+    } catch (err) {
+      stats.failed++;
+      log("error", "proof_reconcile_failed", { relationId: r.$id, message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return stats;
+}
+
+// src/services/reminders.ts
+init_dist();
 
 // src/services/notifications.ts
 init_dist();
@@ -30863,7 +31003,11 @@ var entry_reminders_default = async ({ req, res }) => {
   try {
     setLogLevel(getConfig().logLevel);
     const stats = await runTaskReminders();
-    return res.send(JSON.stringify({ ok: true, durationMs: Date.now() - started, stats }), 200, jsonHeaders);
+    const proofs = await reconcileRecentProofs().catch((err) => {
+      log("error", "proof_reconcile_failure", { message: err instanceof Error ? err.message : String(err) });
+      return null;
+    });
+    return res.send(JSON.stringify({ ok: true, durationMs: Date.now() - started, stats, proofs }), 200, jsonHeaders);
   } catch (err) {
     log("error", "reminders_function_failure", { message: err instanceof Error ? err.message : String(err) });
     return res.send(JSON.stringify({ ok: false, error: "reminders_failed" }), 500, jsonHeaders);
