@@ -73,6 +73,14 @@ export const en = {
   relation: {
     title: 'Learning', workspace: 'Workspace', goals: 'Goals', tasks: 'Tasks', evidence: 'Evidence', proof: 'Progress', addGoal: 'Add goal', addTask: 'Assign task', submitEvidence: 'Submit evidence',
     pauseConfirm: 'Pause this learning relation? While paused, neither of you can add goals, assign tasks, submit evidence or give feedback. Messages still work.', pausedHint: 'This learning relation is paused. Resume it to continue working together.', endReason: 'Why are you ending it? (visible to both of you)', endedBanner: 'Ended by {name} on {date}',
+    next: {
+      yourTurn: 'Your turn', waiting: 'Waiting', due: ' · due {date}',
+      teacher_review: { you: '{n} evidence to review', other: 'Waiting for teacher feedback ({n})' },
+      student_revise: { you: '{n} evidence to revise', other: 'Waiting for the learner to revise ({n})' },
+      student_submit: { you: '{n} tasks to submit', other: 'Waiting for the learner to submit ({n})' },
+      teacher_confirm_goal: { you: 'Confirm {n} completed goals', other: 'Waiting for the teacher to confirm the goal' },
+      teacher_assign: { you: 'Assign the next task', other: 'Waiting for the teacher to assign a task' },
+    },
     giveFeedback: 'Give feedback', markAchieved: 'Mark achieved', openTasks: '{n} open tasks', evidenceCount: '{n} pieces of evidence', status: { active: 'Active', paused: 'Paused', ended: 'Ended' },
     taskStatus: { open: 'Open', submitted: 'Submitted', reviewed: 'Reviewed', done: 'Done', dropped: 'Dropped' }, goalStatus: { active: 'Active', achieved: 'Achieved', dropped: 'Dropped' },
     evidenceTitle: 'Title', evidenceBody: 'What did you do, and what do you now understand differently?', forTask: 'For task', feedbackBody: 'What did you notice?', nextStep: 'Suggested next step',

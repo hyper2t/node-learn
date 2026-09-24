@@ -1,4 +1,4 @@
-import type { EvidenceItem, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationStatus, RequestKind, RequestStatus, TaskStatus, Attachment } from '../contracts/api';
+import type { EvidenceItem, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationNextAction, RelationStatus, RequestKind, RequestStatus, TaskStatus, Attachment } from '../contracts/api';
 import type { EvidenceItemRow, FeedbackEntryRow, LearningGoalRow, LearningRelationRow, LearningRequestRow, LearningTaskRow, ProofRecordRow } from '../db/rows';
 import type { PersonRef } from './profile';
 
@@ -8,11 +8,13 @@ export const toLearningRequest = (r: LearningRequestRow, counterpart: PersonRef)
   createdAt: r.createdAt, respondedAt: r.respondedAt, counterpart,
 });
 
-export const toRelation = (r: LearningRelationRow, student: PersonRef, teacher: PersonRef): LearningRelation => ({
+export const NO_ACTION: RelationNextAction = { kind: 'none', count: 0, dueAt: null };
+
+export const toRelation = (r: LearningRelationRow, student: PersonRef, teacher: PersonRef, nextAction: RelationNextAction = NO_ACTION): LearningRelation => ({
   id: r.$id, studentId: r.studentId, teacherId: r.teacherId, sourceRequestId: r.sourceRequestId, status: r.status as RelationStatus,
   conversationId: r.conversationId, currentGoalId: r.currentGoalId, startedAt: r.startedAt, endedAt: r.endedAt, version: r.version,
   pausedBy: r.pausedBy ?? null, pausedAt: r.pausedAt ?? null, endedBy: r.endedBy ?? null, endReason: r.endReason ?? null,
-  student, teacher, summary: { openTasks: r.openTasks, evidenceCount: r.evidenceCount, lastActivityAt: r.lastActivityAt },
+  student, teacher, summary: { openTasks: r.openTasks, evidenceCount: r.evidenceCount, lastActivityAt: r.lastActivityAt }, nextAction,
 });
 
 export const toGoal = (g: LearningGoalRow): LearningGoal => ({

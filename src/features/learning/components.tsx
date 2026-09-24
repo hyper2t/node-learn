@@ -2,7 +2,23 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Avatar, Badge, PressableCard, Text } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
-import type { LearningRelation, LearningRequest, ProofRecord, Role } from '@/types/api';
+import type { LearningRelation, LearningRequest, ProofRecord, RelationNextAction, Role } from '@/types/api';
+
+/** Whose turn it is, phrased for the viewer. Returns null when there is nothing to say (relation not active). */
+export function nextActionText(next: RelationNextAction, viewerIsTeacher: boolean): { text: string; mine: boolean } | null {
+  if (next.kind === 'none') return null;
+  const teacherActs = next.kind.startsWith('teacher_');
+  const mine = teacherActs === viewerIsTeacher;
+  const due = next.dueAt ? t('relation.next.due', { date: fmt.date(next.dueAt) }) : '';
+  const text = t(`relation.next.${next.kind}.${mine ? 'you' : 'other'}`, { n: next.count }) + due;
+  return { text, mine };
+}
+
+export function NextActionLine({ next, viewerIsTeacher }: { next: RelationNextAction; viewerIsTeacher: boolean }) {
+  const info = nextActionText(next, viewerIsTeacher);
+  if (!info) return null;
+  return <Text variant={info.mine ? 'small-strong' : 'small'} tone={info.mine ? 'primary' : 'secondary'} numberOfLines={1}>{info.mine ? '● ' : ''}{info.text}</Text>;
+}
 
 export function RelationCard({ r, role }: { r: LearningRelation; role: Role }) {
   const router = useRouter();
@@ -15,6 +31,7 @@ export function RelationCard({ r, role }: { r: LearningRelation; role: Role }) {
         <Text variant="small" tone="secondary" numberOfLines={1}>
           {t('relation.openTasks', { n: r.summary.openTasks })} · {t('relation.evidenceCount', { n: r.summary.evidenceCount })}
         </Text>
+        <NextActionLine next={r.nextAction} viewerIsTeacher={role === 'teacher'} />
         {r.summary.lastActivityAt ? <Text variant="caption" tone="tertiary">{fmt.relative(r.summary.lastActivityAt)}</Text> : null}
       </View>
       <Badge label={t(`relation.status.${r.status}`)} tone={r.status === 'active' ? 'success' : 'neutral'} />

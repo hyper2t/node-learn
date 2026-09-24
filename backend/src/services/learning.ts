@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { Query } from 'node-appwrite';
-import type { LearningGoal, LearningRelation, LearningTask, RelationWorkspace } from '../contracts/api';
+import type { LearningGoal, LearningRelation, LearningTask, RelationNextAction, RelationWorkspace } from '../contracts/api';
 import { createRow, getRow, listRows, updateRow } from '../db/repo';
 import { isConflict, type EvidenceItemRow, type FeedbackEntryRow, type LearningGoalRow, type LearningRelationRow, type LearningTaskRow, type ProofRecordRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict, forbidden, notFound, validation } from '../errors';
-import { toEvidence, toGoal, toProof, toRelation, toTask } from '../mappers/learning';
+import { NO_ACTION, toEvidence, toGoal, toProof, toRelation, toTask } from '../mappers/learning';
 import { emitEvent } from './events';
 import { notify } from './notifications';
 import { appendMessage } from './messaging';
@@ -30,6 +30,52 @@ export const seedGoalId = (relationId: string) => createHash('sha256').update(`s
 type RelStatus = 'active' | 'paused' | 'ended';
 const TRANSITIONS: Record<RelStatus, RelStatus[]> = { active: ['paused', 'ended'], paused: ['active', 'ended'], ended: [] };
 
+// --- next action ("whose turn is it") ------------------------------------
+
+export type PendingWork = {
+  status: string;
+  awaitingReview: number;
+  awaitingRevision: number;
+  openTaskDueDates: (string | null)[];
+  goalCompletionRequests: number;
+};
+
+/** Pure: priority order from the plan (L2.3). Earliest due date wins for student_submit. */
+export function deriveNextAction(w: PendingWork): RelationNextAction {
+  if (w.status !== 'active') return NO_ACTION;
+  if (w.awaitingReview > 0) return { kind: 'teacher_review', count: w.awaitingReview, dueAt: null };
+  if (w.awaitingRevision > 0) return { kind: 'student_revise', count: w.awaitingRevision, dueAt: null };
+  if (w.openTaskDueDates.length > 0) {
+    const due = w.openTaskDueDates.filter((d): d is string => !!d).sort()[0] ?? null;
+    return { kind: 'student_submit', count: w.openTaskDueDates.length, dueAt: due };
+  }
+  if (w.goalCompletionRequests > 0) return { kind: 'teacher_confirm_goal', count: w.goalCompletionRequests, dueAt: null };
+  return { kind: 'teacher_assign', count: 0, dueAt: null };
+}
+
+/** Three batched queries for a whole page of relations (only active ones need work counted). */
+export async function nextActionsFor(rels: LearningRelationRow[]): Promise<Map<string, RelationNextAction>> {
+  const out = new Map<string, RelationNextAction>(rels.map((r) => [r.$id, NO_ACTION]));
+  const ids = rels.filter((r) => r.status === 'active').map((r) => r.$id);
+  if (!ids.length) return out;
+  const [evidence, tasks, goals] = await Promise.all([
+    listRows<EvidenceItemRow>(TABLES.evidenceItems, [Query.equal('relationId', ids), Query.equal('status', ['submitted', 'revision_requested']), Query.limit(500)]),
+    listRows<LearningTaskRow>(TABLES.learningTasks, [Query.equal('relationId', ids), Query.equal('status', 'open'), Query.limit(500)]),
+    listRows<LearningGoalRow>(TABLES.learningGoals, [Query.equal('relationId', ids), Query.equal('status', 'active'), Query.limit(500)]),
+  ]);
+  for (const id of ids) {
+    const ev = evidence.filter((e) => e.relationId === id);
+    out.set(id, deriveNextAction({
+      status: 'active',
+      awaitingReview: ev.filter((e) => e.status === 'submitted').length,
+      awaitingRevision: ev.filter((e) => e.status === 'revision_requested').length,
+      openTaskDueDates: tasks.filter((t) => t.relationId === id).map((t) => t.dueAt),
+      goalCompletionRequests: goals.filter((g) => g.relationId === id && (g as LearningGoalRow & { completionRequestedAt?: string | null }).completionRequestedAt).length,
+    }));
+  }
+  return out;
+}
+
 export async function listRelations(userId: string, role: 'student' | 'teacher', status: string | undefined, limit: number, cursor?: string): Promise<{ items: LearningRelation[]; nextCursor: string | null }> {
   const q = [Query.equal(role === 'student' ? 'studentId' : 'teacherId', userId), Query.orderDesc('lastActivityAt'), Query.limit(limit + 1)];
   if (status) q.push(Query.equal('status', status));
@@ -37,29 +83,30 @@ export async function listRelations(userId: string, role: 'student' | 'teacher',
   const rows = await listRows<LearningRelationRow>(TABLES.learningRelations, q);
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
-  const refs = await personRefs(page.flatMap((r) => [r.studentId, r.teacherId]));
+  const [refs, next] = await Promise.all([personRefs(page.flatMap((r) => [r.studentId, r.teacherId])), nextActionsFor(page)]);
   const last = page[page.length - 1];
-  return { items: page.map((r) => toRelation(r, refs.get(r.studentId)!, refs.get(r.teacherId)!)), nextCursor: hasMore && last ? last.$id : null };
+  return { items: page.map((r) => toRelation(r, refs.get(r.studentId)!, refs.get(r.teacherId)!, next.get(r.$id))), nextCursor: hasMore && last ? last.$id : null };
 }
 
 export async function getRelation(relationId: string, userId: string): Promise<LearningRelation> {
   const rel = await requireRelationMember(relationId, userId);
-  const refs = await personRefs([rel.studentId, rel.teacherId]);
-  return toRelation(rel, refs.get(rel.studentId)!, refs.get(rel.teacherId)!);
+  const [refs, next] = await Promise.all([personRefs([rel.studentId, rel.teacherId]), nextActionsFor([rel])]);
+  return toRelation(rel, refs.get(rel.studentId)!, refs.get(rel.teacherId)!, next.get(rel.$id));
 }
 
 export async function getWorkspace(relationId: string, userId: string): Promise<RelationWorkspace> {
   const rel = await requireRelationMember(relationId, userId);
-  const [refs, goals, tasks, evidence, proof] = await Promise.all([
+  const [refs, goals, tasks, evidence, proof, next] = await Promise.all([
     personRefs([rel.studentId, rel.teacherId]),
     listRows<LearningGoalRow>(TABLES.learningGoals, [Query.equal('relationId', relationId), Query.orderDesc('createdAt'), Query.limit(50)]),
     listRows<LearningTaskRow>(TABLES.learningTasks, [Query.equal('relationId', relationId), Query.orderDesc('createdAt'), Query.limit(100)]),
     listRows<EvidenceItemRow>(TABLES.evidenceItems, [Query.equal('relationId', relationId), Query.orderDesc('submittedAt'), Query.limit(5)]),
     getRow<ProofRecordRow>(TABLES.proofRecords, relationId),
+    nextActionsFor([rel]),
   ]);
   const feedback = evidence.length ? await listRows<FeedbackEntryRow>(TABLES.feedbackEntries, [Query.equal('evidenceId', evidence.map((e) => e.$id)), Query.orderAsc('createdAt'), Query.limit(100)]) : [];
   return {
-    relation: toRelation(rel, refs.get(rel.studentId)!, refs.get(rel.teacherId)!),
+    relation: toRelation(rel, refs.get(rel.studentId)!, refs.get(rel.teacherId)!, next.get(rel.$id)),
     goals: goals.map(toGoal),
     tasks: tasks.map(toTask),
     recentEvidence: evidence.map((e) => toEvidence(e, feedback.filter((f) => f.evidenceId === e.$id))),
@@ -83,6 +130,13 @@ export async function updateRelationStatus(relationId: string, userId: string, i
   await updateRow(TABLES.learningRelations, relationId, patch);
   const text = to === 'ended' ? `Learning relation ended. Reason: ${reason}` : to === 'paused' ? 'Learning relation paused.' : 'Learning relation resumed.';
   await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'system', payload: { type: 'system', text }, requestId });
+  const other = userId === rel.teacherId ? rel.studentId : rel.teacherId;
+  const kind = to === 'active' ? 'resumed' : to;
+  const titles = { paused: 'A learning relation was paused', resumed: 'A learning relation was resumed', ended: 'A learning relation was ended' } as const;
+  await notify({
+    userId: other, type: `relation.${kind}`, title: titles[kind], body: to === 'ended' ? reason.slice(0, 300) : '',
+    href: `/relations/${relationId}`, refType: 'learning_relation', refId: relationId, actorId: userId, dedupeKey: `relation.${kind}:${relationId}:${rel.version + 1}`,
+  });
   await emitEvent({ eventType: `relation.${to === 'active' ? 'resumed' : to}`, aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { from, reason: to === 'ended' ? reason : undefined }, requestId });
   return getRelation(relationId, userId);
 }
@@ -108,6 +162,10 @@ export async function createGoal(rel: LearningRelationRow, actorId: string, inpu
   await touch(rel, rel.currentGoalId ? {} : { currentGoalId: row.$id });
   await appendMessage({ conversationId: rel.conversationId, senderId: actorId, type: 'goal_created', payload: { type: 'goal_created', goalId: row.$id, title: row.title }, requestId });
   await emitEvent({ eventType: 'goal.created', aggregateType: 'learning_relation', aggregateId: rel.$id, actorId, payload: { goalId: row.$id }, requestId });
+  if (!rowId) {
+    const other = actorId === rel.teacherId ? rel.studentId : rel.teacherId;
+    await notify({ userId: other, type: 'goal.created', title: actorId === rel.studentId ? 'Your learner proposed a new goal' : 'New learning goal', body: row.title, href: `/relations/${rel.$id}`, refType: 'learning_goal', refId: row.$id, actorId, dedupeKey: `goal.created:${row.$id}` });
+  }
   await recomputeProof(rel.$id);
   return toGoal(row);
 }
@@ -122,6 +180,8 @@ export async function updateGoal(relationId: string, goalId: string, userId: str
   await touch(rel);
   if (patch.status === 'achieved' && goal.status !== 'achieved') {
     await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'milestone_reached', payload: { type: 'milestone_reached', milestoneId: goalId, title: row.title }, requestId });
+    await emitEvent({ eventType: 'goal.achieved', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { goalId }, requestId });
+    await notify({ userId: rel.studentId, type: 'goal.achieved', title: 'Goal achieved', body: row.title, href: `/relations/${relationId}`, refType: 'learning_goal', refId: goalId, actorId: userId, dedupeKey: `goal.achieved:${goalId}` });
   }
   await recomputeProof(relationId);
   return toGoal(row);

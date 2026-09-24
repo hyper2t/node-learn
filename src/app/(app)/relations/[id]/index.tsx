@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useCreateGoal, useCreateTask, useSetRelationStatus, useUpdateGoal, useUpdateTask, useWorkspace } from '@/features/learning/api';
-import { ProofSummary } from '@/features/learning/components';
+import { ProofSummary, nextActionText } from '@/features/learning/components';
 import { Screen, Section, TwoColumn } from '@/shared/layout/screen';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text, confirm as confirmDialog } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
@@ -42,6 +42,14 @@ export default function RelationWorkspace() {
           <View className="flex-1"><Text variant="h2">{other.displayName}</Text><Text variant="caption" tone="tertiary">{isTeacher ? t('role.student') : t('role.teacher')} · {fmt.date(relation.startedAt)}</Text></View>
           <Badge label={t(`relation.status.${relation.status}`)} tone={active ? 'success' : 'neutral'} />
         </View>
+        {(() => {
+          const info = nextActionText(relation.nextAction, !!isTeacher);
+          return info ? (
+            <Card className={`mt-3 ${info.mine ? 'border-primary' : ''}`}>
+              <Text variant={info.mine ? 'body-strong' : 'body'} tone={info.mine ? 'primary' : 'secondary'}>{info.mine ? t('relation.next.yourTurn') : t('relation.next.waiting')} · {info.text}</Text>
+            </Card>
+          ) : null;
+        })()}
       </View>
 
 

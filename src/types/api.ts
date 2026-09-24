@@ -129,6 +129,15 @@ export type RelationStatus = 'active' | 'paused' | 'ended';
 export type GoalStatus = 'active' | 'achieved' | 'dropped';
 export type TaskStatus = 'open' | 'submitted' | 'reviewed' | 'done' | 'dropped';
 
+export type RelationNextActionKind =
+  | 'none'
+  | 'teacher_review'
+  | 'student_revise'
+  | 'student_submit'
+  | 'teacher_confirm_goal'
+  | 'teacher_assign';
+export type RelationNextAction = { kind: RelationNextActionKind; count: number; dueAt: string | null };
+
 export type LearningRelation = {
   id: string;
   studentId: string;
@@ -149,6 +158,8 @@ export type LearningRelation = {
   student: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
   teacher: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
   summary: { openTasks: number; evidenceCount: number; lastActivityAt: string | null };
+  /** Who needs to act next, derived on read. `count`/`dueAt` describe the pending items. */
+  nextAction: RelationNextAction;
 };
 
 export type LearningGoal = {
@@ -331,6 +342,11 @@ export type NotificationType =
   | 'task.assigned'
   | 'evidence.submitted'
   | 'feedback.added'
+  | 'relation.paused'
+  | 'relation.resumed'
+  | 'relation.ended'
+  | 'goal.created'
+  | 'goal.achieved'
   | 'connection.received'
   | 'connection.accepted'
   | 'qa.answered'

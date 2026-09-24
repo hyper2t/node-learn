@@ -6,7 +6,7 @@ process.env.APPWRITE_API_KEY = 'test';
 process.env.NODE_ENV = 'test';
 
 type Row = { $id: string; [k: string]: unknown };
-const db = vi.hoisted(() => ({ tables: new Map<string, Map<string, Record<string, unknown>>>(), seq: 0, messages: [] as unknown[] }));
+const db = vi.hoisted(() => ({ tables: new Map<string, Map<string, Record<string, unknown>>>(), seq: 0, messages: [] as unknown[], notes: [] as { userId: string; type: string; dedupeKey?: string }[] }));
 
 vi.mock('../src/db/repo', () => {
   const table = (t: string) => { if (!db.tables.has(t)) db.tables.set(t, new Map()); return db.tables.get(t)!; };
@@ -42,7 +42,7 @@ vi.mock('../src/services/messaging', () => ({
   getOrCreateConversation: async () => ({ $id: 'conv1' }),
 }));
 vi.mock('../src/services/events', () => ({ emitEvent: async () => undefined }));
-vi.mock('../src/services/notifications', () => ({ notify: async () => undefined }));
+vi.mock('../src/services/notifications', () => ({ notify: async (n: { userId: string; type: string; dedupeKey?: string }) => { db.notes.push(n); } }));
 vi.mock('../src/services/safety', () => ({ assertNotBlocked: async () => undefined }));
 vi.mock('../src/services/uploads', () => ({ assertEvidenceAttachments: async () => [], resolveAttachments: async () => [] }));
 vi.mock('../src/services/profiles', () => ({
@@ -64,7 +64,7 @@ async function seedRelation(status = 'active'): Promise<Row> {
 const errorOf = async (p: Promise<unknown>) => { try { await p; } catch (e) { return e as { status: number; code: string; details?: { reason?: string } }; } throw new Error('expected rejection'); };
 
 describe('learning relation state machine', () => {
-  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; });
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
 
   it('allows active → paused → active → ended and records who and why', async () => {
     await seedRelation();
@@ -103,7 +103,7 @@ describe('learning relation state machine', () => {
 });
 
 describe('writes require an active relation', () => {
-  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; });
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
 
   it.each(['paused', 'ended'])('blocks all six writes while %s', async (status) => {
     const rel = await seedRelation('active');
@@ -129,7 +129,7 @@ describe('writes require an active relation', () => {
 });
 
 describe('role matrix', () => {
-  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; });
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
 
   it('only the teacher can change task status or edit tasks', async () => {
     await seedRelation();
@@ -151,7 +151,7 @@ describe('role matrix', () => {
 });
 
 describe('requests', () => {
-  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; });
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
 
   async function seedRequest(): Promise<void> {
     const { createRow } = await import('../src/db/repo');
@@ -187,5 +187,56 @@ describe('requests', () => {
     const { createLearningRequest } = await import('../src/services/matching');
     const e = await errorOf(createLearningRequest({ $id: S } as never, { teacherId: T, goalTitle: 'Again', message: '' }));
     expect(e).toMatchObject({ status: 409, code: 'duplicate_request', details: { reason: 'pair_relation_paused', relationId: 'rel1' } });
+  });
+});
+
+describe('L2 notifications', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  it('notifies the other member on pause, resume and end with unique dedupe keys', async () => {
+    await seedRelation();
+    const { updateRelationStatus } = await import('../src/services/learning');
+    await updateRelationStatus('rel1', S, { status: 'paused' });
+    await updateRelationStatus('rel1', S, { status: 'active' });
+    await updateRelationStatus('rel1', S, { status: 'paused' });
+    await updateRelationStatus('rel1', T, { status: 'ended', reason: 'Done' });
+    expect(db.notes.map((n) => [n.userId, n.type])).toEqual([[T, 'relation.paused'], [T, 'relation.resumed'], [T, 'relation.paused'], [S, 'relation.ended']]);
+    expect(new Set(db.notes.map((n) => n.dedupeKey)).size).toBe(4);
+  });
+
+  it('notifies on proposed goals and achieved goals, but not for the seed goal', async () => {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    await L.createGoal(rel as never, T, { title: 'Seed' }, undefined, L.seedGoalId('rel1'));
+    expect(db.notes).toHaveLength(0);
+    const g = await L.createGoal(rel as never, S, { title: 'Proposed' });
+    await L.updateGoal('rel1', g.id, T, { status: 'achieved' });
+    expect(db.notes.map((n) => [n.userId, n.type])).toEqual([[T, 'goal.created'], [S, 'goal.achieved']]);
+  });
+});
+
+describe('deriveNextAction', () => {
+  const base = { status: 'active', awaitingReview: 0, awaitingRevision: 0, openTaskDueDates: [] as (string | null)[], goalCompletionRequests: 0 };
+  it('follows the priority order', async () => {
+    const { deriveNextAction } = await import('../src/services/learning');
+    expect(deriveNextAction({ ...base, status: 'paused', awaitingReview: 3 }).kind).toBe('none');
+    expect(deriveNextAction({ ...base, awaitingReview: 2, awaitingRevision: 1, openTaskDueDates: [null] })).toEqual({ kind: 'teacher_review', count: 2, dueAt: null });
+    expect(deriveNextAction({ ...base, awaitingRevision: 1, openTaskDueDates: [null] }).kind).toBe('student_revise');
+    expect(deriveNextAction({ ...base, openTaskDueDates: [null, '2026-10-02T00:00:00.000Z', '2026-10-01T00:00:00.000Z'], goalCompletionRequests: 1 }))
+      .toEqual({ kind: 'student_submit', count: 3, dueAt: '2026-10-01T00:00:00.000Z' });
+    expect(deriveNextAction({ ...base, goalCompletionRequests: 1 }).kind).toBe('teacher_confirm_goal');
+    expect(deriveNextAction(base)).toEqual({ kind: 'teacher_assign', count: 0, dueAt: null });
+  });
+
+  it('is computed for relations in the workspace', async () => {
+    db.tables.clear();
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const P = await import('../src/services/proof');
+    expect((await L.getRelation('rel1', S)).nextAction.kind).toBe('teacher_assign');
+    await L.createTask('rel1', T, { title: 'Worksheet' });
+    expect((await L.getRelation('rel1', S)).nextAction.kind).toBe('student_submit');
+    await P.submitEvidence(rel as never, S, { title: 'Work', body: 'x' });
+    expect((await L.getWorkspace('rel1', T)).relation.nextAction).toMatchObject({ kind: 'teacher_review', count: 1 });
   });
 });
