@@ -6,7 +6,7 @@ import { Text } from './text';
 
 export type InputProps = TextInputProps & { label?: string; hint?: string; error?: string; className?: string; containerClassName?: string };
 
-export const Input = forwardRef<TextInput, InputProps>(function Input({ label, hint, error, className, containerClassName, multiline, ...rest }, ref) {
+export const Input = forwardRef<TextInput, InputProps>(function Input({ label, hint, error, className, containerClassName, multiline, onFocus, onBlur, ...rest }, ref) {
   const [focused, setFocused] = useState(false);
   const colors = useThemeColors();
   return (
@@ -18,8 +18,8 @@ export const Input = forwardRef<TextInput, InputProps>(function Input({ label, h
         placeholderTextColor={colors.foregroundTertiary}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={(e) => { setFocused(true); onFocus?.(e); }}
+        onBlur={(e) => { setFocused(false); onBlur?.(e); }}
         className={cn(
           'rounded-md border bg-surface px-3 text-body text-foreground', multiline ? 'min-h-[96px] py-2' : 'min-h-[44px]',
           error ? 'border-danger' : focused ? 'border-primary' : 'border-border', className,

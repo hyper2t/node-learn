@@ -104,7 +104,12 @@ export const en = {
     inboxCount: '{n} questions in your subjects', inboxEmpty: 'No unanswered questions in your subjects right now.',
     all: 'All', status: { open: 'Open', answered: 'Answered', closed: 'Closed' }, empty: 'No questions here yet.', emptyBody: 'Be the first to ask something specific.',
     topic: 'Topic', questionTitle: 'Question', questionTitleHint: 'One sentence. What exactly are you stuck on?', details: 'Details',
-    detailsHint: 'What you tried, what you expected, and where it went wrong. Markdown works.', post: 'Post question', preview: 'Preview', hidePreview: 'Hide preview',
+    detailsHint: 'What you tried, what you expected, and where it went wrong. Markdown works.', post: 'Post question', preview: 'Preview', hidePreview: 'Hide preview', previewEmpty: 'Start typing, your question will appear here as teachers will see it.',
+    math: {
+      toolbar: 'Math symbols', intoTitle: 'Inserting into: title', intoBody: 'Inserting into: details',
+      hint: 'Tap a symbol to insert it at the cursor (select text first to wrap it). $…$ is inline, $$…$$ on its own line is centred; write \\$ for a literal dollar sign.',
+      groups: { basic: 'Basic', calculus: 'Calculus', greek: 'Greek', relations: 'Relations', structures: 'Structures' },
+    },
     mathHint: 'Math: $x^2$ inline, $$a^2+b^2=c^2$$ on its own line for a centred formula. Works in the title too; write \\$ for a literal dollar sign.',
     answers: '{n} answers', noAnswers: 'No answers yet. Teachers in this topic can see it.', yourAnswer: 'Your answer', answerHint: 'Explain the idea and suggest a next step. Markdown works.',
     postAnswer: 'Post answer', editAnswer: 'Edit answer', saveAnswer: 'Save', accepted: 'Helped the asker', accept: 'This helped me',
