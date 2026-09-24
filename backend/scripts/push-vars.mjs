@@ -30,9 +30,12 @@ const declared = fn.vars ?? [];
 const manual = new Set(declared.filter((v) => String(v.value ?? '') === MANUAL_SECRET).map((v) => v.key));
 const desired = new Map(declared.filter((v) => !manual.has(v.key)).map((v) => [v.key, String(v.value ?? '')]));
 
+// shell:true does not quote arguments, so values with spaces/metacharacters (e.g. "Node Learn API", `unique()`) must be quoted by hand.
+const quote = (a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `"${a.replace(/"/g, '\\"')}"`);
+
 function appwrite(...cliArgs) {
   // shell:true so the Windows `appwrite.cmd`/`appwrite.ps1` shim resolves; JSON goes to stdout.
-  const out = execFileSync('appwrite', [...cliArgs, '--json'], { cwd: repoRoot, encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const out = execFileSync('appwrite', [...cliArgs, '--json'].map(quote), { cwd: repoRoot, encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const start = out.indexOf('{');
   return start >= 0 ? JSON.parse(out.slice(start)) : {};
 }
