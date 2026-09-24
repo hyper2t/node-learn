@@ -44,6 +44,7 @@ export default function ProfileScreen() {
       <PageHeader title={t('profile.title')} right={<Button size="sm" variant="secondary" title={t('profile.settings')} onPress={() => router.push('/(app)/settings')} />} />
       <View className="flex-row flex-wrap gap-2 pb-3">
         <Button size="sm" variant="secondary" title={notif.data?.unread ? `${t('notifications.title')} (${notif.data.unread})` : t('notifications.title')} onPress={() => router.push('/(app)/notifications')} />
+        <Button size="sm" variant="secondary" title={t('qa.title')} onPress={() => router.push('/(app)/qa')} />
         {m.isAdmin ? <Button size="sm" variant="secondary" title={t('admin.title')} onPress={() => router.push('/(app)/admin/reports')} /> : null}
       </View>
       <Card className="flex-row items-center gap-3">

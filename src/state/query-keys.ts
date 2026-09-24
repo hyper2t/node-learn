@@ -12,7 +12,11 @@ export const qk = {
   conversations: { list: ['conversations'] as const, detail: (id: string) => ['conversations', id] as const, messages: (id: string) => ['conversations', id, 'messages'] as const },
   notifications: { summary: ['notifications', 'summary'] as const, list: (unreadOnly: boolean) => ['notifications', 'list', unreadOnly ? 'unread' : 'all'] as const },
   admin: { reports: (status: string) => ['admin', 'reports', status] as const },
+  qa: {
+    topics: ['qa', 'topics'] as const, list: (topic: string, status: string) => ['qa', 'list', topic, status] as const, mine: ['qa', 'mine'] as const,
+    inbox: ['qa', 'inbox'] as const, detail: (id: string) => ['qa', 'detail', id] as const, accepted: (teacherId: string) => ['qa', 'accepted', teacherId] as const,
+  },
   connections: { contacts: ['connections', 'contacts'] as const, requests: (dir: 'incoming' | 'outgoing') => ['connections', 'requests', dir] as const, lookup: (h: string) => ['connections', 'lookup', h] as const },
 } as const;
 
-export const userScopedRoots = [['me'], ['teachers'], ['requests'], ['relations'], ['conversations'], ['connections'], ['notifications'], ['admin']] as const;
+export const userScopedRoots = [['me'], ['teachers'], ['requests'], ['relations'], ['conversations'], ['connections'], ['notifications'], ['admin'], ['qa']] as const;

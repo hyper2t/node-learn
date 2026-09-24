@@ -1861,6 +1861,21 @@
                     "type": "text",
                     "required": false,
                     "array": false
+                },
+                {
+                    "key": "targetType",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "user"
+                },
+                {
+                    "key": "targetId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
                 }
             ],
             "indexes": [
@@ -1888,6 +1903,15 @@
                     "columns": [
                         "status",
                         "resolvedAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_target_content",
+                    "type": "key",
+                    "columns": [
+                        "targetType",
+                        "targetId"
                     ],
                     "orders": []
                 }
@@ -2398,6 +2422,232 @@
                     "type": "key",
                     "columns": [
                         "createdAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "qa_questions",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "qa_questions",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "authorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "topic",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 48
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 160
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "status",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16,
+                    "default": "open"
+                },
+                {
+                    "key": "answerCount",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "default": 0
+                },
+                {
+                    "key": "acceptedAnswerId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "lastActivityAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "removedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "removedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_topic_status_activity",
+                    "type": "key",
+                    "columns": [
+                        "topic",
+                        "status",
+                        "lastActivityAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_activity",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "lastActivityAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_author_created",
+                    "type": "key",
+                    "columns": [
+                        "authorId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_activity",
+                    "type": "key",
+                    "columns": [
+                        "lastActivityAt"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "qa_answers",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "qa_answers",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "questionId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "authorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "kind",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 16
+                },
+                {
+                    "key": "parentAnswerId",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "removedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "removedBy",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_question_created",
+                    "type": "key",
+                    "columns": [
+                        "questionId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_author_created",
+                    "type": "key",
+                    "columns": [
+                        "authorId",
+                        "createdAt"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_parent",
+                    "type": "key",
+                    "columns": [
+                        "parentAnswerId"
                     ],
                     "orders": []
                 }

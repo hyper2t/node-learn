@@ -20,6 +20,7 @@ const PATHS = {
   shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4',
   filter: 'M4 5h16l-6 8v5l-4 2v-7z',
   close: 'M6 6l12 12M18 6L6 18',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
 } as const;
 export type IconName = keyof typeof PATHS;
 

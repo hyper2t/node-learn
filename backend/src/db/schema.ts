@@ -23,6 +23,8 @@ export const TABLES = {
   auditEvents: 'audit_events',
   uploadIntents: 'upload_intents',
   notifications: 'notifications',
+  qaQuestions: 'qa_questions',
+  qaAnswers: 'qa_answers',
 } as const;
 
 export type TableId = (typeof TABLES)[keyof typeof TABLES];

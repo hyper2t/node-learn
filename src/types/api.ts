@@ -327,6 +327,9 @@ export type NotificationType =
   | 'feedback.added'
   | 'connection.received'
   | 'connection.accepted'
+  | 'qa.answered'
+  | 'qa.clarified'
+  | 'qa.accepted'
   | 'system';
 
 export type Notification = {
@@ -350,12 +353,21 @@ export type NotificationSummary = { unread: number };
 // ---------------------------------------------------------------- admin (moderation)
 
 export type ReportStatus = 'open' | 'resolved';
-export type ReportAction = 'dismiss' | 'warn' | 'suspend';
+export type ReportAction = 'dismiss' | 'warn' | 'suspend' | 'remove_content';
+export type ReportTargetType = 'user' | 'qa_question' | 'qa_answer';
 
 export type ReportItem = {
   id: string;
   reporter: PersonRef;
+  /** The person responsible (for content reports: the author). */
   target: PersonRef;
+  targetType: ReportTargetType;
+  /** Content id for qa_* reports; null for user reports. */
+  targetId: string | null;
+  /** Short excerpt of the reported content, for moderator context. Null for user reports or removed rows. */
+  contentExcerpt: string | null;
+  /** In-app link to the reported content, when there is one. */
+  contentHref: string | null;
   reason: ReportInput['reason'];
   details: string;
   status: ReportStatus;
@@ -367,6 +379,85 @@ export type ReportItem = {
 
 export type ReportListParams = { status?: ReportStatus; cursor?: string; limit?: number };
 export type ResolveReportInput = { action: ReportAction; note?: string };
+
+// ---------------------------------------------------------------- topic Q&A
+
+/**
+ * Fixed topic catalogue for Q&A. Profile interests/subjects stay free-form; teachers are
+ * matched to topics by case-insensitive label or slug.
+ */
+export const QA_TOPICS = [
+  { slug: 'programming', label: 'Programming' },
+  { slug: 'math', label: 'Math' },
+  { slug: 'physics', label: 'Physics' },
+  { slug: 'languages', label: 'Languages' },
+  { slug: 'writing', label: 'Writing' },
+  { slug: 'music', label: 'Music' },
+  { slug: 'art-design', label: 'Art & design' },
+  { slug: 'science', label: 'Science' },
+  { slug: 'history', label: 'History' },
+  { slug: 'exam-prep', label: 'Exam prep' },
+  { slug: 'public-speaking', label: 'Public speaking' },
+  { slug: 'learning-how-to-learn', label: 'Learning how to learn' },
+] as const;
+
+export type QaTopicSlug = (typeof QA_TOPICS)[number]['slug'];
+export type QaTopic = { slug: QaTopicSlug; label: string };
+export type QaTopicSummary = QaTopic & { openCount: number };
+
+/** Questions close by themselves after this many days without activity. */
+export const QA_AUTO_CLOSE_DAYS = 14;
+
+export type QaQuestionStatus = 'open' | 'answered' | 'closed';
+
+export type QaQuestion = {
+  id: string;
+  topic: QaTopicSlug;
+  title: string;
+  body: string;
+  status: QaQuestionStatus;
+  answerCount: number;
+  acceptedAnswerId: string | null;
+  /** Minors are shown as "A student" with no handle/avatar. */
+  author: PersonRef;
+  isMine: boolean;
+  lastActivityAt: string;
+  /** When the question will auto-close; null once closed. */
+  closesAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** The asker's single follow-up to one answer. */
+export type QaClarification = { id: string; body: string; createdAt: string };
+
+export type QaAnswer = {
+  id: string;
+  questionId: string;
+  author: PersonRef;
+  body: string;
+  accepted: boolean;
+  isMine: boolean;
+  clarification: QaClarification | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type QaQuestionDetail = {
+  question: QaQuestion;
+  answers: QaAnswer[];
+  /** Server-computed so the client never re-implements the rules. */
+  permissions: { canAnswer: boolean; canEdit: boolean; canClose: boolean; canAccept: boolean; canClarify: boolean; canReport: boolean };
+};
+
+/** A teacher's accepted answer, shown on their profile as trust evidence. */
+export type QaAcceptedAnswer = { answerId: string; questionId: string; topic: QaTopicSlug; questionTitle: string; excerpt: string; acceptedAt: string };
+
+export type QaQuestionListParams = { topic?: QaTopicSlug; status?: QaQuestionStatus; cursor?: string; limit?: number };
+export type CreateQaQuestionInput = { topic: QaTopicSlug; title: string; body: string };
+export type UpdateQaQuestionInput = Partial<{ topic: QaTopicSlug; title: string; body: string }>;
+export type QaBodyInput = { body: string };
+export type QaReportInput = { reason: ReportInput['reason']; details?: string };
 
 // ---------------------------------------------------------------- uploads
 

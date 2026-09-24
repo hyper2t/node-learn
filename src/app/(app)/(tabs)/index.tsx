@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMe, useStudentProfile } from '@/features/identity/api';
 import { useRelations, useWorkspace } from '@/features/learning/api';
 import { useRequests } from '@/features/requests/api';
+import { useQaInbox } from '@/features/qa/api';
 import { ProofSummary, RelationCard, RequestCard } from '@/features/learning/components';
 import { Screen, PageHeader, Section, TwoColumn } from '@/shared/layout/screen';
 import { Button, Card, Empty, ErrorState, Loading, Text } from '@/shared/ui';
@@ -21,6 +22,8 @@ export default function HomeScreen() {
   const relations = useRelations(role, 'active', !!me.data);
   const requests = useRequests(role, 'pending', !!me.data);
   const studentProfile = useStudentProfile(!!me.data && role === 'student');
+  const qaInbox = useQaInbox(!!me.data && role === 'teacher');
+  const qaInboxCount = qaInbox.data?.pages.reduce((n, p) => n + p.items.length, 0) ?? 0;
   if (me.isLoading) return <Loading />;
   if (me.isError) return <ErrorState error={me.error} onRetry={() => me.refetch()} />;
 
@@ -62,6 +65,23 @@ export default function HomeScreen() {
           <Text variant="body-strong">{t('home.setGoal')}</Text>
           <Text variant="small" tone="secondary">{t('home.setGoalBody')}</Text>
           <Button size="sm" variant="secondary" className="mt-1 self-start" title={t('common.edit')} onPress={() => router.push('/(app)/settings/student-profile')} />
+        </Card>
+      ) : null}
+      {isTeacher && qaInboxCount > 0 ? (
+        <Card className="mb-3 gap-1">
+          <Text variant="body-strong">{t('qa.inboxCount', { n: qaInbox.hasNextPage ? `${qaInboxCount}+` : qaInboxCount })}</Text>
+          <Text variant="small" tone="secondary">{t('qa.inboxBody')}</Text>
+          <Button size="sm" variant="secondary" className="mt-1 self-start" title={t('qa.inbox')} onPress={() => router.push('/(app)/qa/inbox')} />
+        </Card>
+      ) : null}
+      {!isTeacher ? (
+        <Card className="mb-3 gap-1">
+          <Text variant="body-strong">{t('qa.title')}</Text>
+          <Text variant="small" tone="secondary">{t('qa.askCta')}</Text>
+          <View className="mt-1 flex-row gap-2">
+            <Button size="sm" variant="secondary" title={t('qa.ask')} onPress={() => router.push('/(app)/qa/ask')} />
+            <Button size="sm" variant="ghost" title={t('qa.browse')} onPress={() => router.push('/(app)/qa')} />
+          </View>
         </Card>
       ) : null}
       {!isTeacher && active[0] ? <Section title={t('home.currentFocus')}><CurrentRelationProof relationId={active[0].id} /></Section> : null}

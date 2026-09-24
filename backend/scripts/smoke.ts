@@ -19,6 +19,9 @@ if (cfg.devBypassUserId) {
   await hit('/v1/teachers?limit=5');
   await hit('/v1/relations?role=student');
   await hit('/v1/conversations');
+  await hit('/v1/qa/topics');
+  await hit('/v1/qa/questions?topic=programming&limit=5');
+  await hit('/v1/qa/questions/mine');
 } else {
   console.log('API_DEV_BYPASS_USER_ID not set: skipped authenticated smoke');
 }

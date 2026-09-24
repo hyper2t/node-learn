@@ -9,6 +9,8 @@
     { "source": "/relations/:id", "destination": "/relations/[id].html" },
     { "source": "/relations/:id/evidence", "destination": "/relations/[id]/evidence.html" },
     { "source": "/relations/:id/evidence/new", "destination": "/relations/[id]/evidence/new.html" },
-    { "source": "/relations/:id/evidence/:evidenceId", "destination": "/relations/[id]/evidence/[evidenceId].html" }
+    { "source": "/relations/:id/evidence/:evidenceId", "destination": "/relations/[id]/evidence/[evidenceId].html" },
+    { "source": "/qa/topic/:slug", "destination": "/qa/topic/[slug].html" },
+    { "source": "/qa/:id", "destination": "/qa/[id].html" }
   ]
 }

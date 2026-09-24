@@ -35,6 +35,7 @@ export function Sidebar() {
   ];
   const secondary: Item[] = [
     ...(!teacher ? [{ href: '/(app)/teachers' as Href, icon: 'search' as IconName, label: t('teachers.title'), match: (p: string) => p.startsWith('/teachers') }] : []),
+    { href: '/(app)/qa', icon: 'help', label: t('qa.title'), match: (p) => p.startsWith('/qa') },
     { href: '/(app)/requests', icon: 'inbox', label: t('requests.title'), match: (p) => p.startsWith('/requests') },
     { href: '/(app)/connections', icon: 'users', label: t('contacts.title'), match: (p) => p.startsWith('/connections') },
     { href: '/(app)/notifications', icon: 'bell', label: t('notifications.title'), match: (p) => p.startsWith('/notifications'), badge: notif.data?.unread ?? 0 },

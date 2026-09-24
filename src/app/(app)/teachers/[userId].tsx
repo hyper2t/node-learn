@@ -3,20 +3,24 @@ import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTeacher } from '@/features/teachers/api';
 import { useCreateRequest } from '@/features/requests/api';
+import { useAcceptedAnswers } from '@/features/qa/api';
+import { topicLabel } from '@/features/qa/components';
 import { useMe, useStudentProfile } from '@/features/identity/api';
 import { Screen, Section } from '@/shared/layout/screen';
-import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, Text } from '@/shared/ui';
+import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
 
 export default function TeacherDetail() {
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { userId, goal: goalParam } = useLocalSearchParams<{ userId: string; goal?: string }>();
   const router = useRouter();
   const me = useMe();
   const tq = useTeacher(userId);
   const sp = useStudentProfile(me.data?.availableRoles.includes('student') ?? false);
   const create = useCreateRequest();
-  const [open, setOpen] = useState(false);
-  const [goal, setGoal] = useState('');
+  const accepted = useAcceptedAnswers(userId);
+  // Arriving from a Q&A answer pre-opens the request form with the question as the goal.
+  const [open, setOpen] = useState(!!goalParam);
+  const [goal, setGoal] = useState(goalParam ? goalParam.slice(0, 120) : '');
   const [message, setMessage] = useState('');
   const [seeded, setSeeded] = useState(false);
   if (tq.isLoading) return <Loading />;
@@ -54,8 +58,21 @@ export default function TeacherDetail() {
         {tp.subjects.length ? <Section title={t('onboarding.subjects')}><View className="flex-row flex-wrap gap-1">{tp.subjects.map((s) => <Badge key={s} label={s} tone="primary" />)}</View></Section> : null}
         {tp.bio ? <Section title={t('onboarding.bio')}><Text>{tp.bio}</Text></Section> : null}
         {tp.approach ? <Section title={t('teachers.approach')}><Text>{tp.approach}</Text></Section> : null}
+        {accepted.data?.length ? (
+          <Section title={t('qa.acceptedAnswers')}>
+            <View className="gap-2">
+              {accepted.data.map((x) => (
+                <PressableCard key={x.answerId} className="gap-1" accessibilityRole="link" onPress={() => router.push(`/(app)/qa/${x.questionId}`)}>
+                  <Badge label={topicLabel(x.topic)} />
+                  <Text variant="body-strong" numberOfLines={2}>{x.questionTitle}</Text>
+                  <Text variant="small" tone="secondary" numberOfLines={3}>{x.excerpt}</Text>
+                </PressableCard>
+              ))}
+            </View>
+          </Section>
+        ) : null}
         {canRequest && !open ? <Button title={t('teachers.request')} disabled={!tp.acceptingRequests} onPress={openForm} /> : null}
-        {open ? (
+        {open && canRequest ? (
           <Card className="gap-3">
             <Text variant="h3">{t('teachers.requestTitle')}</Text>
             <Input label={t('teachers.goalTitle')} value={goal} onChangeText={setGoal} maxLength={140} />

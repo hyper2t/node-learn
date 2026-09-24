@@ -9,6 +9,7 @@ import { toReportItem } from '../mappers/notifications';
 import { audit, emitEvent } from './events';
 import { notify } from './notifications';
 import { personRefs } from './profiles';
+import { contentContext, removeContent } from './qa';
 
 export async function listReports(p: { status?: 'open' | 'resolved'; limit: number; cursor?: string }): Promise<{ items: ReportItem[]; nextCursor: string | null }> {
   const q = [Query.orderDesc('createdAt'), Query.limit(p.limit + 1)];
@@ -18,8 +19,9 @@ export async function listReports(p: { status?: 'open' | 'resolved'; limit: numb
   const hasMore = rows.length > p.limit;
   const page = hasMore ? rows.slice(0, p.limit) : rows;
   const refs = await personRefs(page.flatMap((r) => [r.reporterId, r.targetUserId]));
+  const contexts = await Promise.all(page.map((r) => contentContext(r.targetType, r.targetId)));
   const last = page[page.length - 1];
-  return { items: page.map((r) => toReportItem(r, refs.get(r.reporterId)!, refs.get(r.targetUserId)!)), nextCursor: hasMore && last ? last.$id : null };
+  return { items: page.map((r, i) => toReportItem(r, refs.get(r.reporterId)!, refs.get(r.targetUserId)!, contexts[i])), nextCursor: hasMore && last ? last.$id : null };
 }
 
 /**
@@ -33,7 +35,14 @@ export async function resolveReport(id: string, adminId: string, input: { action
   if (row.status === 'resolved') throw conflict('invalid_state', 'This report is already resolved.');
   const now = new Date().toISOString();
 
-  if (input.action === 'warn') {
+  if (input.action === 'remove_content') {
+    if (row.targetType !== 'qa_question' && row.targetType !== 'qa_answer' || !row.targetId) throw conflict('invalid_state', 'This report is not about a post.');
+    await removeContent(row.targetType, row.targetId, adminId);
+    await notify({
+      userId: row.targetUserId, type: 'system', title: 'A moderator removed one of your posts',
+      body: input.note?.trim() || 'It did not meet our community guidelines.', href: null, refType: 'report', refId: row.$id,
+    });
+  } else if (input.action === 'warn') {
     await notify({
       userId: row.targetUserId, type: 'system', title: 'A moderator reviewed a report about your account',
       body: input.note?.trim() || 'Please keep interactions respectful. Repeated reports can lead to suspension.', href: null, refType: 'report', refId: row.$id,
@@ -55,5 +64,5 @@ export async function resolveReport(id: string, adminId: string, input: { action
   await audit({ actorId: adminId, action: `report.${input.action}`, resourceType: 'report', resourceId: id, reason: input.note, requestId });
   await emitEvent({ eventType: 'report.resolved', aggregateType: 'report', aggregateId: id, actorId: adminId, payload: { action: input.action, targetUserId: row.targetUserId }, requestId });
   const refs = await personRefs([updated.reporterId, updated.targetUserId]);
-  return toReportItem(updated, refs.get(updated.reporterId)!, refs.get(updated.targetUserId)!);
+  return toReportItem(updated, refs.get(updated.reporterId)!, refs.get(updated.targetUserId)!, await contentContext(updated.targetType, updated.targetId));
 }

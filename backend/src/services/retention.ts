@@ -1,7 +1,8 @@
 import type { Models } from 'node-appwrite';
 import { getStorage } from '../db/client';
 import { deleteRow, listRows, Query, updateRow } from '../db/repo';
-import type { AuditEventRow, EvidenceItemRow, IdempotencyKeyRow, MessageRow, NotificationRow, ProfileRow, ReportRow, UploadIntentRow } from '../db/rows';
+import type { AuditEventRow, EvidenceItemRow, IdempotencyKeyRow, MessageRow, NotificationRow, ProfileRow, QaAnswerRow, QaQuestionRow, ReportRow, UploadIntentRow } from '../db/rows';
+import { autoCloseCutoff } from './qa-policy';
 import { TABLES, type TableId } from '../db/schema';
 import { log } from '../log';
 
@@ -26,6 +27,9 @@ export type RetentionPurgeStats = {
   deletedMemberMessagesDeleted: number;
   deletedMemberUploadIntentsDeleted: number;
   evidenceAttachmentRefsCleared: number;
+  deletedMemberQaQuestionsDeleted: number;
+  deletedMemberQaAnswersDeleted: number;
+  qaQuestionsAutoClosed: number;
 };
 
 function blankStats(): RetentionPurgeStats {
@@ -40,6 +44,9 @@ function blankStats(): RetentionPurgeStats {
     deletedMemberMessagesDeleted: 0,
     deletedMemberUploadIntentsDeleted: 0,
     evidenceAttachmentRefsCleared: 0,
+    deletedMemberQaQuestionsDeleted: 0,
+    deletedMemberQaAnswersDeleted: 0,
+    qaQuestionsAutoClosed: 0,
   };
 }
 
@@ -113,12 +120,34 @@ async function purgeDeletedMemberData(stats: RetentionPurgeStats, now: Date, opt
       if (evidenceRows.length < options.batchSize) break;
     }
 
+    // Q&A: a deleted member's questions go (with every answer under them), as do their answers elsewhere.
+    stats.deletedMemberQaQuestionsDeleted += await deleteRows<QaQuestionRow>(TABLES.qaQuestions, [Query.equal('authorId', userId)], options, async (question) => {
+      stats.deletedMemberQaAnswersDeleted += await deleteRows<QaAnswerRow>(TABLES.qaAnswers, [Query.equal('questionId', question.$id)], options);
+    });
+    stats.deletedMemberQaAnswersDeleted += await deleteRows<QaAnswerRow>(TABLES.qaAnswers, [Query.equal('authorId', userId)], options);
+
     stats.deletedMemberUploadIntentsDeleted += await deleteRows<UploadIntentRow>(
       TABLES.uploadIntents,
       [Query.equal('userId', userId)],
       options,
       async (row) => { if (await deleteStorageFile(row.bucketId, row.fileId)) stats.uploadFilesDeleted++; },
     );
+  }
+}
+
+/** Close questions idle for QA_AUTO_CLOSE_DAYS so nothing lingers unanswered ("not a thread that goes cold"). */
+async function autoCloseQuestions(stats: RetentionPurgeStats, now: Date, options: Required<Pick<RetentionPurgeOptions, 'batchSize' | 'maxBatches'>>): Promise<void> {
+  const cutoff = autoCloseCutoff(now);
+  for (const status of ['open', 'answered']) {
+    for (let batch = 0; batch < options.maxBatches; batch++) {
+      const rows = await listRows<QaQuestionRow>(TABLES.qaQuestions, [Query.equal('status', status), Query.lessThan('lastActivityAt', cutoff), Query.limit(options.batchSize)]);
+      if (!rows.length) break;
+      for (const row of rows) {
+        await updateRow(TABLES.qaQuestions, row.$id, { status: 'closed' });
+        stats.qaQuestionsAutoClosed++;
+      }
+      if (rows.length < options.batchSize) break;
+    }
   }
 }
 
@@ -134,6 +163,7 @@ export async function runRetentionPurge(opts: RetentionPurgeOptions = {}): Promi
 
   await purgeExpiredUploadIntents(stats, now, options);
   await purgeDeletedMemberData(stats, now, options);
+  await autoCloseQuestions(stats, now, options);
   stats.idempotencyKeysDeleted += await deleteRows<IdempotencyKeyRow>(TABLES.idempotencyKeys, [Query.lessThan('createdAt', daysAgo(now, 1))], options);
   stats.notificationsDeleted += await deleteRows<NotificationRow>(TABLES.notifications, [Query.lessThan('createdAt', daysAgo(now, 90))], options);
   stats.reportsDeleted += await deleteRows<ReportRow>(TABLES.reports, [Query.equal('status', 'resolved'), Query.lessThan('resolvedAt', daysAgo(now, 365))], options);

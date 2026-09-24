@@ -119,6 +119,18 @@ describe('retention purge', () => {
         row('r-new', { status: 'resolved', resolvedAt: '2026-09-01T00:00:00.000Z' }),
         row('r-open', { status: 'open', resolvedAt: '2025-01-01T00:00:00.000Z' }),
       ],
+      [TABLES.qaQuestions]: [
+        row('qd1', { authorId: 'deleted-old', status: 'open', lastActivityAt: '2026-09-20T00:00:00.000Z' }),
+        row('q-stale', { authorId: 'active', status: 'open', lastActivityAt: '2026-09-01T00:00:00.000Z' }),
+        row('q-stale-answered', { authorId: 'active', status: 'answered', lastActivityAt: '2026-09-05T00:00:00.000Z' }),
+        row('q-fresh', { authorId: 'active', status: 'open', lastActivityAt: '2026-09-20T00:00:00.000Z' }),
+        row('q-closed', { authorId: 'active', status: 'closed', lastActivityAt: '2026-01-01T00:00:00.000Z' }),
+      ],
+      [TABLES.qaAnswers]: [
+        row('qa-under-deleted', { questionId: 'qd1', authorId: 'active', kind: 'answer' }),
+        row('qa-by-deleted', { questionId: 'q-fresh', authorId: 'deleted-old', kind: 'answer' }),
+        row('qa-keep', { questionId: 'q-fresh', authorId: 'active', kind: 'answer' }),
+      ],
       [TABLES.auditEvents]: [
         row('a-old', { createdAt: '2025-09-01T00:00:00.000Z' }),
         row('a-new', { createdAt: '2026-09-01T00:00:00.000Z' }),
@@ -141,7 +153,12 @@ describe('retention purge', () => {
       deletedMemberMessagesDeleted: 2,
       deletedMemberUploadIntentsDeleted: 2,
       evidenceAttachmentRefsCleared: 1,
+      deletedMemberQaQuestionsDeleted: 1,
+      deletedMemberQaAnswersDeleted: 2,
+      qaQuestionsAutoClosed: 2,
     });
+    expect(tableRows(TABLES.qaAnswers).map((r) => r.$id)).toEqual(['qa-keep']);
+    expect(Object.fromEntries(tableRows(TABLES.qaQuestions).map((r) => [r.$id, r.status]))).toEqual({ 'q-stale': 'closed', 'q-stale-answered': 'closed', 'q-fresh': 'open', 'q-closed': 'closed' });
     expect(state.deletedFiles.sort()).toEqual(['evidence/expired-pending', 'evidence/f-evidence']);
     expect(tableRows(TABLES.uploadIntents).map((r) => r.$id).sort()).toEqual(['fresh-pending', 'recent-user-file']);
     expect(tableRows(TABLES.messages).map((r) => r.$id).sort()).toEqual(['m3', 'm4']);

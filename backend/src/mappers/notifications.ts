@@ -1,4 +1,4 @@
-import type { Notification, NotificationType, PersonRef, ReportItem } from '../contracts/api';
+import type { Notification, NotificationType, PersonRef, ReportItem, ReportTargetType } from '../contracts/api';
 import type { NotificationRow, ReportRow } from '../db/rows';
 
 export function toNotification(r: NotificationRow, actor: PersonRef | null): Notification {
@@ -8,9 +8,10 @@ export function toNotification(r: NotificationRow, actor: PersonRef | null): Not
   };
 }
 
-export function toReportItem(r: ReportRow, reporter: PersonRef, target: PersonRef): ReportItem {
+export function toReportItem(r: ReportRow, reporter: PersonRef, target: PersonRef, content: { excerpt: string | null; href: string | null } = { excerpt: null, href: null }): ReportItem {
+  const targetType: ReportTargetType = r.targetType === 'qa_question' || r.targetType === 'qa_answer' ? r.targetType : 'user';
   return {
-    id: r.$id, reporter, target, reason: r.reason as ReportItem['reason'], details: r.details ?? '',
+    id: r.$id, reporter, target, targetType, targetId: r.targetId ?? null, contentExcerpt: content.excerpt, contentHref: content.href, reason: r.reason as ReportItem['reason'], details: r.details ?? '',
     status: (r.status === 'resolved' ? 'resolved' : 'open'), resolution: (r.resolution as ReportItem['resolution']) ?? null,
     resolvedBy: r.resolvedBy ?? null, resolvedAt: r.resolvedAt ?? null, createdAt: r.createdAt,
   };

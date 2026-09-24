@@ -16,6 +16,7 @@ import { conversationRoutes } from './routes/conversations';
 import { healthRoutes } from './routes/health';
 import { meRoutes } from './routes/me';
 import { notificationRoutes } from './routes/notifications';
+import { qaReadRoutes, qaWriteRoutes } from './routes/qa';
 import { relationRoutes } from './routes/relations';
 import { requestRoutes } from './routes/requests';
 import { teacherRoutes } from './routes/teachers';
@@ -61,6 +62,8 @@ export function createApp(): Hono<AppEnv> {
   mount('/v1/connections', connectionRoutes, social);
   mount('/v1/uploads', uploadRoutes, authed);
   mount('/v1/notifications', notificationRoutes, authed);
+  mount('/v1/qa', qaReadRoutes, authed);
+  mount('/v1/qa', qaWriteRoutes, social);
   mount('/v1/admin', adminRoutes, [requireAuth, requireAdmin]);
 
   app.notFound((c) => {

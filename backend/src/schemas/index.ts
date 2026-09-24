@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { QA_TOPICS, type QaTopicSlug } from '../contracts/api';
 
 const trimmed = (max: number, min = 1) => z.string().trim().min(min).max(max);
 const cursor = z.string().min(1).max(64).optional();
@@ -58,4 +59,14 @@ export const notificationList = z.object({ cursor, limit, unreadOnly: z.preproce
 export const markNotificationsRead = z.object({ ids: z.array(trimmed(36)).max(100).optional(), all: z.boolean().optional() }).strict()
   .refine((v) => v.all || (v.ids && v.ids.length > 0), { message: 'Provide ids or all=true.' });
 export const reportList = z.object({ status: z.enum(['open', 'resolved']).optional(), cursor, limit });
-export const resolveReport = z.object({ action: z.enum(['dismiss', 'warn', 'suspend']), note: z.string().trim().max(1000).optional() }).strict();
+export const resolveReport = z.object({ action: z.enum(['dismiss', 'warn', 'suspend', 'remove_content']), note: z.string().trim().max(1000).optional() }).strict();
+
+// --- topic Q&A
+const qaTopicSlugs = QA_TOPICS.map((t) => t.slug) as [QaTopicSlug, ...QaTopicSlug[]];
+export const qaTopic = z.enum(qaTopicSlugs);
+export const qaQuestionList = z.object({ topic: qaTopic.optional(), status: z.enum(['open', 'answered', 'closed']).optional(), cursor, limit });
+export const createQaQuestion = z.object({ topic: qaTopic, title: trimmed(160, 8), body: trimmed(8000, 20) }).strict();
+export const updateQaQuestion = z.object({ topic: qaTopic.optional(), title: trimmed(160, 8).optional(), body: trimmed(8000, 20).optional() }).strict()
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });
+export const qaBody = z.object({ body: trimmed(8000, 2) }).strict();
+export const qaReport = z.object({ reason: z.enum(['harassment', 'spam', 'inappropriate', 'other']), details: z.string().trim().max(2000).optional() }).strict();
