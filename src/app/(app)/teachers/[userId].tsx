@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTeacher } from '@/features/teachers/api';
 import { useCreateRequest } from '@/features/requests/api';
 import { useAcceptedAnswers } from '@/features/qa/api';
-import { topicLabel } from '@/features/qa/components';
+import { MathText, topicLabel } from '@/features/qa/components';
 import { useMe, useStudentProfile } from '@/features/identity/api';
 import { Screen, Section } from '@/shared/layout/screen';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text } from '@/shared/ui';
@@ -64,7 +64,7 @@ export default function TeacherDetail() {
               {accepted.data.map((x) => (
                 <PressableCard key={x.answerId} className="gap-1" accessibilityRole="link" onPress={() => router.push(`/(app)/qa/${x.questionId}`)}>
                   <Badge label={topicLabel(x.topic)} />
-                  <Text variant="body-strong" numberOfLines={2}>{x.questionTitle}</Text>
+                  <MathText variant="body-strong" numberOfLines={2} text={x.questionTitle} />
                   <Text variant="small" tone="secondary" numberOfLines={3}>{x.excerpt}</Text>
                 </PressableCard>
               ))}

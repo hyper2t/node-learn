@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MarkdownView, parseMarkdown } from '@/shared/markdown';
+import { MarkdownView, parseMarkdown, splitInlineMath } from '@/shared/markdown';
+import { MathSvg } from '@/shared/math';
 import { Avatar, Badge, Button, Card, InlineError, Input, PressableCard, SegmentedControl, Text } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
 import { QA_TOPICS, type QaQuestion, type QaQuestionStatus, type QaTopicSlug, type ReportInput } from '@/types/api';
@@ -17,8 +18,19 @@ export function StatusBadge({ status }: { status: QaQuestionStatus }) {
 }
 
 export function Markdown({ source }: { source: string }) {
-  const blocks = useMemo(() => parseMarkdown(source).blocks, [source]);
+  const blocks = useMemo(() => parseMarkdown(source, { math: true }).blocks, [source]);
   return <MarkdownView blocks={blocks} />;
+}
+
+/** Single-line text (question titles) with inline `$…$` / `\\(…\\)` math; no other markdown. */
+export function MathText({ text, ...props }: { text: string } & ComponentProps<typeof Text>) {
+  const parts = useMemo(() => splitInlineMath(text), [text]);
+  const plain = parts.every((p) => p.type === 'text');
+  return (
+    <Text {...props}>
+      {plain ? text : parts.map((p, i) => (p.type === 'math' ? <MathSvg key={i} tex={p.tex} /> : p.type === 'text' ? p.text : null))}
+    </Text>
+  );
 }
 
 export function QuestionCard({ q, showTopic = true }: { q: QaQuestion; showTopic?: boolean }) {
@@ -30,7 +42,7 @@ export function QuestionCard({ q, showTopic = true }: { q: QaQuestion; showTopic
         {showTopic ? <Badge label={topicLabel(q.topic)} /> : null}
         {q.acceptedAnswerId ? <Badge label={t('qa.accepted')} tone="success" /> : null}
       </View>
-      <Text variant="body-strong" numberOfLines={2}>{q.title}</Text>
+      <MathText variant="body-strong" numberOfLines={2} text={q.title} />
       <Text variant="caption" tone="tertiary">
         {t('qa.answers', { n: q.answerCount })} · {t('qa.ago', { when: fmt.relative(q.createdAt) })} · {t('qa.by', { name: q.author.displayName })}
       </Text>

@@ -2,6 +2,7 @@ import { memo, type ReactNode } from 'react';
 import { Linking, Platform, Text as RNText, View, type LayoutChangeEvent, type TextProps } from 'react-native';
 import { Link, type Href } from 'expo-router';
 import { cn } from '@/shared/lib/cn';
+import { MathSvg } from '@/shared/math';
 import { Text } from '@/shared/ui/text';
 import type { Block, HeadingBlock, Inline } from './parse';
 
@@ -30,6 +31,9 @@ function InlineNode({ node }: { node: Inline }) {
       return <RNText className="rounded-xs bg-element px-1 font-mono">{node.text}</RNText>;
     case 'link':
       return <MdLink href={node.href}><Inlines nodes={node.children} /></MdLink>;
+    case 'math':
+      // `$$…$$` mid-paragraph stays in the text run but keeps display-style limits/fractions.
+      return <MathSvg tex={node.display ? `\\displaystyle ${node.tex}` : node.tex} />;
   }
 }
 
@@ -115,6 +119,8 @@ function BlockNode({ block, depth }: { block: Block; depth: number }) {
           <Text variant="small" className="font-mono" selectable>{block.text}</Text>
         </View>
       );
+    case 'math':
+      return <MathSvg tex={block.tex} display fontSize={17} />;
     case 'hr':
       return <View className="my-2 border-t border-border" role="separator" />;
   }

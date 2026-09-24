@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseMarkdown, slugify } from '../parse';
+import { parseMarkdown, slugify, splitInlineMath } from '../parse';
 
 describe('slugify', () => {
   it('makes GitHub-style anchors', () => {
@@ -75,5 +75,50 @@ describe('parseMarkdown', () => {
 
   it('returns an empty toc when there are no headings', () => {
     expect(parseMarkdown('just text').toc).toEqual([]);
+  });
+});
+
+describe('math (opt-in)', () => {
+  const m = (s: string) => parseMarkdown(s, { math: true }).blocks;
+
+  it('is off by default', () => {
+    expect(parseMarkdown('$x$').blocks).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: '$x$' }] }]);
+  });
+
+  it('parses inline $…$ and \\(…\\)', () => {
+    expect(m('a $x^2$ b \\(y\\)')).toEqual([{ type: 'paragraph', children: [
+      { type: 'text', text: 'a ' }, { type: 'math', tex: 'x^2', display: false },
+      { type: 'text', text: ' b ' }, { type: 'math', tex: 'y', display: false },
+    ] }]);
+  });
+
+  it('keeps prices and escaped dollars as text', () => {
+    expect(m('costs $5 and $10 today')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: 'costs $5 and $10 today' }] }]);
+    expect(m('\\$x\\$')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: '$x$' }] }]);
+  });
+
+  it('does not treat underscores inside math as emphasis', () => {
+    expect(m('$a_1 + b_2$')).toEqual([{ type: 'paragraph', children: [{ type: 'math', tex: 'a_1 + b_2', display: false }] }]);
+  });
+
+  it('parses display blocks ($$ and \\[) across lines', () => {
+    expect(m('intro\n\n$$\n\\frac{a}{b}\n$$\n\nafter')).toEqual([
+      { type: 'paragraph', children: [{ type: 'text', text: 'intro' }] },
+      { type: 'math', tex: '\\frac{a}{b}' },
+      { type: 'paragraph', children: [{ type: 'text', text: 'after' }] },
+    ]);
+    expect(m('\\[ x = 1 \\]')).toEqual([{ type: 'math', tex: 'x = 1' }]);
+    expect(m('text\n$$x$$')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: 'text' }] }, { type: 'math', tex: 'x' }]);
+  });
+
+  it('leaves unterminated display math as text and code untouched', () => {
+    expect(m('$$\nx')[0]!.type).toBe('paragraph');
+    expect(m('`$x$`')).toEqual([{ type: 'paragraph', children: [{ type: 'code', text: '$x$' }] }]);
+  });
+
+  it('splitInlineMath handles titles', () => {
+    expect(splitInlineMath('Why is $e^{i\\pi}=-1$ \\$5?')).toEqual([
+      { type: 'text', text: 'Why is ' }, { type: 'math', tex: 'e^{i\\pi}=-1', display: false }, { type: 'text', text: ' $5?' },
+    ]);
   });
 });

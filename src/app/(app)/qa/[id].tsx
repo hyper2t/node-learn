@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useAcceptAnswer, useAnswerQuestion, useClarify, useCloseQuestion, useEditAnswer, useQaQuestion } from '@/features/qa/api';
-import { AuthorLine, Markdown, ReportLink, StatusBadge, topicLabel } from '@/features/qa/components';
+import { AuthorLine, Markdown, MathText, ReportLink, StatusBadge, topicLabel } from '@/features/qa/components';
 import { Screen, Section } from '@/shared/layout/screen';
 import { Badge, Button, Card, ErrorState, InlineError, Input, Loading, Text, confirm } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
@@ -104,7 +104,7 @@ export default function QaQuestionScreen() {
           <Badge label={topicLabel(q.topic)} />
           {q.closesAt ? <Text variant="caption" tone="tertiary">{t('qa.closesOn', { date: fmt.date(q.closesAt) })}</Text> : null}
         </View>
-        <Text variant="h2">{q.title}</Text>
+        <MathText variant="h2" text={q.title} />
         <AuthorLine name={q.author.displayName} avatarFileId={q.author.avatarFileId} when={q.createdAt} />
         <Markdown source={q.body} />
         <View className="flex-row flex-wrap gap-2">

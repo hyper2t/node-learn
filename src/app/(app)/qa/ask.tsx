@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
 import { useAskQuestion, useQaQuestion, useUpdateQuestion } from '@/features/qa/api';
-import { Markdown, TopicPicker } from '@/features/qa/components';
+import { Markdown, MathText, TopicPicker } from '@/features/qa/components';
 import { PageHeader, Screen } from '@/shared/layout/screen';
 import { Button, Card, Empty, InlineError, Input, Loading, Text } from '@/shared/ui';
 import { t } from '@/shared/i18n';
@@ -36,8 +36,14 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
       </View>
       <Input label={t('qa.questionTitle')} hint={t('qa.questionTitleHint')} value={title} onChangeText={setTitle} maxLength={160} />
       <Input label={t('qa.details')} hint={t('qa.detailsHint')} value={body} onChangeText={setBody} multiline maxLength={8000} />
-      {body.trim() ? <Button size="sm" variant="ghost" className="self-start" title={t('qa.preview')} onPress={() => setPreview((v) => !v)} /> : null}
-      {preview && body.trim() ? <Card><Markdown source={body} /></Card> : null}
+      <Text variant="caption" tone="tertiary">{t('qa.mathHint')}</Text>
+      {title.trim() || body.trim() ? <Button size="sm" variant="ghost" className="self-start" title={preview ? t('qa.hidePreview') : t('qa.preview')} onPress={() => setPreview((v) => !v)} /> : null}
+      {preview && (title.trim() || body.trim()) ? (
+        <Card className="gap-3">
+          {title.trim() ? <MathText variant="h3" text={title.trim()} /> : null}
+          {body.trim() ? <Markdown source={body} /> : null}
+        </Card>
+      ) : null}
       <InlineError error={mutation.error} />
       <Button title={editId ? t('qa.saveQuestion') : t('qa.post')} disabled={!valid} loading={mutation.isPending} onPress={submit} />
     </View>
