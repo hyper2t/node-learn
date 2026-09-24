@@ -61,4 +61,17 @@ describe('qa routes', () => {
     expect((await app.fetch(post('/v1/qa/answers/a1/report', { reason: 'spam' }))).status).toBe(201);
     expect(svc.reportContent).toHaveBeenCalledWith(expect.anything(), { type: 'qa_answer', id: 'a1' }, { reason: 'spam' });
   });
+
+  it('accepts up to 5 attachment ids on questions and answers', async () => {
+    const q = { topic: 'math', title: 'How do limits work?', body: 'I keep mixing up epsilon and delta in proofs.' };
+    expect((await app.fetch(post('/v1/qa/questions', { ...q, attachmentFileIds: ['f1', 'f2'] }))).status).toBe(201);
+    expect(svc.createQuestion).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ attachmentFileIds: ['f1', 'f2'] }), expect.any(String));
+    expect((await app.fetch(post('/v1/qa/questions', { ...q, attachmentFileIds: ['1', '2', '3', '4', '5', '6'] }))).status).toBe(422);
+    expect((await app.fetch(post('/v1/qa/questions/q1/answers', { body: 'See the sketch.', attachmentFileIds: ['f3'] }))).status).toBe(201);
+    expect(svc.createAnswer).toHaveBeenCalledWith('q1', expect.anything(), { body: 'See the sketch.', attachmentFileIds: ['f3'] }, expect.any(String));
+  });
+
+  it('does not accept attachments on clarifications', async () => {
+    expect((await app.fetch(post('/v1/qa/answers/a1/clarify', { body: 'What about n = 0?', attachmentFileIds: ['f1'] }))).status).toBe(422);
+  });
 });

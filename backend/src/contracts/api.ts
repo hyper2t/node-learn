@@ -422,6 +422,8 @@ export type QaQuestion = {
   author: PersonRef;
   isMine: boolean;
   lastActivityAt: string;
+  /** Number of attached images/files; the files themselves come with the detail. */
+  attachmentCount: number;
   /** When the question will auto-close; null once closed. */
   closesAt: string | null;
   createdAt: string;
@@ -439,12 +441,16 @@ export type QaAnswer = {
   accepted: boolean;
   isMine: boolean;
   clarification: QaClarification | null;
+  /** Short-lived view URLs; re-fetch the question to refresh. */
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
 };
 
 export type QaQuestionDetail = {
   question: QaQuestion;
+  /** The question's images/files (short-lived view URLs). */
+  attachments: Attachment[];
   answers: QaAnswer[];
   /** Server-computed so the client never re-implements the rules. */
   permissions: { canAnswer: boolean; canEdit: boolean; canClose: boolean; canAccept: boolean; canClarify: boolean; canReport: boolean };
@@ -454,14 +460,18 @@ export type QaQuestionDetail = {
 export type QaAcceptedAnswer = { answerId: string; questionId: string; topic: QaTopicSlug; questionTitle: string; excerpt: string; acceptedAt: string };
 
 export type QaQuestionListParams = { topic?: QaTopicSlug; status?: QaQuestionStatus; cursor?: string; limit?: number };
-export type CreateQaQuestionInput = { topic: QaTopicSlug; title: string; body: string };
-export type UpdateQaQuestionInput = Partial<{ topic: QaTopicSlug; title: string; body: string }>;
+/** Max images/files on one question or answer. */
+export const QA_MAX_ATTACHMENTS = 5;
+export type CreateQaQuestionInput = { topic: QaTopicSlug; title: string; body: string; attachmentFileIds?: string[] };
+/** `attachmentFileIds` replaces the whole list; files left out are deleted. */
+export type UpdateQaQuestionInput = Partial<{ topic: QaTopicSlug; title: string; body: string; attachmentFileIds: string[] }>;
 export type QaBodyInput = { body: string };
+export type QaAnswerInput = { body: string; attachmentFileIds?: string[] };
 export type QaReportInput = { reason: ReportInput['reason']; details?: string };
 
 // ---------------------------------------------------------------- uploads
 
-export type UploadPurpose = 'avatar' | 'evidence';
+export type UploadPurpose = 'avatar' | 'evidence' | 'qa';
 export type UploadIntentInput = { purpose: UploadPurpose; fileName: string; mimeType: string; sizeBytes: number; relationId?: string };
 export type UploadIntent = { bucketId: string; fileId: string; expiresAt: string };
 export type UploadComplete = { fileId: string; bucketId: string };

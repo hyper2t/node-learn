@@ -3,13 +3,14 @@ import type { Models } from 'node-appwrite';
 import type {
   PersonRef, QaAcceptedAnswer, QaAnswer, QaQuestion, QaQuestionDetail, QaQuestionStatus, QaTopicSlug, QaTopicSummary, ReportInput, Role,
 } from '../contracts/api';
-import { QA_TOPICS } from '../contracts/api';
+import { QA_MAX_ATTACHMENTS, QA_TOPICS } from '../contracts/api';
 import { createRow, findOne, getRow, incrementColumn, listRows, Query, updateRow } from '../db/repo';
 import { isConflict, type BlockRow, type ProfileRow, type QaAnswerRow, type QaQuestionRow, type ReportRow, type TeacherProfileRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { conflict, forbidden, HttpError, notFound, roleRequired } from '../errors';
 import { emitEvent } from './events';
 import { notify } from './notifications';
+import { assertQaAttachments, deleteUploads, markAttached, resolveAttachments } from './uploads';
 import {
   canAccept, canAnswer, canClarify, canCloseQuestion, canEditAnswer, canEditQuestion, closesAt, excerpt, publicAuthor,
   QA_DAILY_ANSWER_LIMIT, QA_DAILY_QUESTION_LIMIT, sinceOneDay, statusAfterAnswer, topicsForSubjects, type QaViewer,
@@ -71,7 +72,7 @@ function toQuestion(r: QaQuestionRow, author: PersonRef, viewerId: string): QaQu
   return {
     id: r.$id, topic: r.topic as QaTopicSlug, title: r.title, body: r.body, status, answerCount: r.answerCount ?? 0,
     acceptedAnswerId: r.acceptedAnswerId ?? null, author, isMine: r.authorId === viewerId,
-    lastActivityAt: r.lastActivityAt, closesAt: closesAt(r.lastActivityAt, status), createdAt: r.createdAt, updatedAt: r.updatedAt,
+    lastActivityAt: r.lastActivityAt, attachmentCount: r.attachmentFileIds?.length ?? 0, closesAt: closesAt(r.lastActivityAt, status), createdAt: r.createdAt, updatedAt: r.updatedAt,
   };
 }
 
@@ -89,6 +90,16 @@ async function pageQuestions(queries: string[], p: { limit: number; cursor?: str
   const last = page[page.length - 1];
   // Filter after slicing so the cursor still advances over hidden rows.
   return { items: await toQuestions(page.filter((r) => !blocked.has(r.authorId)), viewerId), nextCursor: hasMore && last ? last.$id : null };
+}
+
+/**
+ * Validates a replacement attachment list. `commit` runs after the row is saved: new files are
+ * marked attached and files dropped from the list are deleted.
+ */
+async function replaceAttachments(userId: string, current: string[] | null | undefined, next: string[]): Promise<{ ids: string[]; commit: () => Promise<void> }> {
+  const ids = await assertQaAttachments(userId, next, QA_MAX_ATTACHMENTS);
+  const dropped = (current ?? []).filter((id) => !ids.includes(id));
+  return { ids, commit: async () => { await markAttached(ids); await deleteUploads(dropped); } };
 }
 
 // --- reads -------------------------------------------------------------------
@@ -129,15 +140,20 @@ export async function getQuestionDetail(id: string, actor: Actor): Promise<QaQue
   const rows = await listRows<QaAnswerRow>(TABLES.qaAnswers, [Query.equal('questionId', id), Query.isNull('removedAt'), Query.orderAsc('createdAt'), Query.limit(200)]);
   const answers = rows.filter((r) => r.kind === 'answer' && !blocked.has(r.authorId));
   const clarByParent = new Map(rows.filter((r) => r.kind === 'clarification' && r.parentAnswerId).map((r) => [r.parentAnswerId!, r]));
-  const refs = await authors([q.authorId, ...answers.map((a) => a.authorId)]);
+  const [refs, attachments] = await Promise.all([
+    authors([q.authorId, ...answers.map((a) => a.authorId)]),
+    Promise.all([q, ...answers].map((r) => resolveAttachments(r.attachmentFileIds ?? []))),
+  ]);
+  const [questionAttachments = [], ...answerAttachments] = attachments;
   const viewer: QaViewer = { userId: viewerId, roles: actor.roles, blockedWithAuthor: false };
   const accepted = q.acceptedAnswerId;
   const outAnswers: QaAnswer[] = answers
-    .map((a) => {
+    .map((a, i) => {
       const c = clarByParent.get(a.$id);
       return {
         id: a.$id, questionId: id, author: refs.get(a.authorId)!, body: a.body, accepted: a.$id === accepted, isMine: a.authorId === viewerId,
-        clarification: c ? { id: c.$id, body: c.body, createdAt: c.createdAt } : null, createdAt: a.createdAt, updatedAt: a.updatedAt,
+        clarification: c ? { id: c.$id, body: c.body, createdAt: c.createdAt } : null, attachments: answerAttachments[i] ?? [],
+        createdAt: a.createdAt, updatedAt: a.updatedAt,
       };
     })
     // Accepted first, then oldest first.
@@ -146,6 +162,7 @@ export async function getQuestionDetail(id: string, actor: Actor): Promise<QaQue
   const anyClarifiable = answers.some((a) => canClarify(q, { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: clarByParent.has(a.$id) }, viewer));
   return {
     question: toQuestion(q, refs.get(q.authorId)!, viewerId),
+    attachments: questionAttachments,
     answers: outAnswers,
     permissions: {
       canAnswer: canAnswer(q, viewer, alreadyAnswered),
@@ -175,22 +192,27 @@ export async function acceptedAnswersOf(teacherId: string, limit = 3): Promise<Q
 
 // --- writes ------------------------------------------------------------------
 
-export async function createQuestion(actor: Actor, input: { topic: QaTopicSlug; title: string; body: string }, requestId?: string): Promise<QaQuestion> {
+export async function createQuestion(actor: Actor, input: { topic: QaTopicSlug; title: string; body: string; attachmentFileIds?: string[] }, requestId?: string): Promise<QaQuestion> {
   if (!actor.roles.includes('student')) throw roleRequired('student');
   await assertDailyLimit(TABLES.qaQuestions, actor.user.$id, QA_DAILY_QUESTION_LIMIT);
+  const fileIds = await assertQaAttachments(actor.user.$id, input.attachmentFileIds, QA_MAX_ATTACHMENTS);
   const row = await createRow<QaQuestionRow>(TABLES.qaQuestions, {
     authorId: actor.user.$id, topic: input.topic, title: input.title, body: input.body, status: 'open', answerCount: 0,
-    acceptedAnswerId: null, lastActivityAt: nowIso(), removedAt: null, removedBy: null,
+    acceptedAnswerId: null, lastActivityAt: nowIso(), removedAt: null, removedBy: null, attachmentFileIds: fileIds,
   });
+  await markAttached(fileIds);
   await emitEvent({ eventType: 'qa.question.created', aggregateType: 'qa_question', aggregateId: row.$id, actorId: actor.user.$id, payload: { topic: input.topic }, requestId });
   return (await toQuestions([row], actor.user.$id))[0]!;
 }
 
-export async function updateQuestion(id: string, actor: Actor, patch: { topic?: QaTopicSlug; title?: string; body?: string }): Promise<QaQuestion> {
+export async function updateQuestion(id: string, actor: Actor, patch: { topic?: QaTopicSlug; title?: string; body?: string; attachmentFileIds?: string[] }): Promise<QaQuestion> {
   const q = await loadQuestion(id);
   if (q.authorId !== actor.user.$id) throw forbidden('Only the person who asked can edit this question.');
   if (!canEditQuestion(q, { userId: actor.user.$id, roles: actor.roles, blockedWithAuthor: false })) throw conflict('invalid_state', 'Questions can only be edited before anyone answers.');
-  const row = await updateRow<QaQuestionRow>(TABLES.qaQuestions, id, { ...patch, lastActivityAt: nowIso() });
+  const { attachmentFileIds, ...fields } = patch;
+  const files = attachmentFileIds === undefined ? null : await replaceAttachments(actor.user.$id, q.attachmentFileIds, attachmentFileIds);
+  const row = await updateRow<QaQuestionRow>(TABLES.qaQuestions, id, { ...fields, ...(files ? { attachmentFileIds: files.ids } : {}), lastActivityAt: nowIso() });
+  if (files) await files.commit();
   return (await toQuestions([row], actor.user.$id))[0]!;
 }
 
@@ -203,7 +225,7 @@ export async function closeQuestion(id: string, actor: Actor, requestId?: string
   return (await toQuestions([row], actor.user.$id))[0]!;
 }
 
-export async function createAnswer(questionId: string, actor: Actor, input: { body: string }, requestId?: string): Promise<QaQuestionDetail> {
+export async function createAnswer(questionId: string, actor: Actor, input: { body: string; attachmentFileIds?: string[] }, requestId?: string): Promise<QaQuestionDetail> {
   const me = actor.user.$id;
   if (!actor.roles.includes('teacher')) throw roleRequired('teacher');
   const q = await loadQuestion(questionId);
@@ -212,13 +234,17 @@ export async function createAnswer(questionId: string, actor: Actor, input: { bo
   if (q.authorId === me) throw conflict('invalid_state', 'You cannot answer your own question.');
   if (q.status === 'closed') throw conflict('invalid_state', 'This question is closed.');
   await assertDailyLimit(TABLES.qaAnswers, me, QA_DAILY_ANSWER_LIMIT, [Query.equal('kind', 'answer')]);
+  const fileIds = await assertQaAttachments(me, input.attachmentFileIds, QA_MAX_ATTACHMENTS);
   try {
     // Deterministic id = one answer per teacher per question, enforced by the DB.
-    await createRow<QaAnswerRow>(TABLES.qaAnswers, { questionId, authorId: me, kind: 'answer', parentAnswerId: null, body: input.body, removedAt: null, removedBy: null }, answerRowId(questionId, me));
+    await createRow<QaAnswerRow>(TABLES.qaAnswers, {
+      questionId, authorId: me, kind: 'answer', parentAnswerId: null, body: input.body, removedAt: null, removedBy: null, attachmentFileIds: fileIds,
+    }, answerRowId(questionId, me));
   } catch (err) {
     if (isConflict(err)) throw conflict('duplicate_request', 'You already answered this question. Edit your answer instead.');
     throw err;
   }
+  await markAttached(fileIds);
   await incrementColumn(TABLES.qaQuestions, questionId, 'answerCount', 1);
   await updateRow(TABLES.qaQuestions, questionId, { status: statusAfterAnswer(q.status), lastActivityAt: nowIso() });
   await notify({
@@ -229,14 +255,16 @@ export async function createAnswer(questionId: string, actor: Actor, input: { bo
   return getQuestionDetail(questionId, actor);
 }
 
-export async function updateAnswer(answerId: string, actor: Actor, input: { body: string }): Promise<QaQuestionDetail> {
+export async function updateAnswer(answerId: string, actor: Actor, input: { body: string; attachmentFileIds?: string[] }): Promise<QaQuestionDetail> {
   const a = await loadAnswer(answerId);
   const q = await loadQuestion(a.questionId);
   if (a.authorId !== actor.user.$id) throw forbidden('Only the author can edit this answer.');
   if (!canEditAnswer(q, { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: false }, { userId: actor.user.$id, roles: actor.roles, blockedWithAuthor: false })) {
     throw conflict('invalid_state', 'This question is closed.');
   }
-  await updateRow(TABLES.qaAnswers, answerId, { body: input.body });
+  const files = input.attachmentFileIds === undefined ? null : await replaceAttachments(actor.user.$id, a.attachmentFileIds, input.attachmentFileIds);
+  await updateRow(TABLES.qaAnswers, answerId, { body: input.body, ...(files ? { attachmentFileIds: files.ids } : {}) });
+  if (files) await files.commit();
   return getQuestionDetail(q.$id, actor);
 }
 
@@ -302,12 +330,16 @@ export async function removeContent(targetType: 'qa_question' | 'qa_answer', id:
   const now = nowIso();
   if (targetType === 'qa_question') {
     const q = await getRow<QaQuestionRow>(TABLES.qaQuestions, id);
-    if (q && !q.removedAt) await updateRow(TABLES.qaQuestions, id, { removedAt: now, removedBy: adminId, status: 'closed' });
+    if (q && !q.removedAt) {
+      await updateRow(TABLES.qaQuestions, id, { removedAt: now, removedBy: adminId, status: 'closed', attachmentFileIds: [] });
+      await deleteUploads(q.attachmentFileIds ?? []);
+    }
     return;
   }
   const a = await getRow<QaAnswerRow>(TABLES.qaAnswers, id);
   if (!a || a.removedAt) return;
-  await updateRow(TABLES.qaAnswers, id, { removedAt: now, removedBy: adminId });
+  await updateRow(TABLES.qaAnswers, id, { removedAt: now, removedBy: adminId, attachmentFileIds: [] });
+  await deleteUploads(a.attachmentFileIds ?? []);
   if (a.kind === 'answer') {
     const q = await getRow<QaQuestionRow>(TABLES.qaQuestions, a.questionId);
     if (q) {

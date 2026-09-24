@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { QA_TOPICS, type QaTopicSlug } from '../contracts/api';
+import { QA_MAX_ATTACHMENTS, QA_TOPICS, type QaTopicSlug } from '../contracts/api';
 
 const trimmed = (max: number, min = 1) => z.string().trim().min(min).max(max);
 const cursor = z.string().min(1).max(64).optional();
@@ -52,7 +52,7 @@ export const connectionList = z.object({ direction: z.enum(['incoming', 'outgoin
 export const blockInput = z.object({ userId: trimmed(36) }).strict();
 export const reportInput = z.object({ targetUserId: trimmed(36), reason: z.enum(['harassment', 'spam', 'inappropriate', 'other']), details: z.string().trim().max(2000).optional() }).strict();
 
-export const uploadIntent = z.object({ purpose: z.enum(['avatar', 'evidence']), fileName: trimmed(255), mimeType: trimmed(128), sizeBytes: z.number().int().min(1), relationId: z.string().max(36).optional() }).strict();
+export const uploadIntent = z.object({ purpose: z.enum(['avatar', 'evidence', 'qa']), fileName: trimmed(255), mimeType: trimmed(128), sizeBytes: z.number().int().min(1), relationId: z.string().max(36).optional() }).strict();
 export const uploadComplete = z.object({ fileId: trimmed(36) }).strict();
 
 export const notificationList = z.object({ cursor, limit, unreadOnly: z.preprocess((v) => v === 'true' || v === '1', z.boolean()).optional() });
@@ -65,8 +65,10 @@ export const resolveReport = z.object({ action: z.enum(['dismiss', 'warn', 'susp
 const qaTopicSlugs = QA_TOPICS.map((t) => t.slug) as [QaTopicSlug, ...QaTopicSlug[]];
 export const qaTopic = z.enum(qaTopicSlugs);
 export const qaQuestionList = z.object({ topic: qaTopic.optional(), status: z.enum(['open', 'answered', 'closed']).optional(), cursor, limit });
-export const createQaQuestion = z.object({ topic: qaTopic, title: trimmed(160, 8), body: trimmed(8000, 20) }).strict();
-export const updateQaQuestion = z.object({ topic: qaTopic.optional(), title: trimmed(160, 8).optional(), body: trimmed(8000, 20).optional() }).strict()
+const qaAttachmentIds = z.array(z.string().trim().min(1).max(36)).max(QA_MAX_ATTACHMENTS);
+export const createQaQuestion = z.object({ topic: qaTopic, title: trimmed(160, 8), body: trimmed(8000, 20), attachmentFileIds: qaAttachmentIds.optional() }).strict();
+export const updateQaQuestion = z.object({ topic: qaTopic.optional(), title: trimmed(160, 8).optional(), body: trimmed(8000, 20).optional(), attachmentFileIds: qaAttachmentIds.optional() }).strict()
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });
 export const qaBody = z.object({ body: trimmed(8000, 2) }).strict();
+export const qaAnswerBody = z.object({ body: trimmed(8000, 2), attachmentFileIds: qaAttachmentIds.optional() }).strict();
 export const qaReport = z.object({ reason: z.enum(['harassment', 'spam', 'inappropriate', 'other']), details: z.string().trim().max(2000).optional() }).strict();

@@ -49,9 +49,9 @@ export type AuditEventRow = Stamped & { actorId: string; action: string; resourc
 export type UploadIntentRow = Stamped & { userId: string; purpose: string; bucketId: string; fileId: string; relationId: string | null; fileName: string | null; mimeType: string; sizeBytes: number; status: string | null; expiresAt: string };
 export type QaQuestionRow = Stamped & {
   authorId: string; topic: string; title: string; body: string; status: string; answerCount: number; acceptedAnswerId: string | null;
-  lastActivityAt: string; removedAt: string | null; removedBy: string | null;
+  lastActivityAt: string; removedAt: string | null; removedBy: string | null; attachmentFileIds?: string[] | null;
 };
-export type QaAnswerRow = Stamped & { questionId: string; authorId: string; kind: string; parentAnswerId: string | null; body: string; removedAt: string | null; removedBy: string | null };
+export type QaAnswerRow = Stamped & { questionId: string; authorId: string; kind: string; parentAnswerId: string | null; body: string; removedAt: string | null; removedBy: string | null; attachmentFileIds?: string[] | null };
 
 export function isRowNotFound(err: unknown): boolean {
   const e = err as { code?: number; type?: string } | null;

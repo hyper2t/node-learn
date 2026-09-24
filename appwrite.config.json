@@ -96,6 +96,10 @@
                     "value": "avatars"
                 },
                 {
+                    "key": "APPWRITE_QA_BUCKET_ID",
+                    "value": "qa"
+                },
+                {
                     "key": "APPWRITE_ADMIN_TEAM_ID",
                     "value": "admins"
                 },
@@ -164,6 +168,10 @@
                 {
                     "key": "APPWRITE_AVATAR_BUCKET_ID",
                     "value": "avatars"
+                },
+                {
+                    "key": "APPWRITE_QA_BUCKET_ID",
+                    "value": "qa"
                 },
                 {
                     "key": "LOG_LEVEL",
@@ -2505,6 +2513,13 @@
                     "size": 36
                 },
                 {
+                    "key": "attachmentFileIds",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 36
+                },
+                {
                     "key": "createdAt",
                     "type": "datetime",
                     "required": true,
@@ -2612,6 +2627,13 @@
                     "size": 36
                 },
                 {
+                    "key": "attachmentFileIds",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 36
+                },
+                {
                     "key": "createdAt",
                     "type": "datetime",
                     "required": true,
@@ -2678,6 +2700,29 @@
         {
             "$id": "evidence",
             "name": "evidence",
+            "$permissions": [
+                "create(\"users\")"
+            ],
+            "fileSecurity": true,
+            "enabled": true,
+            "maximumFileSize": 26214400,
+            "allowedFileExtensions": [
+                "jpg",
+                "jpeg",
+                "png",
+                "webp",
+                "pdf",
+                "txt",
+                "md",
+                "zip"
+            ],
+            "compression": "gzip",
+            "encryption": true,
+            "antivirus": true
+        },
+        {
+            "$id": "qa",
+            "name": "qa",
             "$permissions": [
                 "create(\"users\")"
             ],

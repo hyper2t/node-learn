@@ -169,5 +169,20 @@ describe('retention purge', () => {
     expect(tableRows(TABLES.reports).map((r) => r.$id).sort()).toEqual(['r-new', 'r-open']);
     expect(tableRows(TABLES.auditEvents).map((r) => r.$id)).toEqual(['a-new']);
   });
+
+  it('purges Q&A uploads that were finished but never attached', async () => {
+    state.rows[TABLES.uploadIntents]!.push(
+      row('qa-orphan', { userId: 'active', status: 'complete', purpose: 'qa', bucketId: 'qa', fileId: 'qa-orphan', updatedAt: '2026-09-21T00:00:00.000Z', expiresAt: '2026-09-21T00:15:00.000Z' }),
+      row('qa-draft', { userId: 'active', status: 'complete', purpose: 'qa', bucketId: 'qa', fileId: 'qa-draft', updatedAt: '2026-09-22T20:00:00.000Z', expiresAt: '2026-09-22T20:15:00.000Z' }),
+      row('qa-attached', { userId: 'active', status: 'attached', purpose: 'qa', bucketId: 'qa', fileId: 'qa-attached', updatedAt: '2026-09-01T00:00:00.000Z', expiresAt: '2026-09-01T00:15:00.000Z' }),
+    );
+    const { runRetentionPurge } = await import('../src/services/retention');
+    const stats = await runRetentionPurge({ now: new Date('2026-09-23T00:00:00.000Z'), batchSize: 50, maxBatches: 3 });
+    expect(stats.qaOrphanUploadsDeleted).toBe(1);
+    expect(state.deletedFiles).toContain('qa/qa-orphan');
+    const left = tableRows(TABLES.uploadIntents).map((r) => r.$id);
+    expect(left).toEqual(expect.arrayContaining(['qa-draft', 'qa-attached']));
+    expect(left).not.toContain('qa-orphan');
+  });
 });
 

@@ -33,12 +33,12 @@ qaWriteRoutes.patch('/questions/:id', async (c) => ok(rid(c), await updateQuesti
 qaWriteRoutes.post('/questions/:id/close', async (c) => ok(rid(c), await closeQuestion(c.req.param('id'), actorOf(c), rid(c))));
 qaWriteRoutes.post('/questions/:id/answers', async (c) => {
   const actor = actorOf(c);
-  const body = await readJsonBody(c, S.qaBody);
+  const body = await readJsonBody(c, S.qaAnswerBody);
   const id = c.req.param('id');
   return ok(rid(c), await withIdempotency(actor.user.$id, idempotencyKeyOf(c), { id, ...body }, () => createAnswer(id, actor, body, rid(c))), 201);
 });
 qaWriteRoutes.post('/questions/:id/report', async (c) => ok(rid(c), await reportContent(actorOf(c), { type: 'qa_question', id: c.req.param('id') }, await readJsonBody(c, S.qaReport)), 201));
-qaWriteRoutes.patch('/answers/:id', async (c) => ok(rid(c), await updateAnswer(c.req.param('id'), actorOf(c), await readJsonBody(c, S.qaBody))));
+qaWriteRoutes.patch('/answers/:id', async (c) => ok(rid(c), await updateAnswer(c.req.param('id'), actorOf(c), await readJsonBody(c, S.qaAnswerBody))));
 qaWriteRoutes.post('/answers/:id/clarify', async (c) => ok(rid(c), await clarifyAnswer(c.req.param('id'), actorOf(c), await readJsonBody(c, S.qaBody), rid(c)), 201));
 qaWriteRoutes.post('/answers/:id/accept', async (c) => ok(rid(c), await acceptAnswer(c.req.param('id'), actorOf(c), rid(c))));
 qaWriteRoutes.post('/answers/:id/report', async (c) => ok(rid(c), await reportContent(actorOf(c), { type: 'qa_answer', id: c.req.param('id') }, await readJsonBody(c, S.qaReport)), 201));

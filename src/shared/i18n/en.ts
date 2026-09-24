@@ -97,6 +97,10 @@ export const en = {
     targets: { user: 'Account', qa_question: 'Question', qa_answer: 'Answer' }, viewContent: 'View post', removedContent: 'This post is no longer available.',
     removeConfirm: 'Remove this post? The author will be notified.',
   },
+  attachments: {
+    addImage: 'Image', addFile: 'File', uploading: 'Uploading', failed: 'Upload failed.', failedShort: 'Failed', retry: 'Retry',
+    remove: 'Remove {name}', title: 'Attachments', waitForUploads: 'Wait for uploads to finish before posting.',
+  },
   qa: {
     title: 'Questions', body: 'Ask a focused question in a topic. Teachers who work in that area answer. Questions close after {days} days without activity.',
     topics: 'Topics', openCount: '{n} open', ask: 'Ask a question', askTitle: 'Ask a question', mine: 'My questions', inbox: 'Questions for you',

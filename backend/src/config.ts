@@ -15,6 +15,7 @@ const envSchema = z.object({
   APPWRITE_ADMIN_TEAM_ID: z.string().default(''),
   APPWRITE_EVIDENCE_BUCKET_ID: z.string().default('evidence'),
   APPWRITE_AVATAR_BUCKET_ID: z.string().default('avatars'),
+  APPWRITE_QA_BUCKET_ID: z.string().default('qa'),
 
   CORS_ORIGINS: z.string().default('http://localhost:8071'),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(120),
@@ -39,6 +40,7 @@ export type Config = {
     adminTeamId: string | null;
     evidenceBucketId: string;
     avatarBucketId: string;
+    qaBucketId: string;
   };
   corsOrigins: string[];
   rateLimitPerMin: number;
@@ -96,6 +98,7 @@ export function getConfig(): Config {
       adminTeamId: toNullable(e.APPWRITE_ADMIN_TEAM_ID),
       evidenceBucketId: e.APPWRITE_EVIDENCE_BUCKET_ID,
       avatarBucketId: e.APPWRITE_AVATAR_BUCKET_ID,
+      qaBucketId: e.APPWRITE_QA_BUCKET_ID,
     },
     corsOrigins: e.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean),
     rateLimitPerMin: e.RATE_LIMIT_PER_MIN,

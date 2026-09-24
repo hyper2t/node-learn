@@ -30,6 +30,7 @@ export type RetentionPurgeStats = {
   deletedMemberQaQuestionsDeleted: number;
   deletedMemberQaAnswersDeleted: number;
   qaQuestionsAutoClosed: number;
+  qaOrphanUploadsDeleted: number;
 };
 
 function blankStats(): RetentionPurgeStats {
@@ -47,6 +48,7 @@ function blankStats(): RetentionPurgeStats {
     deletedMemberQaQuestionsDeleted: 0,
     deletedMemberQaAnswersDeleted: 0,
     qaQuestionsAutoClosed: 0,
+    qaOrphanUploadsDeleted: 0,
   };
 }
 
@@ -95,6 +97,17 @@ async function purgeExpiredUploadIntents(stats: RetentionPurgeStats, now: Date, 
   stats.expiredUploadIntentsDeleted += await deleteRows<UploadIntentRow>(
     TABLES.uploadIntents,
     [Query.equal('status', 'pending'), Query.lessThan('expiresAt', cutoff)],
+    options,
+    async (row) => { if (await deleteStorageFile(row.bucketId, row.fileId)) stats.uploadFilesDeleted++; },
+  );
+}
+
+/** Q&A uploads finished but never attached to a post (abandoned drafts) go after a day. */
+async function purgeOrphanQaUploads(stats: RetentionPurgeStats, now: Date, options: Required<Pick<RetentionPurgeOptions, 'batchSize' | 'maxBatches'>>): Promise<void> {
+  const cutoff = daysAgo(now, 1);
+  stats.qaOrphanUploadsDeleted += await deleteRows<UploadIntentRow>(
+    TABLES.uploadIntents,
+    [Query.equal('purpose', 'qa'), Query.equal('status', 'complete'), Query.lessThan('updatedAt', cutoff)],
     options,
     async (row) => { if (await deleteStorageFile(row.bucketId, row.fileId)) stats.uploadFilesDeleted++; },
   );
@@ -162,6 +175,7 @@ export async function runRetentionPurge(opts: RetentionPurgeOptions = {}): Promi
   log('info', 'retention_purge_started');
 
   await purgeExpiredUploadIntents(stats, now, options);
+  await purgeOrphanQaUploads(stats, now, options);
   await purgeDeletedMemberData(stats, now, options);
   await autoCloseQuestions(stats, now, options);
   stats.idempotencyKeysDeleted += await deleteRows<IdempotencyKeyRow>(TABLES.idempotencyKeys, [Query.lessThan('createdAt', daysAgo(now, 1))], options);

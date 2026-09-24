@@ -5,21 +5,30 @@ import { useMe } from '@/features/identity/api';
 import { useAcceptAnswer, useAnswerQuestion, useClarify, useCloseQuestion, useEditAnswer, useQaQuestion } from '@/features/qa/api';
 import { AuthorLine, Markdown, MathText, ReportLink, StatusBadge, topicLabel } from '@/features/qa/components';
 import { Screen, Section } from '@/shared/layout/screen';
-import { Badge, Button, Card, ErrorState, InlineError, Input, Loading, Text, confirm } from '@/shared/ui';
+import { AttachmentBar, AttachmentList, Badge, Button, Card, ErrorState, InlineError, Input, Loading, Text, confirm, doneFileIds, fromAttachments, isUploading, type PendingAttachment } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
-import type { QaAnswer, QaQuestionDetail } from '@/types/api';
+import { QA_MAX_ATTACHMENTS, type Attachment, type QaAnswer, type QaQuestionDetail } from '@/types/api';
 
-function Composer({ label, hint, submitLabel, initial = '', busy, error, onSubmit, onCancel }: {
-  label: string; hint?: string; submitLabel: string; initial?: string; busy: boolean; error: unknown; onSubmit: (body: string) => void; onCancel?: () => void;
+/**
+ * Answer / follow-up composer. With `attachments` (answers only) a compact icon bar sits under the
+ * text field, above Cancel/Submit, so it stays reachable next to the actions on every width.
+ */
+function Composer({ label, hint, submitLabel, initial = '', attachments, busy, error, onSubmit, onCancel }: {
+  label: string; hint?: string; submitLabel: string; initial?: string; attachments?: Attachment[]; busy: boolean; error: unknown;
+  onSubmit: (body: string, attachmentFileIds?: string[]) => void; onCancel?: () => void;
 }) {
   const [body, setBody] = useState(initial);
+  const [files, setFiles] = useState<PendingAttachment[]>(() => fromAttachments(attachments ?? []));
+  const uploading = isUploading(files);
   return (
     <View className="gap-2">
       <Input label={label} hint={hint} value={body} onChangeText={setBody} multiline maxLength={8000} />
+      {attachments ? <AttachmentBar purpose="qa" max={QA_MAX_ATTACHMENTS} value={files} onChange={setFiles} compact /> : null}
       <InlineError error={error} />
       <View className="flex-row gap-2">
         {onCancel ? <Button variant="secondary" className="flex-1" title={t('common.cancel')} onPress={onCancel} /> : null}
-        <Button className="flex-1" title={submitLabel} disabled={body.trim().length < 2} loading={busy} onPress={() => onSubmit(body.trim())} />
+        <Button className="flex-1" title={submitLabel} disabled={body.trim().length < 2 || uploading} loading={busy}
+          onPress={() => onSubmit(body.trim(), attachments ? doneFileIds(files) : undefined)} />
       </View>
     </View>
   );
@@ -43,9 +52,14 @@ function AnswerCard({ a, detail, isStudentViewer }: { a: QaAnswer; detail: QaQue
         {a.accepted ? <Badge label={t('qa.accepted')} tone="success" /> : null}
       </View>
       {mode === 'edit' ? (
-        <Composer label={t('qa.editAnswer')} submitLabel={t('qa.saveAnswer')} initial={a.body} busy={edit.isPending} error={edit.error}
-          onCancel={() => setMode('view')} onSubmit={(body) => edit.mutate({ answerId: a.id, body }, { onSuccess: () => setMode('view') })} />
-      ) : <Markdown source={a.body} />}
+        <Composer label={t('qa.editAnswer')} submitLabel={t('qa.saveAnswer')} initial={a.body} attachments={a.attachments} busy={edit.isPending} error={edit.error}
+          onCancel={() => setMode('view')} onSubmit={(body, attachmentFileIds) => edit.mutate({ answerId: a.id, body, attachmentFileIds }, { onSuccess: () => setMode('view') })} />
+      ) : (
+        <>
+          <Markdown source={a.body} />
+          <AttachmentList items={a.attachments} showTitle={false} />
+        </>
+      )}
 
       {a.clarification ? (
         <View className="gap-1 rounded-md bg-element p-3">
@@ -107,6 +121,7 @@ export default function QaQuestionScreen() {
         <MathText variant="h2" text={q.title} />
         <AuthorLine name={q.author.displayName} avatarFileId={q.author.avatarFileId} when={q.createdAt} />
         <Markdown source={q.body} />
+        <AttachmentList items={d.attachments} title={t('attachments.title')} />
         <View className="flex-row flex-wrap gap-2">
           {d.permissions.canEdit ? <Button size="sm" variant="secondary" title={t('qa.editQuestion')} onPress={() => router.push({ pathname: '/(app)/qa/ask', params: { edit: q.id } })} /> : null}
           {d.permissions.canClose ? <Button size="sm" variant="ghost" title={t('qa.closeQuestion')} loading={close.isPending} onPress={closeQ} /> : null}
@@ -125,8 +140,8 @@ export default function QaQuestionScreen() {
       {q.status === 'closed' ? <Text variant="small" tone="secondary" className="py-3">{t('qa.closedNote')}</Text> : null}
       {d.permissions.canAnswer ? (
         <Card className="my-3">
-          <Composer label={t('qa.yourAnswer')} hint={t('qa.answerHint')} submitLabel={t('qa.postAnswer')} busy={answer.isPending} error={answer.error}
-            onSubmit={(body) => answer.mutate(body)} />
+          <Composer label={t('qa.yourAnswer')} hint={t('qa.answerHint')} submitLabel={t('qa.postAnswer')} attachments={[]} busy={answer.isPending} error={answer.error}
+            onSubmit={(body, attachmentFileIds) => answer.mutate({ body, attachmentFileIds })} />
         </Card>
       ) : null}
     </Screen>

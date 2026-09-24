@@ -2,17 +2,25 @@ import { ID, Permission, Query, Role, Tokens } from 'node-appwrite';
 import type { Attachment } from '../contracts/api';
 import type { UploadIntent, UploadPurpose } from '../contracts/api';
 import { getConfig } from '../config';
-import { createRow, getRow, listRows, updateRow } from '../db/repo';
+import { createRow, deleteRow, getRow, listRows, updateRow } from '../db/repo';
 import type { ProfileRow, UploadIntentRow } from '../db/rows';
 import { TABLES } from '../db/schema';
 import { getAdminClient, getStorage } from '../db/client';
 import { conflict, forbidden, notFound, validation } from '../errors';
 import { requireRelationMember } from './learning';
 
+const DOCS = /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/;
 const LIMITS: Record<UploadPurpose, { maxBytes: number; mime: RegExp }> = {
   avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/ },
-  evidence: { maxBytes: 25 * 1024 * 1024, mime: /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/ },
+  evidence: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
+  qa: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
 };
+
+/**
+ * Intent lifecycle: pending → complete (file verified, permissions set) → attached (bound to a
+ * post). Q&A uploads that stay `complete` (abandoned drafts) are purged by retention.
+ */
+export const INTENT_ATTACHED = 'attached';
 
 /**
  * Server-authorised upload: we mint the file ID and record intent; the client
@@ -28,7 +36,7 @@ export async function createIntent(userId: string, input: { purpose: UploadPurpo
     await requireRelationMember(input.relationId, userId);
   }
   const cfg = getConfig().appwrite;
-  const bucketId = input.purpose === 'avatar' ? cfg.avatarBucketId : cfg.evidenceBucketId;
+  const bucketId = input.purpose === 'avatar' ? cfg.avatarBucketId : input.purpose === 'qa' ? cfg.qaBucketId : cfg.evidenceBucketId;
   const fileId = ID.unique();
   const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
   await createRow<UploadIntentRow>(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, fileName: input.fileName.slice(0, 255), mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: 'pending', expiresAt }, fileId);
@@ -40,7 +48,7 @@ export async function completeIntent(userId: string, fileId: string): Promise<{ 
   const intent = await getRow<UploadIntentRow>(TABLES.uploadIntents, fileId);
   if (!intent) throw notFound('not_found', 'Upload not found.');
   if (intent.userId !== userId) throw forbidden();
-  if (intent.status === 'complete') return { fileId, bucketId: intent.bucketId };
+  if (intent.status === 'complete' || intent.status === INTENT_ATTACHED) return { fileId, bucketId: intent.bucketId };
   if (new Date(intent.expiresAt).getTime() < Date.now()) throw conflict('invalid_state', 'This upload has expired. Start again.');
   const storage = getStorage();
   const file = await storage.getFile({ bucketId: intent.bucketId, fileId }).catch(() => null);
@@ -51,6 +59,8 @@ export async function completeIntent(userId: string, fileId: string): Promise<{ 
   }
   const readers = [Permission.read(Role.user(userId))];
   if (intent.purpose === 'avatar') readers.push(Permission.read(Role.any()));
+  // Q&A is visible to every signed-in member; views still go through short-lived tokens.
+  if (intent.purpose === 'qa') readers.push(Permission.read(Role.users()));
   if (intent.relationId) {
     const rel = await requireRelationMember(intent.relationId, userId);
     const other = rel.studentId === userId ? rel.teacherId : rel.studentId;
@@ -83,6 +93,40 @@ export async function assertEvidenceAttachments(userId: string, relationId: stri
     }
   }
   return ids;
+}
+
+/**
+ * Q&A attachments must be the author's own finished `qa` uploads (complete, or already attached,
+ * e.g. kept while editing). Returns ids deduped, in the order given.
+ */
+export async function assertQaAttachments(userId: string, fileIds: string[] | undefined, max = 5): Promise<string[]> {
+  const ids = Array.from(new Set(fileIds ?? []));
+  if (ids.length > max) throw validation(`You can attach up to ${max} files.`, [{ path: 'attachmentFileIds', message: `max ${max}` }]);
+  if (!ids.length) return [];
+  const rows = await listRows<UploadIntentRow>(TABLES.uploadIntents, [Query.equal('$id', ids), Query.limit(ids.length)]);
+  for (const id of ids) {
+    const row = rows.find((r) => r.$id === id);
+    if (!row || row.userId !== userId || row.purpose !== 'qa' || (row.status !== 'complete' && row.status !== INTENT_ATTACHED)) {
+      throw validation('One of the attachments is not a finished upload of yours.', [{ path: 'attachmentFileIds', message: id }]);
+    }
+  }
+  return ids;
+}
+
+/** Marks uploads as bound to a post so the orphan purge leaves them alone. */
+export async function markAttached(fileIds: string[]): Promise<void> {
+  await Promise.all(fileIds.map((id) => updateRow(TABLES.uploadIntents, id, { status: INTENT_ATTACHED }).catch(() => undefined)));
+}
+
+/** Best effort: delete stored files and their intents (edits that drop files, removed content). */
+export async function deleteUploads(fileIds: string[]): Promise<void> {
+  if (!fileIds.length) return;
+  const rows = await listRows<UploadIntentRow>(TABLES.uploadIntents, [Query.equal('$id', fileIds), Query.limit(fileIds.length)]);
+  const storage = getStorage();
+  await Promise.all(rows.map(async (r) => {
+    await storage.deleteFile({ bucketId: r.bucketId, fileId: r.fileId }).catch(() => undefined);
+    await deleteRow(TABLES.uploadIntents, r.$id).catch(() => undefined);
+  }));
 }
 
 const TOKEN_TTL_MS = 30 * 60_000;

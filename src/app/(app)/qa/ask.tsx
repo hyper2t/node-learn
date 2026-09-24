@@ -9,20 +9,25 @@ import { MathToolbar } from '@/features/qa/math-toolbar';
 import { useBreakpoint } from '@/shared/hooks/use-breakpoint';
 import { cn } from '@/shared/lib/cn';
 import { PageHeader, Screen } from '@/shared/layout/screen';
-import { Badge, Button, Card, Empty, InlineError, Input, Loading, Text } from '@/shared/ui';
+import { AttachmentBar, AttachmentList, Badge, Button, Card, Empty, doneFileIds, fromAttachments, isUploading, type PendingAttachment, InlineError, Input, Loading, Text } from '@/shared/ui';
 import { t } from '@/shared/i18n';
-import { QA_TOPICS, type QaTopicSlug } from '@/types/api';
+import { QA_MAX_ATTACHMENTS, QA_TOPICS, type Attachment, type QaTopicSlug } from '@/types/api';
 
 const isTopic = (v: unknown): v is QaTopicSlug => QA_TOPICS.some((x) => x.slug === v);
 const TITLE_MAX = 160;
 const BODY_MAX = 8000;
-type Draft = { topic: QaTopicSlug | null; title: string; body: string };
+type Draft = { topic: QaTopicSlug | null; title: string; body: string; attachments: Attachment[] };
+
+/** Local picks rendered like published attachments (local URIs, no token). */
+const asPreview = (items: PendingAttachment[]): Attachment[] => items
+  .filter((a) => a.status === 'done')
+  .map((a) => ({ fileId: a.key, fileName: a.file.name, mimeType: a.file.mimeType, sizeBytes: a.file.size, url: a.file.uri, expiresAt: '' }));
 
 type Field = 'title' | 'body';
 
 /** Live preview, laid out like the published question so authors see what teachers will see. */
-function PreviewCard({ topic, title, body, className }: { topic: QaTopicSlug | null; title: string; body: string; className?: string }) {
-  const empty = !title.trim() && !body.trim();
+function PreviewCard({ topic, title, body, files, className }: { topic: QaTopicSlug | null; title: string; body: string; files: Attachment[]; className?: string }) {
+  const empty = !title.trim() && !body.trim() && !files.length;
   return (
     <Card className={cn('gap-3', className)}>
       <View className="flex-row items-center justify-between gap-2">
@@ -34,6 +39,7 @@ function PreviewCard({ topic, title, body, className }: { topic: QaTopicSlug | n
           {title.trim() ? <MathText variant="h2" text={title.trim()} /> : <Text variant="h2" tone="tertiary">{t('qa.questionTitle')}</Text>}
           <View className="border-t border-border" />
           {body.trim() ? <Markdown source={body} /> : <Text variant="small" tone="tertiary">{t('qa.detailsHint')}</Text>}
+          <AttachmentList items={files} showTitle={false} />
         </>
       )}
     </Card>
@@ -49,6 +55,9 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
   const [preview, setPreview] = useState(true);
+  const [files, setFiles] = useState<PendingAttachment[]>(() => fromAttachments(initial.attachments));
+  const uploading = isUploading(files);
+  const previewFiles = asPreview(files);
   const stem = isStemTopic(topic);
 
   // Toolbar target: the field focused last, and each field's caret (kept across blur).
@@ -76,11 +85,11 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
   };
   const selectionProp = (field: Field) => (forced?.field === field ? forced.selection : undefined);
 
-  const valid = !!topic && title.trim().length >= 8 && body.trim().length >= 20;
+  const valid = !!topic && title.trim().length >= 8 && body.trim().length >= 20 && !uploading;
   const mutation = editId ? update : ask;
   const submit = () => {
     if (!topic) return;
-    const input = { topic, title: title.trim(), body: body.trim() };
+    const input = { topic, title: title.trim(), body: body.trim(), attachmentFileIds: doneFileIds(files) };
     if (editId) update.mutate(input, { onSuccess: () => router.back() });
     else ask.mutate(input, { onSuccess: (q) => router.replace(`/(app)/qa/${q.id}`) });
   };
@@ -101,13 +110,16 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
         onFocus={() => setTarget('body')} onSelectionChange={onBodySel} selection={selectionProp('body')}
         className={stem ? 'min-h-[180px] font-mono text-small' : 'min-h-[140px]'}
       />
+      {/* Attachments sit directly under Details (the LaTeX toolbar is above it), so the two never share a row. */}
+      <AttachmentBar purpose="qa" max={QA_MAX_ATTACHMENTS} value={files} onChange={setFiles} />
       <Text variant="caption" tone="tertiary">{t(stem ? 'qa.math.hint' : 'qa.mathHint')}</Text>
       {!desktop ? (
         <View className="gap-2">
           <Button size="sm" variant="ghost" className="self-start" title={preview ? t('qa.hidePreview') : t('qa.preview')} onPress={() => setPreview((v) => !v)} />
-          {preview ? <PreviewCard topic={topic} title={title} body={body} /> : null}
+          {preview ? <PreviewCard topic={topic} title={title} body={body} files={previewFiles} /> : null}
         </View>
       ) : null}
+      {uploading ? <Text variant="caption" tone="tertiary">{t('attachments.waitForUploads')}</Text> : null}
       <InlineError error={mutation.error} />
       <Button title={editId ? t('qa.saveQuestion') : t('qa.post')} disabled={!valid} loading={mutation.isPending} onPress={submit} />
     </View>
@@ -118,7 +130,7 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
   return (
     <View className="flex-row items-start gap-6 py-2">
       <View className="min-w-0 flex-1">{form}</View>
-      <View className="min-w-0 flex-1"><PreviewCard topic={topic} title={title} body={body} /></View>
+      <View className="min-w-0 flex-1"><PreviewCard topic={topic} title={title} body={body} files={previewFiles} /></View>
     </View>
   );
 }
@@ -138,7 +150,9 @@ export default function AskScreen() {
   }
   if (editId && existing.data && !existing.data.permissions.canEdit) return <Screen><Empty title={t('qa.editLocked')} /></Screen>;
   const q = existing.data?.question;
-  const initial: Draft = q ? { topic: q.topic, title: q.title, body: q.body } : { topic: isTopic(params.topic) ? params.topic : null, title: '', body: '' };
+  const initial: Draft = q
+    ? { topic: q.topic, title: q.title, body: q.body, attachments: existing.data?.attachments ?? [] }
+    : { topic: isTopic(params.topic) ? params.topic : null, title: '', body: '', attachments: [] };
 
   return (
     <Screen width="wide">

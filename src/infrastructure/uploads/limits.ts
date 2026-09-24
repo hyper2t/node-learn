@@ -5,6 +5,7 @@ import type { PickedFile } from './pick';
 export const UPLOAD_LIMITS: Record<UploadPurpose, { maxBytes: number; mime: RegExp; label: string }> = {
   avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/, label: 'JPG, PNG or WebP up to 2 MB' },
   evidence: { maxBytes: 25 * 1024 * 1024, mime: /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/, label: 'Images, PDF, ZIP, text or Markdown up to 25 MB' },
+  qa: { maxBytes: 25 * 1024 * 1024, mime: /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/, label: 'Images, PDF, ZIP, text or Markdown up to 25 MB' },
 };
 
 export class UploadError extends Error {

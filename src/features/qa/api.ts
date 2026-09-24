@@ -3,7 +3,7 @@ import { api, newIdempotencyKey } from '@/infrastructure/api';
 import { qk } from '@/state/query-keys';
 import type {
   CreateQaQuestionInput, Page, QaAcceptedAnswer, QaQuestion, QaQuestionDetail, QaQuestionStatus, QaReportInput, QaTopicSlug, QaTopicSummary,
-  UpdateQaQuestionInput,
+  QaAnswerInput, UpdateQaQuestionInput,
 } from '@/types/api';
 
 type Inbox = Page<QaQuestion> & { topics: QaTopicSlug[] };
@@ -18,8 +18,8 @@ export const qaApi = {
   ask: (input: CreateQaQuestionInput) => api.post<QaQuestion>('/v1/qa/questions', input, { idempotencyKey: newIdempotencyKey() }),
   update: (id: string, input: UpdateQaQuestionInput) => api.patch<QaQuestion>(`/v1/qa/questions/${id}`, input),
   close: (id: string) => api.post<QaQuestion>(`/v1/qa/questions/${id}/close`, {}),
-  answer: (id: string, body: string) => api.post<QaQuestionDetail>(`/v1/qa/questions/${id}/answers`, { body }, { idempotencyKey: newIdempotencyKey() }),
-  editAnswer: (answerId: string, body: string) => api.patch<QaQuestionDetail>(`/v1/qa/answers/${answerId}`, { body }),
+  answer: (id: string, input: QaAnswerInput) => api.post<QaQuestionDetail>(`/v1/qa/questions/${id}/answers`, input, { idempotencyKey: newIdempotencyKey() }),
+  editAnswer: (answerId: string, input: QaAnswerInput) => api.patch<QaQuestionDetail>(`/v1/qa/answers/${answerId}`, input),
   clarify: (answerId: string, body: string) => api.post<QaQuestionDetail>(`/v1/qa/answers/${answerId}/clarify`, { body }),
   accept: (answerId: string) => api.post<QaQuestionDetail>(`/v1/qa/answers/${answerId}/accept`, {}),
   report: (target: { type: 'question' | 'answer'; id: string }, input: QaReportInput) =>
@@ -79,8 +79,8 @@ function useDetailMutation<V>(id: string, fn: (v: V) => Promise<QaQuestionDetail
   });
 }
 
-export function useAnswerQuestion(id: string) { return useDetailMutation(id, (body: string) => qaApi.answer(id, body)); }
-export function useEditAnswer(id: string) { return useDetailMutation(id, (v: { answerId: string; body: string }) => qaApi.editAnswer(v.answerId, v.body)); }
+export function useAnswerQuestion(id: string) { return useDetailMutation(id, (input: QaAnswerInput) => qaApi.answer(id, input)); }
+export function useEditAnswer(id: string) { return useDetailMutation(id, ({ answerId, ...input }: QaAnswerInput & { answerId: string }) => qaApi.editAnswer(answerId, input)); }
 export function useClarify(id: string) { return useDetailMutation(id, (v: { answerId: string; body: string }) => qaApi.clarify(v.answerId, v.body)); }
 export function useAcceptAnswer(id: string) { return useDetailMutation(id, (answerId: string) => qaApi.accept(answerId)); }
 

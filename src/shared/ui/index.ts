@@ -7,7 +7,7 @@ export { Avatar } from './avatar';
 export { ListRow, Separator } from './list-row';
 export { ChoiceCard, Checkbox, SegmentedControl } from './choice';
 export { Loading, Empty, ErrorState, InlineError, errorMessage } from './states';
-export { AttachmentPicker, AttachmentList, type PendingAttachment } from './attachments';
+export { AttachmentBar, AttachmentPicker, AttachmentList, doneFileIds, fromAttachments, isUploading, type PendingAttachment } from './attachments';
 export { confirm, useConfirm, DialogHost, type ConfirmOptions } from './dialog';
 export { Skeleton, SkeletonCard, SkeletonList } from './skeleton';
 export { TagPicker } from './tag-picker';

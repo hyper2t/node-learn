@@ -41,6 +41,7 @@ export function QuestionCard({ q, showTopic = true }: { q: QaQuestion; showTopic
         <StatusBadge status={q.status} />
         {showTopic ? <Badge label={topicLabel(q.topic)} /> : null}
         {q.acceptedAnswerId ? <Badge label={t('qa.accepted')} tone="success" /> : null}
+        {q.attachmentCount > 0 ? <Badge label={`📎 ${q.attachmentCount}`} /> : null}
       </View>
       <MathText variant="body-strong" numberOfLines={2} text={q.title} />
       <Text variant="caption" tone="tertiary">

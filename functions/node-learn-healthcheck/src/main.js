@@ -17,14 +17,14 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// backend/src/entry-healthcheck.ts
+// src/entry-healthcheck.ts
 var entry_healthcheck_exports = {};
 __export(entry_healthcheck_exports, {
   default: () => entry_healthcheck_default
 });
 module.exports = __toCommonJS(entry_healthcheck_exports);
 
-// backend/src/log.ts
+// src/log.ts
 var LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 var threshold = LEVELS.info;
 function setLogLevel(level) {
@@ -38,7 +38,7 @@ function log(level, message, meta) {
   else console.log(text);
 }
 
-// backend/src/services/healthcheck.ts
+// src/services/healthcheck.ts
 var DEFAULT_TIMEOUT_MS = 7e3;
 var MAX_BODY_SAMPLE = 1e3;
 var MANUAL_SECRET = "__SET_IN_APPWRITE_CONSOLE__";
@@ -109,7 +109,7 @@ async function runHealthcheck(env = process.env) {
   return result;
 }
 
-// backend/src/entry-healthcheck.ts
+// src/entry-healthcheck.ts
 var jsonHeaders = { "content-type": "application/json; charset=utf-8" };
 var entry_healthcheck_default = async ({ res }) => {
   try {
