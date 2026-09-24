@@ -12,7 +12,7 @@ export const qk = {
   conversations: { list: ['conversations'] as const, detail: (id: string) => ['conversations', id] as const, messages: (id: string) => ['conversations', id, 'messages'] as const },
   reviews: { relation: (id: string) => ['reviews', 'relation', id] as const, teacher: (id: string) => ['reviews', 'teacher', id] as const },
   notifications: { summary: ['notifications', 'summary'] as const, list: (unreadOnly: boolean) => ['notifications', 'list', unreadOnly ? 'unread' : 'all'] as const },
-  admin: { reports: (status: string) => ['admin', 'reports', status] as const },
+  admin: { reports: (status: string) => ['admin', 'reports', status] as const, metrics: (weeks: number) => ['admin', 'metrics', weeks] as const },
   qa: {
     topics: ['qa', 'topics'] as const, list: (topic: string, status: string) => ['qa', 'list', topic, status] as const, mine: ['qa', 'mine'] as const,
     inbox: ['qa', 'inbox'] as const, detail: (id: string) => ['qa', 'detail', id] as const, accepted: (teacherId: string) => ['qa', 'accepted', teacherId] as const,

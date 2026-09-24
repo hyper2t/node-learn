@@ -57,6 +57,7 @@ function ReportCard({ r, onResolve, busy }: { r: ReportItem; onResolve: (action:
 
 export default function AdminReportsScreen() {
   const me = useMe();
+  const router = useRouter();
   const isAdmin = !!me.data?.isAdmin;
   const [status, setStatus] = useState<ReportStatus>('open');
   const reports = useReports(status, isAdmin);
@@ -69,6 +70,7 @@ export default function AdminReportsScreen() {
     <Screen>
       <Stack.Screen options={{ title: t('admin.title') }} />
       <PageHeader title={t('admin.reports')} body={t('admin.reportsBody')} />
+      <Button size="sm" variant="secondary" className="mb-3 self-start" title={t('admin.metrics.title')} onPress={() => router.push('/(app)/admin/metrics')} />
       <SegmentedControl value={status} onChange={setStatus} options={[{ value: 'open', label: t('admin.open') }, { value: 'resolved', label: t('admin.resolved') }]} />
       <InlineError error={resolve.error} />
       <View className="gap-3 py-3">

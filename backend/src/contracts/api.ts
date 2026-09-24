@@ -194,6 +194,49 @@ export type UpdateGoalInput = Partial<{ title: string; description: string; stat
 export type CreateTaskInput = { title: string; instructions?: string; goalId?: string | null; dueAt?: string | null };
 export type UpdateTaskInput = Partial<{ title: string; instructions: string; status: TaskStatus; dueAt: string | null }>;
 
+// ---------------------------------------------------------------- admin metrics (ops dashboard)
+
+/** `pct` is null when the denominator is 0. */
+export type MetricRate = { num: number; den: number; pct: number | null };
+export type MetricsWeek = {
+  /** Monday 00:00 Asia/Taipei, as ISO (UTC). */
+  weekStart: string;
+  signups: number;
+  activation48h: MetricRate;
+  newRelations: number;
+  activeRelations: number;
+  evidence: number;
+  evidencePerActive: number | null;
+  feedbackMedianHours: number | null;
+  reviews: number;
+  /** Cumulative complete relations at the end of the week. */
+  completeRelations: number;
+};
+export type AwaitingFeedback = { evidenceId: string; relationId: string; title: string; teacherId: string; teacherName: string; studentName: string; waitingSince: string; hours: number };
+export type AdminMetrics = {
+  generatedAt: string;
+  timeZone: 'Asia/Taipei';
+  weeks: number;
+  /** Window = the last `weeks` weeks, except `completeRelations`, `retention4w`, `reviewRate` (all time). */
+  totals: {
+    signups: number;
+    activation48h: MetricRate;
+    activationStudents: MetricRate;
+    activationTeachers: MetricRate;
+    evidencePerActiveWeek: number | null;
+    feedbackMedianHours: number | null;
+    awaitingOver48h: number;
+    retention4w: MetricRate;
+    reviewRate: MetricRate;
+    completeRelations: number;
+  };
+  funnel: { signups: number; studentsOnboarded: number; teachersOnboarded: number; requests: number; accepted: number; firstEvidence: number; firstFeedback: number; complete: number };
+  qa: { questions: number; answered24h: MetricRate; accepted: number; toRequests: number };
+  weekly: MetricsWeek[];
+  awaiting: AwaitingFeedback[];
+  excludedUsers: number;
+};
+
 // ---------------------------------------------------------------- teacher reviews (L4.3)
 
 export const REVIEW_MIN_FOR_AVERAGE = 3;

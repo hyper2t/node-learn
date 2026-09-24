@@ -130,6 +130,17 @@ export const en = {
     emptyBody: 'Requests, tasks, evidence and feedback will show up here.',
   },
   admin: {
+    metrics: {
+      title: 'Metrics', body: 'Early-stage health of learning relations. Definitions: docs/ops, appendix A. Weeks start Monday (Asia/Taipei).',
+      weeks: '{n} weeks', northStar: 'Complete relations', northStarHint: '28+ days and 3+ evidence with feedback (all time)',
+      activation: '48h activation', students: 'Students', teachers: 'Teachers', evidencePerActive: 'Evidence / relation / week',
+      feedbackMedian: 'Feedback median', hours: '{n} h', awaiting: 'Awaiting feedback > 48h', retention: '4-week retention', reviewRate: 'Review rate',
+      funnel: 'Funnel', qa: 'Q&A', weekly: 'Weekly', excluded: '{n} test/deleted accounts excluded',
+      f: { signups: 'Sign-ups', studentsOnboarded: 'Students onboarded', teachersOnboarded: 'Teachers onboarded', requests: 'Requests', accepted: 'Accepted', firstEvidence: 'First evidence', firstFeedback: 'First feedback', complete: 'Complete' },
+      q: { questions: 'Questions', answered24h: 'Answered in 24h', accepted: 'Accepted answers', toRequests: 'Led to a request' },
+      cols: { week: 'Week', signups: 'Sign-ups', act: '48h act.', newRel: 'New', active: 'Active', evidence: 'Evidence', perActive: 'Per rel.', fb: 'Fb median', reviews: 'Reviews', complete: 'Complete' },
+      waited: 'waited {n} h', open: 'Open',
+    },
     title: 'Moderation', reports: 'Reports', reportsBody: 'Review reports from members. Suspending disables the account and ends its active learning relations.',
     open: 'Open', resolved: 'Resolved', empty: 'No reports here.', reportedBy: 'Reported by {name}', note: 'Note to the member (optional)',
     actions: { dismiss: 'Dismiss', warn: 'Warn', suspend: 'Suspend', remove_content: 'Remove post' }, suspend: 'Suspend account', suspendConfirm: 'Suspend this account? They will be signed out and all their active learning relations will end.',

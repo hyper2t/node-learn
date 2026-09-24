@@ -22203,9 +22203,9 @@ var require_util8 = __commonJS({
       }
       return true;
     }
-    function delay(ms) {
+    function delay(ms2) {
       return new Promise((resolve2) => {
-        setTimeout(resolve2, ms).unref();
+        setTimeout(resolve2, ms2).unref();
       });
     }
     module2.exports = {
@@ -40063,6 +40063,7 @@ var upsertReview = external_exports.object({
   anonymous: external_exports.boolean().optional()
 }).strict();
 var reviewReply = external_exports.object({ reply: external_exports.string().trim().max(500) }).strict();
+var metricsQuery = external_exports.object({ weeks: external_exports.coerce.number().int().min(1).max(52).default(12) });
 var closingNote = external_exports.object({ note: external_exports.string().trim().max(1e3) }).strict();
 var declineGoalCompletion = external_exports.object({ note: external_exports.string().trim().max(300).optional() }).strict();
 var paged = external_exports.object({ cursor, limit });
@@ -40890,9 +40891,215 @@ async function resolveReport2(id, adminId, input, requestId2) {
   return toReportItem(updated, refs.get(updated.reporterId), refs.get(updated.targetUserId), await contextOf(updated.targetType, updated.targetId));
 }
 
+// src/services/metrics.ts
+init_dist();
+init_paginate();
+init_schema();
+init_log();
+
+// src/services/metrics-calc.ts
+var HOUR = 36e5;
+var DAY = 24 * HOUR;
+var WEEK = 7 * DAY;
+var TAIPEI_MONDAY_0 = 4 * DAY - 8 * HOUR;
+var weekStartOf = (ms2) => TAIPEI_MONDAY_0 + Math.floor((ms2 - TAIPEI_MONDAY_0) / WEEK) * WEEK;
+function rate(num, den) {
+  return { num, den, pct: den ? Math.round(num / den * 1e3) / 10 : null };
+}
+function median(xs) {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  const v = s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  return Math.round(v * 10) / 10;
+}
+var ms = (iso) => iso ? Date.parse(iso) : NaN;
+var inRange = (t, from, to) => t >= from && t < to;
+function completedAt(rel, firstFeedbackByEvidence, evidenceByRelation) {
+  const start = ms(rel.startedAt);
+  const day28 = start + 28 * DAY;
+  if (rel.endedAt && ms(rel.endedAt) < day28) return null;
+  const fbTimes = (evidenceByRelation.get(rel.id) ?? []).map((e) => firstFeedbackByEvidence.get(e.id)).filter((t) => t !== void 0).sort((a, b) => a - b);
+  if (fbTimes.length < 3) return null;
+  return Math.max(day28, fbTimes[2]);
+}
+function computeMetrics(inp) {
+  const { now } = inp;
+  const firstWeek = weekStartOf(now) - (inp.weeks - 1) * WEEK;
+  const from = firstWeek;
+  const firstFb = /* @__PURE__ */ new Map();
+  for (const f of inp.feedback) {
+    const t = ms(f.createdAt);
+    const cur = firstFb.get(f.evidenceId);
+    if (cur === void 0 || t < cur) firstFb.set(f.evidenceId, t);
+  }
+  const evByRel = /* @__PURE__ */ new Map();
+  for (const e of inp.evidence) evByRel.set(e.relationId, [...evByRel.get(e.relationId) ?? [], e]);
+  const firstRelOf = /* @__PURE__ */ new Map();
+  for (const r of inp.relations) for (const u of [r.studentId, r.teacherId]) {
+    const t = ms(r.startedAt);
+    if (!firstRelOf.has(u) || t < firstRelOf.get(u)) firstRelOf.set(u, t);
+  }
+  const rolesOf = /* @__PURE__ */ new Map();
+  for (const r of inp.roles) rolesOf.set(r.userId, [...rolesOf.get(r.userId) ?? [], r]);
+  const complete = /* @__PURE__ */ new Map();
+  for (const r of inp.relations) {
+    const c = completedAt(r, firstFb, evByRel);
+    if (c !== null && c <= now) complete.set(r.id, c);
+  }
+  const liveReviews = new Set(inp.reviews.filter((r) => !r.removedAt).map((r) => r.relationId));
+  const activated = (u) => {
+    const t = firstRelOf.get(u.id);
+    return t !== void 0 && t <= ms(u.createdAt) + 48 * HOUR;
+  };
+  const activationOf = (users2) => {
+    const eligible = users2.filter((u) => ms(u.createdAt) + 48 * HOUR <= now || activated(u));
+    return rate(eligible.filter(activated).length, eligible.length);
+  };
+  const activeIn = (r, a, b) => ms(r.startedAt) < b && (!r.endedAt || ms(r.endedAt) >= a) && !(r.status === "paused" && ms(r.pausedAt) < b);
+  const fbHours = (evs) => evs.map((e) => firstFb.get(e.id)).map((t, i) => t === void 0 ? null : (t - ms(evs[i].submittedAt)) / HOUR).filter((h) => h !== null && h >= 0);
+  const weekly = [];
+  for (let w = 0; w < inp.weeks; w++) {
+    const a = firstWeek + w * WEEK;
+    const b = a + WEEK;
+    const signups = inp.users.filter((u) => inRange(ms(u.createdAt), a, b));
+    const active = inp.relations.filter((r) => activeIn(r, a, b)).length;
+    const evs = inp.evidence.filter((e) => inRange(ms(e.submittedAt), a, b));
+    weekly.push({
+      weekStart: new Date(a).toISOString(),
+      signups: signups.length,
+      activation48h: activationOf(signups),
+      newRelations: inp.relations.filter((r) => inRange(ms(r.startedAt), a, b)).length,
+      activeRelations: active,
+      evidence: evs.length,
+      evidencePerActive: active ? Math.round(evs.length / active * 100) / 100 : null,
+      feedbackMedianHours: median(fbHours(evs)),
+      reviews: inp.reviews.filter((r) => !r.removedAt && inRange(ms(r.createdAt), a, b)).length,
+      completeRelations: [...complete.values()].filter((t) => t < b).length
+    });
+  }
+  const winUsers = inp.users.filter((u) => ms(u.createdAt) >= from);
+  const isRole2 = (u, role2) => (rolesOf.get(u.id) ?? []).some((r) => r.role === role2);
+  const winEvidence = inp.evidence.filter((e) => ms(e.submittedAt) >= from);
+  const fullWeeks = weekly.slice(0, -1).filter((w) => w.activeRelations > 0);
+  const evPerActive = fullWeeks.length ? Math.round(fullWeeks.reduce((n, w) => n + w.evidence, 0) / fullWeeks.reduce((n, w) => n + w.activeRelations, 0) * 100) / 100 : null;
+  const awaiting = [];
+  const relById = new Map(inp.relations.map((r) => [r.id, r]));
+  for (const e of inp.evidence) {
+    if (e.status !== "submitted" && e.status !== "revised") continue;
+    const rel = relById.get(e.relationId);
+    if (!rel || rel.status !== "active") continue;
+    const since = e.status === "revised" ? ms(e.updatedAt) : ms(e.submittedAt);
+    const hours = (now - since) / HOUR;
+    if (hours < 48) continue;
+    awaiting.push({
+      evidenceId: e.id,
+      relationId: e.relationId,
+      title: e.title,
+      teacherId: rel.teacherId,
+      teacherName: inp.names.get(rel.teacherId) ?? rel.teacherId,
+      studentName: inp.names.get(rel.studentId) ?? rel.studentId,
+      waitingSince: new Date(since).toISOString(),
+      hours: Math.round(hours)
+    });
+  }
+  awaiting.sort((x, y) => y.hours - x.hours);
+  const matured = inp.relations.filter((r) => ms(r.startedAt) + 28 * DAY <= now);
+  const ended = inp.relations.filter((r) => r.status === "ended");
+  const winRels = inp.relations.filter((r) => ms(r.startedAt) >= from);
+  const winReq = inp.requests.filter((r) => ms(r.createdAt) >= from);
+  const winQ = inp.questions.filter((q) => !q.removedAt && ms(q.createdAt) >= from);
+  const answersByQ = /* @__PURE__ */ new Map();
+  for (const a of inp.answers) if (a.kind === "answer" && !a.removedAt) answersByQ.set(a.questionId, [...answersByQ.get(a.questionId) ?? [], a]);
+  const q24 = winQ.filter((q) => ms(q.createdAt) + 24 * HOUR <= now || (answersByQ.get(q.id) ?? []).length);
+  const answered24 = q24.filter((q) => (answersByQ.get(q.id) ?? []).some((a) => ms(a.createdAt) - ms(q.createdAt) <= 24 * HOUR));
+  const qById = new Map(inp.questions.map((q) => [q.id, q]));
+  const toRequests = winReq.filter((req) => inp.answers.some((a) => a.kind === "answer" && a.authorId === req.teacherId && ms(a.createdAt) < ms(req.createdAt) && qById.get(a.questionId)?.authorId === req.studentId)).length;
+  return {
+    generatedAt: new Date(now).toISOString(),
+    timeZone: "Asia/Taipei",
+    weeks: inp.weeks,
+    totals: {
+      signups: winUsers.length,
+      activation48h: activationOf(winUsers),
+      activationStudents: activationOf(winUsers.filter((u) => isRole2(u, "student"))),
+      activationTeachers: activationOf(winUsers.filter((u) => isRole2(u, "teacher"))),
+      evidencePerActiveWeek: evPerActive,
+      feedbackMedianHours: median(fbHours(winEvidence)),
+      awaitingOver48h: awaiting.length,
+      retention4w: rate(matured.filter((r) => !r.endedAt || ms(r.endedAt) >= ms(r.startedAt) + 28 * DAY).length, matured.length),
+      reviewRate: rate(ended.filter((r) => liveReviews.has(r.id)).length, ended.length),
+      completeRelations: complete.size
+    },
+    funnel: {
+      signups: winUsers.length,
+      studentsOnboarded: winUsers.filter((u) => (rolesOf.get(u.id) ?? []).some((r) => r.role === "student" && r.onboarded)).length,
+      teachersOnboarded: winUsers.filter((u) => (rolesOf.get(u.id) ?? []).some((r) => r.role === "teacher" && r.onboarded)).length,
+      requests: winReq.length,
+      accepted: winReq.filter((r) => r.status === "accepted" || !!r.relationId).length,
+      firstEvidence: winRels.filter((r) => (evByRel.get(r.id) ?? []).length > 0).length,
+      firstFeedback: winRels.filter((r) => (evByRel.get(r.id) ?? []).some((e) => firstFb.has(e.id))).length,
+      complete: winRels.filter((r) => complete.has(r.id)).length
+    },
+    qa: { questions: winQ.length, answered24h: rate(answered24.length, q24.length), accepted: winQ.filter((q) => !!q.acceptedAnswerId).length, toRequests },
+    weekly,
+    awaiting: awaiting.slice(0, 50),
+    excludedUsers: inp.excludedUsers
+  };
+}
+
+// src/services/metrics.ts
+function excludePattern() {
+  const raw2 = process.env.METRICS_EXCLUDE_EMAILS?.trim();
+  if (!raw2) return null;
+  try {
+    return new RegExp(raw2, "i");
+  } catch {
+    log("warn", "metrics_bad_exclude_pattern", {});
+    return null;
+  }
+}
+async function loadMetrics(weeks = 12, now = Date.now()) {
+  const [profiles, roles, requests, relations, evidence, feedback, reviews, questions, answers] = await Promise.all([
+    listAllRows(TABLES.profiles, [Query.select(["$id", "email", "displayName", "status", "createdAt"])]),
+    listAllRows(TABLES.roleMemberships, [Query.select(["$id", "userId", "role", "onboarded"])]),
+    listAllRows(TABLES.learningRequests, [Query.select(["$id", "studentId", "teacherId", "status", "relationId", "createdAt"])]),
+    listAllRows(TABLES.learningRelations, [Query.select(["$id", "studentId", "teacherId", "status", "startedAt", "endedAt", "pausedAt"])]),
+    listAllRows(TABLES.evidenceItems, [Query.select(["$id", "relationId", "title", "status", "submittedAt", "updatedAt"])]),
+    listAllRows(TABLES.feedbackEntries, [Query.select(["$id", "evidenceId", "createdAt"])]),
+    listAllRows(TABLES.teacherReviews, [Query.select(["$id", "relationId", "createdAt", "removedAt"])]),
+    listAllRows(TABLES.qaQuestions, [Query.select(["$id", "authorId", "createdAt", "acceptedAnswerId", "removedAt"])]),
+    listAllRows(TABLES.qaAnswers, [Query.select(["$id", "questionId", "authorId", "kind", "createdAt", "removedAt"])])
+  ]);
+  const pattern = excludePattern();
+  const excluded = new Set(profiles.filter((p) => pattern && pattern.test(p.email ?? "") || p.status === "deleted").map((p) => p.$id));
+  const keep = (...ids) => ids.every((id) => !excluded.has(id));
+  const rels = relations.filter((r) => keep(r.studentId, r.teacherId));
+  const relIds = new Set(rels.map((r) => r.$id));
+  const evs = evidence.filter((e) => relIds.has(e.relationId));
+  const evIds = new Set(evs.map((e) => e.$id));
+  const qs = questions.filter((q) => keep(q.authorId));
+  return computeMetrics({
+    now,
+    weeks,
+    users: profiles.filter((p) => !excluded.has(p.$id)).map((p) => ({ id: p.$id, createdAt: p.createdAt })),
+    roles: roles.filter((r) => keep(r.userId)).map((r) => ({ userId: r.userId, role: r.role, onboarded: r.onboarded })),
+    requests: requests.filter((r) => keep(r.studentId, r.teacherId)).map((r) => ({ studentId: r.studentId, teacherId: r.teacherId, status: r.status, relationId: r.relationId, createdAt: r.createdAt })),
+    relations: rels.map((r) => ({ id: r.$id, studentId: r.studentId, teacherId: r.teacherId, status: r.status, startedAt: r.startedAt, endedAt: r.endedAt, pausedAt: r.pausedAt ?? null })),
+    evidence: evs.map((e) => ({ id: e.$id, relationId: e.relationId, title: e.title, status: e.status, submittedAt: e.submittedAt, updatedAt: e.updatedAt })),
+    feedback: feedback.filter((f) => evIds.has(f.evidenceId)).map((f) => ({ evidenceId: f.evidenceId, createdAt: f.createdAt })),
+    reviews: reviews.filter((r) => relIds.has(r.relationId)).map((r) => ({ relationId: r.relationId, createdAt: r.createdAt, removedAt: r.removedAt })),
+    questions: qs.map((q) => ({ id: q.$id, authorId: q.authorId, createdAt: q.createdAt, acceptedAnswerId: q.acceptedAnswerId, removedAt: q.removedAt })),
+    answers: answers.filter((a) => keep(a.authorId)).map((a) => ({ id: a.$id, questionId: a.questionId, authorId: a.authorId, kind: a.kind, createdAt: a.createdAt, removedAt: a.removedAt })),
+    names: new Map(profiles.map((p) => [p.$id, p.displayName])),
+    excludedUsers: excluded.size
+  });
+}
+
 // src/routes/admin.ts
 var adminRoutes = new Hono2();
 adminRoutes.get("/reports", async (c) => ok(c.get("requestId"), await listReports(readQuery(c, reportList))));
+adminRoutes.get("/metrics", async (c) => ok(c.get("requestId"), await loadMetrics(readQuery(c, metricsQuery).weeks)));
 adminRoutes.post("/reports/:id/resolve", async (c) => {
   const body2 = await readJsonBody(c, resolveReport);
   return ok(c.get("requestId"), await resolveReport2(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));

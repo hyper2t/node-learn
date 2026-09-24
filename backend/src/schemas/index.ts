@@ -47,6 +47,7 @@ export const upsertReview = z.object({
   tags: z.array(z.enum(['clear', 'responsive', 'patient'])).max(3).optional(), anonymous: z.boolean().optional(),
 }).strict();
 export const reviewReply = z.object({ reply: z.string().trim().max(500) }).strict();
+export const metricsQuery = z.object({ weeks: z.coerce.number().int().min(1).max(52).default(12) });
 export const closingNote = z.object({ note: z.string().trim().max(1000) }).strict();
 export const declineGoalCompletion = z.object({ note: z.string().trim().max(300).optional() }).strict();
 export const paged = z.object({ cursor, limit });

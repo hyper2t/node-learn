@@ -18,6 +18,7 @@
     "make-dev-user": "tsx scripts/make-dev-user.ts",
     "tables:ensure": "tsx scripts/ensure-tables.ts",
     "proof:rebuild": "tsx scripts/proof-rebuild.ts",
+    "metrics": "tsx scripts/metrics.ts",
     "backfill:permissions": "tsx scripts/backfill-permissions.ts",
     "smoke:uploads": "tsx scripts/upload-smoke.ts",
     "schema:check": "tsx scripts/check-schema.ts",
