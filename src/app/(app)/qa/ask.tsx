@@ -19,7 +19,7 @@ function QuestionForm({ editId, initial }: { editId: string; initial: Draft }) {
   const [topic, setTopic] = useState(initial.topic);
   const [title, setTitle] = useState(initial.title);
   const [body, setBody] = useState(initial.body);
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState(true);
   const valid = !!topic && title.trim().length >= 8 && body.trim().length >= 20;
   const mutation = editId ? update : ask;
   const submit = () => {

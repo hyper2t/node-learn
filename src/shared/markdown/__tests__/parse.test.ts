@@ -116,6 +116,13 @@ describe('math (opt-in)', () => {
     expect(m('`$x$`')).toEqual([{ type: 'paragraph', children: [{ type: 'code', text: '$x$' }] }]);
   });
 
+  it('accepts spaced $ x^2 $ and full-width ＄ when the content looks like TeX', () => {
+    expect(m('$ x^2 $')).toEqual([{ type: 'paragraph', children: [{ type: 'math', tex: 'x^2', display: false }] }]);
+    expect(m('＄\\frac{1}{2}＄')).toEqual([{ type: 'paragraph', children: [{ type: 'math', tex: '\\frac{1}{2}', display: false }] }]);
+    expect(m('价格 $5 和 $10')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: '价格 $5 和 $10' }] }]);
+    expect(m('from $ 5 to $ 10')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: 'from $ 5 to $ 10' }] }]);
+  });
+
   it('splitInlineMath handles titles', () => {
     expect(splitInlineMath('Why is $e^{i\\pi}=-1$ \\$5?')).toEqual([
       { type: 'text', text: 'Why is ' }, { type: 'math', tex: 'e^{i\\pi}=-1', display: false }, { type: 'text', text: ' $5?' },

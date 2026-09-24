@@ -39,6 +39,10 @@ type BlockState = Parameters<Parameters<typeof md.block.ruler.before>[2]>[0];
 
 const DOLLAR = 0x24;
 const BACKSLASH = 0x5c;
+/** Characters that only really occur in formulas: commands, sub/superscripts, groups, relations. */
+const TEXISH = /[\\\\^_{}=<>]/;
+/** Chinese/Japanese IMEs type a full-width dollar sign for Shift+4. */
+export const normalizeMathDelimiters = (s: string) => s.replace(/\uFF04/g, '$');
 const isSpace = (c: string | undefined) => c === undefined || /\s/.test(c);
 
 /**
@@ -63,13 +67,15 @@ export function matchInlineMath(src: string, pos: number): { tex: string; displa
   if (src.startsWith('\\[', pos)) return pair('\\[', '\\]', true);
   if (src[pos] !== '$') return null;
   if (src[pos + 1] === '$') return pair('$$', '$$', true);
-  if (isSpace(src[pos + 1])) return null;
   let i = pos + 1;
   while ((i = src.indexOf('$', i)) !== -1) {
     if (src[i - 1] === '\\') { i++; continue; }
-    if (!isSpace(src[i - 1]) && !/[0-9]/.test(src[i + 1] ?? '')) {
-      return { tex: src.slice(pos + 1, i), display: false, end: i + 1 };
-    }
+    const tex = src.slice(pos + 1, i);
+    if (tex.includes('\n\n')) return null;
+    // Strict (pandoc) form: "$x$". Relaxed form "$ x^2 $" is accepted only when the content
+    // clearly looks like TeX, so prices such as "$5 and $10" stay plain text.
+    const strict = !isSpace(src[pos + 1]) && !isSpace(src[i - 1]) && !/[0-9]/.test(src[i + 1] ?? '');
+    if (tex.trim() && (strict || TEXISH.test(tex))) return { tex: tex.trim(), display: false, end: i + 1 };
     i++;
   }
   return null;
@@ -138,7 +144,8 @@ mdMath.inline.ruler.before('escape', 'math_inline', mathInlineRule);
 mdMath.block.ruler.before('fence', 'math_block', mathBlockRule, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
 
 /** Splits a single-line string (e.g. a title) into text and inline-math runs; no other markdown. */
-export function splitInlineMath(text: string): Inline[] {
+export function splitInlineMath(input: string): Inline[] {
+  const text = normalizeMathDelimiters(input);
   const out: Inline[] = [];
   let buf = '';
   for (let i = 0; i < text.length; ) {
@@ -247,7 +254,7 @@ export function plainText(nodes: Inline[]): string {
 export type ParseOptions = { math?: boolean };
 
 export function parseMarkdown(source: string, options: ParseOptions = {}): ParsedMarkdown {
-  const tokens = (options.math ? mdMath : md).parse(source, {});
+  const tokens = options.math ? mdMath.parse(normalizeMathDelimiters(source), {}) : md.parse(source, {});
   const headings: HeadingBlock[] = [];
   const used = new Map<string, number>();
   const uniqueId = (base: string): string => {
