@@ -193,6 +193,30 @@ export type UpdateGoalInput = Partial<{ title: string; description: string; stat
 export type CreateTaskInput = { title: string; instructions?: string; goalId?: string | null; dueAt?: string | null };
 export type UpdateTaskInput = Partial<{ title: string; instructions: string; status: TaskStatus; dueAt: string | null }>;
 
+/** End-of-relation snapshot (L4.2). Frozen when the relation ends; only the teacher's closing note changes later. */
+export type RelationSummary = {
+  relationId: string;
+  student: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
+  teacher: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
+  startedAt: string;
+  endedAt: string;
+  weeks: number;
+  endedBy: string | null;
+  endReason: string | null;
+  goals: {
+    achieved: { id: string; title: string; achievedAt: string }[];
+    dropped: { id: string; title: string }[];
+    open: { id: string; title: string }[];
+  };
+  counts: { tasksDone: number; evidenceSubmitted: number; feedbackReceived: number; revisions: number };
+  milestones: { id: string; title: string; reachedAt: string; evidenceId: string | null }[];
+  closingNote: string | null;
+  closingNoteAt: string | null;
+  /** The teacher may write or edit the note until this time (14 days after the end). */
+  closingNoteEditableUntil: string;
+  generatedAt: string;
+};
+
 /** Teacher's cross-relation to-do list (L4.1). Oldest first. */
 export type ReviewQueueItem = {
   kind: 'evidence' | 'goal';
@@ -379,6 +403,7 @@ export type NotificationType =
   | 'evidence.revised'
   | 'task.due_soon'
   | 'task.overdue'
+  | 'relation.closing_note'
   | 'connection.received'
   | 'connection.accepted'
   | 'qa.answered'

@@ -5,6 +5,7 @@ import { idempotencyKeyOf, readJsonBody, readQuery } from '../lib/body';
 import { currentUser } from '../middleware/auth';
 import * as S from '../schemas';
 import { withIdempotency } from '../services/idempotency';
+import { getSummary, setClosingNote } from '../services/summary';
 import { createGoal, createTask, declineGoalCompletion, requestGoalCompletion, getRelation, getWorkspace, listRelations, requireRelationMember, updateGoal, updateRelationStatus, updateTask } from '../services/learning';
 import { addFeedback, getEvidence, listEvidence, recomputeProof, reviseEvidence, submitEvidence } from '../services/proof';
 
@@ -19,6 +20,12 @@ relationRoutes.get('/:id/workspace', async (c) => ok(c.get('requestId'), await g
 relationRoutes.post('/:id/status', async (c) => {
   const body = await readJsonBody(c, S.relationStatus);
   return ok(c.get('requestId'), await updateRelationStatus(c.req.param('id'), currentUser(c).$id, body, c.get('requestId')));
+});
+
+relationRoutes.get('/:id/summary', async (c) => ok(c.get('requestId'), await getSummary(c.req.param('id'), currentUser(c).$id)));
+relationRoutes.put('/:id/summary/closing-note', async (c) => {
+  const body = await readJsonBody(c, S.closingNote);
+  return ok(c.get('requestId'), await setClosingNote(c.req.param('id'), currentUser(c).$id, body.note, c.get('requestId')));
 });
 
 relationRoutes.post('/:id/goals', async (c) => {

@@ -29,6 +29,10 @@ export type EvidenceItemRow = Stamped & {
   attachmentFileIds: string[] | null; status: string; version: number; submittedAt: string; reviewedAt: string | null;
 };
 export type FeedbackEntryRow = Stamped & { evidenceId: string; relationId: string; authorId: string; body: string | null; nextStep: string | null; outcome?: string | null };
+export type RelationSummaryRow = Stamped & {
+  relationId: string; studentId: string; teacherId: string; startedAt: string; endedAt: string; endedBy: string | null; endReason: string | null;
+  goalsJson: string; countsJson: string; milestonesJson: string; closingNote: string | null; closingNoteAt: string | null;
+};
 export type EvidenceRevisionRow = Stamped & { evidenceId: string; relationId: string; authorId: string; version: number; title: string; body: string | null; attachmentFileIds: string[] | null };
 export type ProofRecordRow = Stamped & {
   relationId: string; currentFocus: string | null; milestonesJson: string | null; tasksDone: number; evidenceSubmitted: number;

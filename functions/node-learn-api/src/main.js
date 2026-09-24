@@ -35881,7 +35881,8 @@ var init_schema = __esm({
       notifications: "notifications",
       qaQuestions: "qa_questions",
       qaAnswers: "qa_answers",
-      evidenceRevisions: "evidence_revisions"
+      evidenceRevisions: "evidence_revisions",
+      relationSummaries: "relation_summaries"
     };
   }
 });
@@ -36984,6 +36985,141 @@ var init_proof = __esm({
   }
 });
 
+// src/services/summary.ts
+var summary_exports = {};
+__export(summary_exports, {
+  CLOSING_NOTE_WINDOW_MS: () => CLOSING_NOTE_WINDOW_MS,
+  buildSnapshot: () => buildSnapshot,
+  ensureSummary: () => ensureSummary,
+  ensureSummaryQuietly: () => ensureSummaryQuietly,
+  getSummary: () => getSummary,
+  setClosingNote: () => setClosingNote
+});
+function buildSnapshot(goals, tasks, evidence, feedbackCount) {
+  const byCreated = [...goals].sort((a, b) => a.createdAt < b.createdAt ? -1 : 1);
+  const achieved = byCreated.filter((g) => g.status === "achieved").sort((a, b) => a.updatedAt < b.updatedAt ? -1 : 1);
+  return {
+    goals: {
+      achieved: achieved.map((g) => ({ id: g.$id, title: g.title, achievedAt: g.updatedAt })),
+      dropped: byCreated.filter((g) => g.status === "dropped").map((g) => ({ id: g.$id, title: g.title })),
+      open: byCreated.filter((g) => g.status === "active").map((g) => ({ id: g.$id, title: g.title }))
+    },
+    counts: {
+      tasksDone: tasks.filter((t) => t.status === "done").length,
+      evidenceSubmitted: evidence.length,
+      feedbackReceived: feedbackCount,
+      revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0)
+    },
+    milestones: achieved.map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }))
+  };
+}
+async function ensureSummary(rel) {
+  const existing = await getRow(TABLES.relationSummaries, rel.$id);
+  if (existing) return existing;
+  if (rel.status !== "ended") throw conflict("invalid_state", "The summary is available once the learning relation has ended.", { reason: "relation_not_ended" });
+  const [goals, tasks, evidence, feedback] = await Promise.all([
+    listRows(TABLES.learningGoals, [Query.equal("relationId", rel.$id), Query.limit(200)]),
+    listRows(TABLES.learningTasks, [Query.equal("relationId", rel.$id), Query.limit(500)]),
+    listRows(TABLES.evidenceItems, [Query.equal("relationId", rel.$id), Query.limit(500)]),
+    listRows(TABLES.feedbackEntries, [Query.equal("relationId", rel.$id), Query.limit(1e3)])
+  ]);
+  const snap = buildSnapshot(goals, tasks, evidence, feedback.length);
+  const data = {
+    relationId: rel.$id,
+    studentId: rel.studentId,
+    teacherId: rel.teacherId,
+    startedAt: rel.startedAt,
+    endedAt: rel.endedAt ?? rel.updatedAt,
+    endedBy: rel.endedBy ?? null,
+    endReason: rel.endReason ?? null,
+    goalsJson: JSON.stringify(snap.goals),
+    countsJson: JSON.stringify(snap.counts),
+    milestonesJson: JSON.stringify(snap.milestones),
+    closingNote: null,
+    closingNoteAt: null
+  };
+  try {
+    return await createRow(TABLES.relationSummaries, data, rel.$id);
+  } catch (err) {
+    if (!isConflict(err)) throw err;
+    return await getRow(TABLES.relationSummaries, rel.$id);
+  }
+}
+async function ensureSummaryQuietly(relationId) {
+  try {
+    const rel = await getRow(TABLES.learningRelations, relationId);
+    if (rel) await ensureSummary(rel);
+  } catch (err) {
+    log("warn", "summary_generation_failed", { relationId, message: err instanceof Error ? err.message : String(err) });
+  }
+}
+async function toSummary(row) {
+  const refs = await personRefs([row.studentId, row.teacherId]);
+  return {
+    relationId: row.relationId,
+    student: refs.get(row.studentId),
+    teacher: refs.get(row.teacherId),
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    weeks: Math.max(1, Math.round((Date.parse(row.endedAt) - Date.parse(row.startedAt)) / WEEK_MS)),
+    endedBy: row.endedBy,
+    endReason: row.endReason,
+    goals: parse(row.goalsJson, { achieved: [], dropped: [], open: [] }),
+    counts: parse(row.countsJson, { tasksDone: 0, evidenceSubmitted: 0, feedbackReceived: 0, revisions: 0 }),
+    milestones: parse(row.milestonesJson, []),
+    closingNote: row.closingNote || null,
+    closingNoteAt: row.closingNoteAt,
+    closingNoteEditableUntil: new Date(Date.parse(row.endedAt) + CLOSING_NOTE_WINDOW_MS).toISOString(),
+    generatedAt: row.createdAt
+  };
+}
+async function getSummary(relationId, userId) {
+  const rel = await requireRelationMember(relationId, userId);
+  return toSummary(await ensureSummary(rel));
+}
+async function setClosingNote(relationId, userId, note, requestId2, now = /* @__PURE__ */ new Date()) {
+  const rel = await requireRelationMember(relationId, userId);
+  if (rel.teacherId !== userId) throw forbidden("Only the teacher writes the closing note.");
+  const row = await ensureSummary(rel);
+  if (now.getTime() > Date.parse(row.endedAt) + CLOSING_NOTE_WINDOW_MS) throw conflict("invalid_state", "The closing note can only be written within 14 days after the relation ended.", { reason: "closing_note_window_passed" });
+  const first = !row.closingNote;
+  const updated = await updateRow(TABLES.relationSummaries, row.$id, { closingNote: note || null, closingNoteAt: note ? now.toISOString() : null });
+  if (note) {
+    await emitEvent({ eventType: "relation.closing_note", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { first }, requestId: requestId2 });
+    if (first) {
+      await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text: "Your teacher wrote a closing note in the learning summary." }, requestId: requestId2 });
+      await notify({ userId: rel.studentId, type: "relation.closing_note", title: "Your teacher left a closing note", body: note.slice(0, 140), href: `/relations/${relationId}/summary`, refType: "learning_relation", refId: relationId, actorId: userId, dedupeKey: `relation.closing_note:${relationId}` });
+    }
+  }
+  return toSummary(updated);
+}
+var CLOSING_NOTE_WINDOW_MS, WEEK_MS, parse;
+var init_summary = __esm({
+  "src/services/summary.ts"() {
+    "use strict";
+    init_dist();
+    init_repo();
+    init_rows();
+    init_schema();
+    init_errors2();
+    init_log();
+    init_events();
+    init_learning2();
+    init_messaging3();
+    init_notifications2();
+    init_profiles();
+    CLOSING_NOTE_WINDOW_MS = 14 * 24 * 36e5;
+    WEEK_MS = 7 * 24 * 36e5;
+    parse = (raw2, fallback) => {
+      try {
+        return raw2 ? JSON.parse(raw2) : fallback;
+      } catch {
+        return fallback;
+      }
+    };
+  }
+});
+
 // src/services/learning.ts
 var learning_exports = {};
 __export(learning_exports, {
@@ -37109,6 +37245,10 @@ async function updateRelationStatus(relationId, userId, input, requestId2) {
     actorId: userId,
     dedupeKey: `relation.${kind}:${relationId}:${rel.version + 1}`
   });
+  if (to === "ended") {
+    const { ensureSummaryQuietly: ensureSummaryQuietly2 } = await Promise.resolve().then(() => (init_summary(), summary_exports));
+    await ensureSummaryQuietly2(relationId);
+  }
   await emitEvent({ eventType: `relation.${to === "active" ? "resumed" : to}`, aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { from, reason: to === "ended" ? reason : void 0 }, requestId: requestId2 });
   return getRelation(relationId, userId);
 }
@@ -40046,6 +40186,7 @@ var updateTask = external_exports.object({ title: trimmed(120).optional(), instr
 var createEvidence = external_exports.object({ title: trimmed(120), body: external_exports.string().trim().max(8e3), taskId: external_exports.string().max(36).nullable().optional(), goalId: external_exports.string().max(36).nullable().optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict();
 var createFeedback = external_exports.object({ body: trimmed(4e3), nextStep: external_exports.string().trim().max(300).optional(), markTaskDone: external_exports.boolean().optional(), outcome: external_exports.enum(["approved", "needs_revision"]).optional() }).strict();
 var reviseEvidence = external_exports.object({ title: trimmed(120).optional(), body: external_exports.string().trim().max(8e3).optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict().refine((v) => v.title !== void 0 || v.body !== void 0 || v.attachmentFileIds !== void 0, { message: "Change at least one field." });
+var closingNote = external_exports.object({ note: external_exports.string().trim().max(1e3) }).strict();
 var declineGoalCompletion = external_exports.object({ note: external_exports.string().trim().max(300).optional() }).strict();
 var paged = external_exports.object({ cursor, limit });
 var sendMessage = external_exports.object({ clientMessageId: trimmed(64), text: trimmed(4e3) }).strict();
@@ -40727,7 +40868,7 @@ async function unlinkIdentity(user, identityId) {
 }
 async function exportData(userId) {
   const by = (table, col) => listRows(table, [Query.equal(col, userId), Query.limit(500)]);
-  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions] = await Promise.all([
+  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions, summariesS, summariesT] = await Promise.all([
     getRow(TABLES.profiles, userId),
     by(TABLES.roleMemberships, "userId"),
     by(TABLES.studentProfiles, "userId"),
@@ -40740,10 +40881,12 @@ async function exportData(userId) {
     by(TABLES.feedbackEntries, "authorId"),
     by(TABLES.contacts, "userId"),
     by(TABLES.blocks, "blockerId"),
-    by(TABLES.evidenceRevisions, "authorId")
+    by(TABLES.evidenceRevisions, "authorId"),
+    by(TABLES.relationSummaries, "studentId"),
+    by(TABLES.relationSummaries, "teacherId")
   ]);
   const messages = await by(TABLES.messages, "senderId");
-  return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, feedback, messagesSent: messages, contacts, blocks };
+  return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, learningSummaries: [...summariesS, ...summariesT], feedback, messagesSent: messages, contacts, blocks };
 }
 async function deleteAvatarFile(fileId) {
   if (!fileId) return;
@@ -40857,6 +41000,7 @@ qaWriteRoutes.post("/answers/:id/report", async (c) => ok(rid(c), await reportCo
 
 // src/routes/relations.ts
 init_errors2();
+init_summary();
 init_learning2();
 init_proof();
 var relationRoutes = new Hono2();
@@ -40869,6 +41013,11 @@ relationRoutes.get("/:id/workspace", async (c) => ok(c.get("requestId"), await g
 relationRoutes.post("/:id/status", async (c) => {
   const body2 = await readJsonBody(c, relationStatus);
   return ok(c.get("requestId"), await updateRelationStatus(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
+});
+relationRoutes.get("/:id/summary", async (c) => ok(c.get("requestId"), await getSummary(c.req.param("id"), currentUser(c).$id)));
+relationRoutes.put("/:id/summary/closing-note", async (c) => {
+  const body2 = await readJsonBody(c, closingNote);
+  return ok(c.get("requestId"), await setClosingNote(c.req.param("id"), currentUser(c).$id, body2.note, c.get("requestId")));
 });
 relationRoutes.post("/:id/goals", async (c) => {
   const user = currentUser(c);

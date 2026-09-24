@@ -30524,7 +30524,8 @@ var TABLES = {
   notifications: "notifications",
   qaQuestions: "qa_questions",
   qaAnswers: "qa_answers",
-  evidenceRevisions: "evidence_revisions"
+  evidenceRevisions: "evidence_revisions",
+  relationSummaries: "relation_summaries"
 };
 
 // src/services/retention.ts

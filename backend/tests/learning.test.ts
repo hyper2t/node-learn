@@ -369,3 +369,59 @@ describe('L4.1 review queue', () => {
     await expect(reviewQueue({ user: { $id: T }, roles: ['teacher'] })).resolves.toEqual({ items: [], counts: { evidence: 0, goals: 0 } });
   });
 });
+
+describe('L4.2 relation summary', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  async function endedRelationWithWork() {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const P = await import('../src/services/proof');
+    const g1 = await L.createGoal(rel as never, T, { title: 'Fractions' });
+    await L.createGoal(rel as never, T, { title: 'Decimals' });
+    const task = await L.createTask('rel1', T, { title: 'Worksheet', goalId: g1.id });
+    const ev = await P.submitEvidence(rel as never, S, { title: 'Done', body: 'x', taskId: task.id, goalId: g1.id });
+    await P.addFeedback(rel as never, ev.id, T, { body: 'Good', markTaskDone: true });
+    await L.updateGoal('rel1', g1.id, T, { status: 'achieved' });
+    await L.updateRelationStatus('rel1', S, { status: 'ended', reason: 'Exam passed' });
+    return { g1, ev };
+  }
+
+  it('is frozen when the relation ends and readable by both members', async () => {
+    const { g1, ev } = await endedRelationWithWork();
+    const { TABLES } = await import('../src/db/schema');
+    expect(db.tables.get(TABLES.relationSummaries)?.has('rel1')).toBe(true);
+    const { getSummary } = await import('../src/services/summary');
+    const s = await getSummary('rel1', S);
+    expect(s).toMatchObject({ relationId: 'rel1', endedBy: S, endReason: 'Exam passed', counts: { tasksDone: 1, evidenceSubmitted: 1, feedbackReceived: 1, revisions: 0 }, closingNote: null });
+    expect(s.goals.achieved).toEqual([expect.objectContaining({ id: g1.id, title: 'Fractions' })]);
+    expect(s.goals.open.map((g) => g.title)).toEqual(['Decimals']);
+    expect(s.milestones[0]).toMatchObject({ id: g1.id, evidenceId: ev.id });
+    await expect(getSummary('rel1', T)).resolves.toMatchObject({ relationId: 'rel1' });
+    expect(await errorOf(getSummary('rel1', 'stranger'))).toMatchObject({ status: 403 });
+  });
+
+  it('is not available while the relation is active, and is generated lazily for old ended relations', async () => {
+    await seedRelation();
+    const { getSummary } = await import('../src/services/summary');
+    expect(await errorOf(getSummary('rel1', S))).toMatchObject({ status: 409, details: { reason: 'relation_not_ended' } });
+    const { updateRow } = await import('../src/db/repo');
+    const { TABLES } = await import('../src/db/schema');
+    await updateRow(TABLES.learningRelations, 'rel1', { status: 'ended', endedAt: '2026-01-01T00:00:00.000Z' });
+    await expect(getSummary('rel1', S)).resolves.toMatchObject({ endedAt: '2026-01-01T00:00:00.000Z', goals: { achieved: [] } });
+  });
+
+  it('closing note: teacher only, within 14 days, notifies the learner once', async () => {
+    await endedRelationWithWork();
+    const { setClosingNote, getSummary } = await import('../src/services/summary');
+    const endedAt = Date.parse((await getSummary('rel1', T)).endedAt);
+    expect(await errorOf(setClosingNote('rel1', S, 'hi'))).toMatchObject({ status: 403 });
+    db.notes = [];
+    await setClosingNote('rel1', T, 'Great work', undefined, new Date(endedAt + 3_600_000));
+    const edited = await setClosingNote('rel1', T, 'Great work, keep going', undefined, new Date(endedAt + 2 * 3_600_000));
+    expect(edited.closingNote).toBe('Great work, keep going');
+    expect(db.notes.map((n) => [n.userId, n.type])).toEqual([[S, 'relation.closing_note']]);
+    const late = new Date(endedAt + 15 * 24 * 3_600_000);
+    expect(await errorOf(setClosingNote('rel1', T, 'too late', undefined, late))).toMatchObject({ status: 409, details: { reason: 'closing_note_window_passed' } });
+  });
+});

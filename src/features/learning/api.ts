@@ -3,7 +3,7 @@ import { api, newIdempotencyKey } from '@/infrastructure/api';
 import { qk } from '@/state/query-keys';
 import type {
   CreateEvidenceInput, CreateFeedbackInput, CreateGoalInput, CreateTaskInput, EvidenceItem, Feedback, LearningGoal, LearningRelation, LearningTask, Page,
-  ProofRecord, RelationStatus, ReviewQueue, RelationWorkspace, ReviseEvidenceInput, Role, UpdateGoalInput, UpdateTaskInput,
+  ProofRecord, RelationStatus, RelationSummary, ReviewQueue, RelationWorkspace, ReviseEvidenceInput, Role, UpdateGoalInput, UpdateTaskInput,
 } from '@/types/api';
 
 const idem = () => ({ idempotencyKey: newIdempotencyKey() });
@@ -23,6 +23,8 @@ export const learningApi = {
   reviseEvidence: (id: string, evidenceId: string, input: ReviseEvidenceInput) => api.patch<EvidenceItem>(`/v1/relations/${id}/evidence/${evidenceId}`, input),
   requestGoalCompletion: (id: string, goalId: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/request-completion`, {}, idem()),
   declineGoalCompletion: (id: string, goalId: string, note?: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/decline-completion`, note ? { note } : {}, idem()),
+  summary: (id: string) => api.get<RelationSummary>(`/v1/relations/${id}/summary`),
+  setClosingNote: (id: string, note: string) => api.put<RelationSummary>(`/v1/relations/${id}/summary/closing-note`, { note }),
   reviewQueue: () => api.get<ReviewQueue>('/v1/review-queue'),
   proof: (id: string) => api.get<ProofRecord>(`/v1/relations/${id}/proof`),
 };
@@ -63,3 +65,10 @@ export function useCreateFeedback(id: string) { const inv = useRelationInvalidat
 export function useReviseEvidence(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { evidenceId: string; input: ReviseEvidenceInput }) => learningApi.reviseEvidence(id, p.evidenceId, p.input), onSuccess: inv }); }
 export function useRequestGoalCompletion(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (goalId: string) => learningApi.requestGoalCompletion(id, goalId), onSuccess: inv }); }
 export function useDeclineGoalCompletion(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { goalId: string; note?: string }) => learningApi.declineGoalCompletion(id, p.goalId, p.note), onSuccess: inv }); }
+export function useRelationSummary(id: string, enabled = true) {
+  return useQuery({ queryKey: qk.relations.summary(id), queryFn: () => learningApi.summary(id), enabled: enabled && !!id });
+}
+export function useSetClosingNote(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (note: string) => learningApi.setClosingNote(id, note), onSuccess: (data) => { qc.setQueryData(qk.relations.summary(id), data); } });
+}

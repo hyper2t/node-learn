@@ -152,6 +152,7 @@ export default function RelationWorkspace() {
         <Card className="my-4 gap-1">
           <Text variant="body-strong">{t('relation.endedBanner', { name: relation.endedBy === relation.teacherId ? relation.teacher.displayName : relation.student.displayName, date: relation.endedAt ? fmt.date(relation.endedAt) : '' })}</Text>
           {relation.endReason ? <Text variant="small" tone="secondary">{relation.endReason}</Text> : null}
+          <Button size="sm" className="mt-2 self-start" title={t('summary.view')} onPress={() => router.push(`/(app)/relations/${id}/summary`)} />
         </Card>
       ) : null}
       {relation.status === 'paused' ? <Text variant="small" tone="secondary" className="mt-4">{t('relation.pausedHint')}</Text> : null}

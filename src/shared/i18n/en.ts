@@ -104,6 +104,13 @@ export const en = {
     sending: 'Sending…', failed: 'Not sent. Tap to retry.', queued: 'Waiting for connection', system: 'System', goalCreated: 'New goal: {title}', taskAssigned: 'Task assigned: {title}',
     evidenceSubmitted: 'Evidence submitted: {title}', feedbackAdded: 'Feedback added', milestone: 'Milestone reached: {title}', open: 'Open',
   },
+  summary: {
+    title: 'Learning summary', view: 'View learning summary', period: '{from} – {to} · {weeks} weeks', achieved: 'Goals achieved', dropped: 'Dropped goals', open: 'Not finished',
+    numbers: 'In numbers', tasksDone: 'Tasks done', evidence: 'Evidence submitted', feedback: 'Feedback received', revisions: 'Revisions', milestones: 'Milestones',
+    closingNote: 'Closing note from your teacher', closingNoteTeacher: 'Your closing note', closingNoteHint: 'A few words for your learner. They are notified the first time you save. Editable until {date}.',
+    noClosingNote: 'No closing note.', endReason: 'Why it ended', none: 'None', copy: 'Copy as text', copied: 'Copied', print: 'Print / save as PDF', share: 'Share as text',
+    openEvidence: 'Evidence',
+  },
   review: {
     title: 'To review', empty: 'Nothing waiting on you.', emptyBody: 'Evidence to review and goals to confirm from all your learners show up here.',
     summary: '{e} evidence to review · {g} goals to confirm', open: 'Open', evidence: 'Evidence', goal: 'Confirm goal', resubmitted: 'Version {n}',

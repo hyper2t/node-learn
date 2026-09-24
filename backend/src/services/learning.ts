@@ -137,6 +137,11 @@ export async function updateRelationStatus(relationId: string, userId: string, i
     userId: other, type: `relation.${kind}`, title: titles[kind], body: to === 'ended' ? reason.slice(0, 300) : '',
     href: `/relations/${relationId}`, refType: 'learning_relation', refId: relationId, actorId: userId, dedupeKey: `relation.${kind}:${relationId}:${rel.version + 1}`,
   });
+  if (to === 'ended') {
+    // Freeze the learning summary now; getSummary regenerates lazily if this fails.
+    const { ensureSummaryQuietly } = await import('./summary');
+    await ensureSummaryQuietly(relationId);
+  }
   await emitEvent({ eventType: `relation.${to === 'active' ? 'resumed' : to}`, aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { from, reason: to === 'ended' ? reason : undefined }, requestId });
   return getRelation(relationId, userId);
 }
