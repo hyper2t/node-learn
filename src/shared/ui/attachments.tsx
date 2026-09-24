@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import { pickDocuments, pickImage, uploadFile, UploadError, UPLOAD_LIMITS, type PickedFile, type UploadedFile } from '@/infrastructure/uploads';
 import { useBreakpoint } from '@/shared/hooks/use-breakpoint';
@@ -37,7 +37,8 @@ type UploadsOptions = { purpose: UploadPurpose; relationId?: string; max: number
 
 /** Pick → upload → progress/failed bookkeeping shared by every attachment UI. */
 function useAttachmentUploads({ purpose, relationId, max, value, onChange }: UploadsOptions) {
-  const [busy, setBusy] = useState(false);
+  // Which picker is open, so only the pressed button shows it (not both at once).
+  const [picking, setPicking] = useState<'image' | 'file' | null>(null);
   const latest = { current: value };
 
   const update = (key: string, patch: Partial<PendingAttachment>) => {
@@ -61,11 +62,12 @@ function useAttachmentUploads({ purpose, relationId, max, value, onChange }: Upl
     await Promise.all(items.map(run));
   };
   const add = async (kind: 'image' | 'file') => {
-    setBusy(true);
+    if (picking) return;
+    setPicking(kind);
     try {
       const picked = kind === 'image' ? [await pickImage()].filter((f): f is PickedFile => !!f) : await pickDocuments(max - value.length);
       await start(picked);
-    } finally { setBusy(false); }
+    } finally { setPicking(null); }
   };
   const retry = (key: string) => {
     const it = latest.current.find((a) => a.key === key);
@@ -74,14 +76,14 @@ function useAttachmentUploads({ purpose, relationId, max, value, onChange }: Upl
     void run(it);
   };
   const remove = (key: string) => onChange(value.filter((a) => a.key !== key));
-  return { busy, add, retry, remove, full: value.length >= max };
+  return { picking, add, retry, remove, full: value.length >= max };
 }
 
 /** Pick + upload files for a purpose (evidence form layout: list rows with progress). */
 export function AttachmentPicker({ purpose = 'evidence', relationId, max = 5, value, onChange }: {
   purpose?: UploadPurpose; relationId?: string; max?: number; value: PendingAttachment[]; onChange: (next: PendingAttachment[]) => void;
 }) {
-  const { busy, add, remove, full } = useAttachmentUploads({ purpose, relationId, max, value, onChange });
+  const { picking, add, remove, full } = useAttachmentUploads({ purpose, relationId, max, value, onChange });
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between">
@@ -105,8 +107,9 @@ export function AttachmentPicker({ purpose = 'evidence', relationId, max = 5, va
       </View>
       {!full ? (
         <View className="flex-row gap-2">
-          <Button size="sm" variant="secondary" title={t('relation.addImage')} disabled={busy} onPress={() => add('image')} />
-          <Button size="sm" variant="secondary" title={t('relation.addAttachment')} disabled={busy} onPress={() => add('file')} />
+          {/* Only the pressed button shows progress; add() ignores presses while a picker is open. */}
+          <Button size="sm" variant="secondary" title={t('relation.addImage')} loading={picking === 'image'} onPress={() => add('image')} />
+          <Button size="sm" variant="secondary" title={t('relation.addAttachment')} loading={picking === 'file'} onPress={() => add('file')} />
         </View>
       ) : null}
       <Text variant="caption" tone="tertiary">{t('relation.attachmentHint')}</Text>
@@ -114,20 +117,26 @@ export function AttachmentPicker({ purpose = 'evidence', relationId, max = 5, va
   );
 }
 
-function BarButton({ icon, label, iconOnly, disabled, onPress }: { icon: IconName; label: string; iconOnly: boolean; disabled: boolean; onPress: () => void }) {
+/**
+ * `loading`: this button's picker is open (spinner, stays solid). `blocked`: the other picker is
+ * open — ignore presses without dimming. `disabled`: attachment limit reached (dimmed).
+ */
+function BarButton({ icon, label, iconOnly, disabled, loading, blocked, onPress }: {
+  icon: IconName; label: string; iconOnly: boolean; disabled: boolean; loading: boolean; blocked: boolean; onPress: () => void;
+}) {
   const colors = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading || blocked}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: disabled || blocked, busy: loading }}
       {...(Platform.OS === 'web' ? ({ title: label } as object) : null)}
       hitSlop={4}
       className={cn('min-h-[44px] min-w-[44px] flex-row items-center justify-center gap-1.5 rounded-md border border-border bg-surface active:bg-element', iconOnly ? 'px-2.5' : 'px-3', disabled && 'opacity-50')}
     >
-      <Icon name={icon} size={18} color={colors.foregroundSecondary} />
+      {loading ? <ActivityIndicator size="small" color={colors.primary} style={{ width: 18, height: 18 }} /> : <Icon name={icon} size={18} color={colors.foregroundSecondary} />}
       {!iconOnly ? <Text variant="small-strong" tone="secondary">{label}</Text> : null}
     </Pressable>
   );
@@ -195,14 +204,16 @@ export function AttachmentBar({ purpose, relationId, max = 5, value, onChange, c
 }) {
   const bp = useBreakpoint();
   const phone = bp === 'phone';
-  const { busy, add, retry, remove, full } = useAttachmentUploads({ purpose, relationId, max, value, onChange });
+  const { picking, add, retry, remove, full } = useAttachmentUploads({ purpose, relationId, max, value, onChange });
   const iconOnly = compact;
   const tiles = value.map((a) => <Tile key={a.key} a={a} compact={compact || phone} onRemove={() => remove(a.key)} onRetry={() => retry(a.key)} />);
   return (
     <View className="gap-2">
       <View className="flex-row flex-wrap items-center gap-2">
-        <BarButton icon="image" label={t('attachments.addImage')} iconOnly={iconOnly} disabled={busy || full} onPress={() => { void add('image'); }} />
-        <BarButton icon="paperclip" label={t('attachments.addFile')} iconOnly={iconOnly} disabled={busy || full} onPress={() => { void add('file'); }} />
+        <BarButton icon="image" label={t('attachments.addImage')} iconOnly={iconOnly} disabled={full}
+          loading={picking === 'image'} blocked={picking === 'file'} onPress={() => { void add('image'); }} />
+        <BarButton icon="paperclip" label={t('attachments.addFile')} iconOnly={iconOnly} disabled={full}
+          loading={picking === 'file'} blocked={picking === 'image'} onPress={() => { void add('file'); }} />
         <View className="min-w-0 flex-1 items-end">
           <Text variant="caption" tone="tertiary" numberOfLines={phone ? 1 : 2} className="text-right">
             {value.length}/{max}{!compact && !phone ? ` · ${UPLOAD_LIMITS[purpose].label}` : ''}
