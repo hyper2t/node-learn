@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMe, useStudentProfile } from '@/features/identity/api';
-import { useRelations, useWorkspace } from '@/features/learning/api';
+import { useRelations, useReviewQueue, useWorkspace } from '@/features/learning/api';
 import { useRequests } from '@/features/requests/api';
 import { useQaInbox } from '@/features/qa/api';
 import { ProofSummary, RelationCard, RequestCard } from '@/features/learning/components';
@@ -23,6 +23,7 @@ export default function HomeScreen() {
   const requests = useRequests(role, 'pending', !!me.data);
   const studentProfile = useStudentProfile(!!me.data && role === 'student');
   const qaInbox = useQaInbox(!!me.data && role === 'teacher');
+  const queue = useReviewQueue(!!me.data && role === 'teacher');
   const qaInboxCount = qaInbox.data?.pages.reduce((n, p) => n + p.items.length, 0) ?? 0;
   if (me.isLoading) return <Loading />;
   if (me.isError) return <ErrorState error={me.error} onRetry={() => me.refetch()} />;
@@ -37,6 +38,13 @@ export default function HomeScreen() {
       <TwoColumn
         asideFirst
         main={<View>
+      {isTeacher && queue.data?.items.length ? (
+        <Card className="mb-3 gap-1 border-primary">
+          <Text variant="body-strong">{t('review.title')}</Text>
+          <Text variant="small" tone="secondary">{t('review.summary', { e: queue.data.counts.evidence, g: queue.data.counts.goals })}</Text>
+          <Button size="sm" className="mt-1 self-start" title={t('review.open')} onPress={() => router.push('/(app)/review')} />
+        </Card>
+      ) : null}
       {relations.isError ? <ErrorState error={relations.error} onRetry={() => relations.refetch()} /> : null}
       {active.length === 0 && !relations.isLoading ? (
         <Empty title={isTeacher ? t('home.noStudents') : t('home.noRelation')} body={isTeacher ? t('home.noStudentsBody') : t('home.noRelationBody')}

@@ -331,3 +331,41 @@ describe('L3 task reminders', () => {
     expect(new Set(db.notes.map((n) => n.dedupeKey)).size).toBe(3);
   });
 });
+
+describe('L4.1 review queue', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  it('lists evidence to review and goals to confirm across active relations, oldest first', async () => {
+    const { createRow } = await import('../src/db/repo');
+    const { TABLES } = await import('../src/db/schema');
+    const rel = (id: string, studentId: string, teacherId: string, status: string) =>
+      createRow(TABLES.learningRelations, { studentId, teacherId, status, conversationId: 'c', version: 1, openTasks: 0, evidenceCount: 0 }, id);
+    await rel('rA', 'sA', T, 'active');
+    await rel('rB', 'sB', T, 'active');
+    await rel('rP', 'sP', T, 'paused');
+    await rel('rX', 'sX', 'otherTeacher', 'active');
+    const ev = (id: string, relationId: string, status: string, submittedAt: string, extra: Record<string, unknown> = {}) =>
+      createRow(TABLES.evidenceItems, { relationId, authorId: 's', title: id, status, version: 1, submittedAt, ...extra }, id);
+    await ev('e_new', 'rA', 'submitted', '2026-09-23T00:00:00.000Z');
+    await ev('e_old', 'rB', 'submitted', '2026-09-20T00:00:00.000Z');
+    await ev('e_rev', 'rA', 'revised', '2026-09-01T00:00:00.000Z', { version: 2, updatedAt: '2026-09-22T00:00:00.000Z' });
+    await ev('e_done', 'rA', 'reviewed', '2026-09-10T00:00:00.000Z');
+    await ev('e_wait', 'rA', 'needs_revision', '2026-09-10T00:00:00.000Z');
+    await ev('e_paused', 'rP', 'submitted', '2026-09-10T00:00:00.000Z');
+    await ev('e_other', 'rX', 'submitted', '2026-09-10T00:00:00.000Z');
+    await createRow(TABLES.learningGoals, { relationId: 'rB', title: 'g_req', status: 'active', completionRequestedAt: '2026-09-21T00:00:00.000Z' }, 'g1');
+    await createRow(TABLES.learningGoals, { relationId: 'rB', title: 'g_plain', status: 'active', completionRequestedAt: null }, 'g2');
+
+    const { reviewQueue } = await import('../src/services/review-queue');
+    const out = await reviewQueue({ user: { $id: T }, roles: ['teacher'] });
+    expect(out.items.map((i) => i.id)).toEqual(['e_old', 'g1', 'e_rev', 'e_new']);
+    expect(out.counts).toEqual({ evidence: 3, goals: 1 });
+    expect(out.items.find((i) => i.id === 'e_rev')).toMatchObject({ version: 2, since: '2026-09-22T00:00:00.000Z', student: { userId: 'sA' } });
+  });
+
+  it('is teacher-only and empty without active relations', async () => {
+    const { reviewQueue } = await import('../src/services/review-queue');
+    expect(await errorOf(reviewQueue({ user: { $id: S }, roles: ['student'] }))).toMatchObject({ status: 403, code: 'role_required' });
+    await expect(reviewQueue({ user: { $id: T }, roles: ['teacher'] })).resolves.toEqual({ items: [], counts: { evidence: 0, goals: 0 } });
+  });
+});

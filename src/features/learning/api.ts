@@ -3,7 +3,7 @@ import { api, newIdempotencyKey } from '@/infrastructure/api';
 import { qk } from '@/state/query-keys';
 import type {
   CreateEvidenceInput, CreateFeedbackInput, CreateGoalInput, CreateTaskInput, EvidenceItem, Feedback, LearningGoal, LearningRelation, LearningTask, Page,
-  ProofRecord, RelationStatus, RelationWorkspace, ReviseEvidenceInput, Role, UpdateGoalInput, UpdateTaskInput,
+  ProofRecord, RelationStatus, ReviewQueue, RelationWorkspace, ReviseEvidenceInput, Role, UpdateGoalInput, UpdateTaskInput,
 } from '@/types/api';
 
 const idem = () => ({ idempotencyKey: newIdempotencyKey() });
@@ -23,11 +23,16 @@ export const learningApi = {
   reviseEvidence: (id: string, evidenceId: string, input: ReviseEvidenceInput) => api.patch<EvidenceItem>(`/v1/relations/${id}/evidence/${evidenceId}`, input),
   requestGoalCompletion: (id: string, goalId: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/request-completion`, {}, idem()),
   declineGoalCompletion: (id: string, goalId: string, note?: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/decline-completion`, note ? { note } : {}, idem()),
+  reviewQueue: () => api.get<ReviewQueue>('/v1/review-queue'),
   proof: (id: string) => api.get<ProofRecord>(`/v1/relations/${id}/proof`),
 };
 
 export function useRelations(role: Role, status?: RelationStatus, enabled = true) {
   return useQuery({ queryKey: qk.relations.list(role, status), queryFn: () => learningApi.list(role, status), enabled });
+}
+/** Teacher-only. Refreshes every minute while mounted; mutations invalidate it through the ['relations'] root. */
+export function useReviewQueue(enabled = true) {
+  return useQuery({ queryKey: qk.relations.reviewQueue, queryFn: () => learningApi.reviewQueue(), enabled, refetchInterval: 60_000 });
 }
 export function useWorkspace(id: string) {
   return useQuery({ queryKey: qk.relations.workspace(id), queryFn: () => learningApi.workspace(id), enabled: !!id });

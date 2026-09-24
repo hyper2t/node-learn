@@ -18,6 +18,7 @@ import { meRoutes } from './routes/me';
 import { notificationRoutes } from './routes/notifications';
 import { qaReadRoutes, qaWriteRoutes } from './routes/qa';
 import { relationRoutes } from './routes/relations';
+import { reviewQueueRoutes } from './routes/review-queue';
 import { requestRoutes } from './routes/requests';
 import { teacherRoutes } from './routes/teachers';
 import { uploadRoutes } from './routes/uploads';
@@ -58,6 +59,7 @@ export function createApp(): Hono<AppEnv> {
   mount('/v1/teachers', teacherRoutes, authed);
   mount('/v1/requests', requestRoutes, social);
   mount('/v1/relations', relationRoutes, authed);
+  mount('/v1/review-queue', reviewQueueRoutes, authed);
   mount('/v1/conversations', conversationRoutes, authed);
   mount('/v1/connections', connectionRoutes, social);
   mount('/v1/uploads', uploadRoutes, authed);

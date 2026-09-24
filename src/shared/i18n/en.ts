@@ -104,6 +104,11 @@ export const en = {
     sending: 'Sending…', failed: 'Not sent. Tap to retry.', queued: 'Waiting for connection', system: 'System', goalCreated: 'New goal: {title}', taskAssigned: 'Task assigned: {title}',
     evidenceSubmitted: 'Evidence submitted: {title}', feedbackAdded: 'Feedback added', milestone: 'Milestone reached: {title}', open: 'Open',
   },
+  review: {
+    title: 'To review', empty: 'Nothing waiting on you.', emptyBody: 'Evidence to review and goals to confirm from all your learners show up here.',
+    summary: '{e} evidence to review · {g} goals to confirm', open: 'Open', evidence: 'Evidence', goal: 'Confirm goal', resubmitted: 'Version {n}',
+    waiting: 'waiting {time}', stale: 'Waiting over 3 days',
+  },
   notifications: {
     title: 'Notifications', all: 'All', unread: 'Unread', markAllRead: 'Mark all read', empty: 'You are all caught up.',
     emptyBody: 'Requests, tasks, evidence and feedback will show up here.',

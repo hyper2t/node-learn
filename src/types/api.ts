@@ -193,6 +193,21 @@ export type UpdateGoalInput = Partial<{ title: string; description: string; stat
 export type CreateTaskInput = { title: string; instructions?: string; goalId?: string | null; dueAt?: string | null };
 export type UpdateTaskInput = Partial<{ title: string; instructions: string; status: TaskStatus; dueAt: string | null }>;
 
+/** Teacher's cross-relation to-do list (L4.1). Oldest first. */
+export type ReviewQueueItem = {
+  kind: 'evidence' | 'goal';
+  /** Evidence id or goal id. */
+  id: string;
+  relationId: string;
+  student: { userId: string; displayName: string; handle: string | null; avatarFileId: string | null };
+  title: string;
+  /** When it started waiting: evidence submittedAt/updatedAt, or goal completionRequestedAt. */
+  since: string;
+  /** Evidence only: >1 means a resubmission. */
+  version: number | null;
+};
+export type ReviewQueue = { items: ReviewQueueItem[]; counts: { evidence: number; goals: number } };
+
 export type RelationWorkspace = {
   relation: LearningRelation;
   goals: LearningGoal[];

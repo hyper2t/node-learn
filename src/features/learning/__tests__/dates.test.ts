@@ -29,3 +29,12 @@ describe('isOverdue', () => {
     expect(isOverdue({ status: 'open', dueAt: null }, now.getTime())).toBe(false);
   });
 });
+
+describe('isStale', () => {
+  it('flags items waiting more than 3 days', async () => {
+    const { isStale } = await import('../dates');
+    const t0 = Date.parse('2026-09-24T12:00:00.000Z');
+    expect(isStale('2026-09-21T11:59:00.000Z', t0)).toBe(true);
+    expect(isStale('2026-09-21T12:01:00.000Z', t0)).toBe(false);
+  });
+});

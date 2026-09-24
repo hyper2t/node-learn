@@ -23133,7 +23133,7 @@ var require_bignumber = __commonJS({
   "node_modules/bignumber.js/bignumber.js"(exports2, module2) {
     (function(globalObject) {
       "use strict";
-      var BigNumber, isNumeric = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i, mathceil = Math.ceil, mathfloor = Math.floor, bignumberError = "[BigNumber Error] ", tooManyDigits = bignumberError + "Number primitive has more than 15 significant digits: ", BASE = 1e14, LOG_BASE = 14, MAX_SAFE_INTEGER = 9007199254740991, POWS_TEN = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13], SQRT_BASE = 1e7, MAX2 = 1e9;
+      var BigNumber, isNumeric = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i, mathceil = Math.ceil, mathfloor = Math.floor, bignumberError = "[BigNumber Error] ", tooManyDigits = bignumberError + "Number primitive has more than 15 significant digits: ", BASE = 1e14, LOG_BASE = 14, MAX_SAFE_INTEGER = 9007199254740991, POWS_TEN = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13], SQRT_BASE = 1e7, MAX3 = 1e9;
       function clone(configObject) {
         var div, convertBase, parseNumeric, P = BigNumber2.prototype = { constructor: BigNumber2, toString: null, valueOf: null }, ONE = new BigNumber2(1), DECIMAL_PLACES = 20, ROUNDING_MODE = 4, TO_EXP_NEG = -7, TO_EXP_POS = 21, MIN_EXP = -1e7, MAX_EXP = 1e7, CRYPTO = false, MODULO_MODE = 1, POW_PRECISION = 0, FORMAT = {
           prefix: "",
@@ -23277,7 +23277,7 @@ var require_bignumber = __commonJS({
             if (typeof obj == "object") {
               if (obj.hasOwnProperty(p = "DECIMAL_PLACES")) {
                 v = obj[p];
-                intCheck(v, 0, MAX2, p);
+                intCheck(v, 0, MAX3, p);
                 DECIMAL_PLACES = v;
               }
               if (obj.hasOwnProperty(p = "ROUNDING_MODE")) {
@@ -23288,24 +23288,24 @@ var require_bignumber = __commonJS({
               if (obj.hasOwnProperty(p = "EXPONENTIAL_AT")) {
                 v = obj[p];
                 if (v && v.pop) {
-                  intCheck(v[0], -MAX2, 0, p);
-                  intCheck(v[1], 0, MAX2, p);
+                  intCheck(v[0], -MAX3, 0, p);
+                  intCheck(v[1], 0, MAX3, p);
                   TO_EXP_NEG = v[0];
                   TO_EXP_POS = v[1];
                 } else {
-                  intCheck(v, -MAX2, MAX2, p);
+                  intCheck(v, -MAX3, MAX3, p);
                   TO_EXP_NEG = -(TO_EXP_POS = v < 0 ? -v : v);
                 }
               }
               if (obj.hasOwnProperty(p = "RANGE")) {
                 v = obj[p];
                 if (v && v.pop) {
-                  intCheck(v[0], -MAX2, -1, p);
-                  intCheck(v[1], 1, MAX2, p);
+                  intCheck(v[0], -MAX3, -1, p);
+                  intCheck(v[1], 1, MAX3, p);
                   MIN_EXP = v[0];
                   MAX_EXP = v[1];
                 } else {
-                  intCheck(v, -MAX2, MAX2, p);
+                  intCheck(v, -MAX3, MAX3, p);
                   if (v) {
                     MIN_EXP = -(MAX_EXP = v < 0 ? -v : v);
                   } else {
@@ -23337,7 +23337,7 @@ var require_bignumber = __commonJS({
               }
               if (obj.hasOwnProperty(p = "POW_PRECISION")) {
                 v = obj[p];
-                intCheck(v, 0, MAX2, p);
+                intCheck(v, 0, MAX3, p);
                 POW_PRECISION = v;
               }
               if (obj.hasOwnProperty(p = "FORMAT")) {
@@ -23375,7 +23375,7 @@ var require_bignumber = __commonJS({
           if (!BigNumber2.DEBUG) return true;
           var i, n, c = v.c, e = v.e, s = v.s;
           out: if ({}.toString.call(c) == "[object Array]") {
-            if ((s === 1 || s === -1) && e >= -MAX2 && e <= MAX2 && e === mathfloor(e)) {
+            if ((s === 1 || s === -1) && e >= -MAX3 && e <= MAX3 && e === mathfloor(e)) {
               if (c[0] === 0) {
                 if (e === 0 && c.length === 1) return true;
                 break out;
@@ -23411,7 +23411,7 @@ var require_bignumber = __commonJS({
           return function(dp) {
             var a, b, e, k, v, i = 0, c = [], rand = new BigNumber2(ONE);
             if (dp == null) dp = DECIMAL_PLACES;
-            else intCheck(dp, 0, MAX2);
+            else intCheck(dp, 0, MAX3);
             k = mathceil(dp / LOG_BASE);
             if (CRYPTO) {
               if (crypto.getRandomValues) {
@@ -23879,7 +23879,7 @@ var require_bignumber = __commonJS({
         P.decimalPlaces = P.dp = function(dp, rm) {
           var c, n, v, x = this;
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX3);
             if (rm == null) rm = ROUNDING_MODE;
             else intCheck(rm, 0, 8);
             return round(new BigNumber2(x), dp + x.e + 1, rm);
@@ -24199,7 +24199,7 @@ var require_bignumber = __commonJS({
         P.precision = P.sd = function(sd, rm) {
           var c, n, v, x = this;
           if (sd != null && sd !== !!sd) {
-            intCheck(sd, 1, MAX2);
+            intCheck(sd, 1, MAX3);
             if (rm == null) rm = ROUNDING_MODE;
             else intCheck(rm, 0, 8);
             return round(new BigNumber2(x), sd, rm);
@@ -24274,14 +24274,14 @@ var require_bignumber = __commonJS({
         };
         P.toExponential = function(dp, rm) {
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX3);
             dp++;
           }
           return format(this, dp, rm, 1);
         };
         P.toFixed = function(dp, rm) {
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX3);
             dp = dp + this.e + 1;
           }
           return format(this, dp, rm);
@@ -24370,7 +24370,7 @@ var require_bignumber = __commonJS({
           return +valueOf(this);
         };
         P.toPrecision = function(sd, rm) {
-          if (sd != null) intCheck(sd, 1, MAX2);
+          if (sd != null) intCheck(sd, 1, MAX3);
           return format(this, sd, rm, 2);
         };
         P.toString = function(b) {
@@ -40924,6 +40924,39 @@ relationRoutes.get("/:id/proof", async (c) => {
   return ok(c.get("requestId"), await recomputeProof(c.req.param("id")));
 });
 
+// src/routes/review-queue.ts
+init_errors2();
+
+// src/services/review-queue.ts
+init_dist();
+init_repo();
+init_schema();
+init_errors2();
+init_profiles();
+var MAX2 = 200;
+async function reviewQueue(actor) {
+  if (!actor.roles.includes("teacher")) throw roleRequired("teacher");
+  const rels = await listRows(TABLES.learningRelations, [Query.equal("teacherId", actor.user.$id), Query.equal("status", "active"), Query.limit(MAX2)]);
+  if (!rels.length) return { items: [], counts: { evidence: 0, goals: 0 } };
+  const ids = rels.map((r) => r.$id);
+  const [evidence, goals, refs] = await Promise.all([
+    listRows(TABLES.evidenceItems, [Query.equal("relationId", ids), Query.equal("status", ["submitted", "revised"]), Query.limit(MAX2)]),
+    listRows(TABLES.learningGoals, [Query.equal("relationId", ids), Query.equal("status", "active"), Query.isNotNull("completionRequestedAt"), Query.limit(MAX2)]),
+    personRefs(rels.map((r) => r.studentId))
+  ]);
+  const studentOf = new Map(rels.map((r) => [r.$id, refs.get(r.studentId)]));
+  const items = [
+    // A resubmission starts waiting again when it was revised (updatedAt), not at the original submission.
+    ...evidence.map((e) => ({ kind: "evidence", id: e.$id, relationId: e.relationId, student: studentOf.get(e.relationId), title: e.title, since: e.status === "revised" ? e.updatedAt : e.submittedAt, version: e.version ?? 1 })),
+    ...goals.filter((g) => g.completionRequestedAt).map((g) => ({ kind: "goal", id: g.$id, relationId: g.relationId, student: studentOf.get(g.relationId), title: g.title, since: g.completionRequestedAt, version: null }))
+  ].filter((i) => i.student).sort((a, b) => a.since < b.since ? -1 : a.since > b.since ? 1 : 0);
+  return { items, counts: { evidence: items.filter((i) => i.kind === "evidence").length, goals: items.filter((i) => i.kind === "goal").length } };
+}
+
+// src/routes/review-queue.ts
+var reviewQueueRoutes = new Hono2();
+reviewQueueRoutes.get("/", async (c) => ok(c.get("requestId"), await reviewQueue({ user: currentUser(c), roles: c.get("roles") })));
+
 // src/routes/requests.ts
 init_errors2();
 
@@ -41146,6 +41179,7 @@ function createApp() {
   mount("/v1/teachers", teacherRoutes, authed);
   mount("/v1/requests", requestRoutes, social);
   mount("/v1/relations", relationRoutes, authed);
+  mount("/v1/review-queue", reviewQueueRoutes, authed);
   mount("/v1/conversations", conversationRoutes, authed);
   mount("/v1/connections", connectionRoutes, social);
   mount("/v1/uploads", uploadRoutes, authed);

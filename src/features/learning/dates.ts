@@ -28,3 +28,7 @@ export function daysFromNow(n: number, now = new Date()): string {
 }
 
 /** Whose turn it is, phrased for the viewer. Returns null when there is nothing to say (relation not active). */
+
+/** Review queue: an item waiting longer than this is highlighted. */
+export const STALE_AFTER_MS = 3 * 24 * 3_600_000;
+export const isStale = (sinceIso: string, now = Date.now()) => now - Date.parse(sinceIso) > STALE_AFTER_MS;
