@@ -34,13 +34,14 @@ export async function unlinkIdentity(user: Models.User, identityId: string): Pro
 /** Data export: everything keyed to this user, as JSON. Message bodies included only for conversations they belong to. */
 export async function exportData(userId: string): Promise<Record<string, unknown>> {
   const by = (table: Parameters<typeof listRows>[0], col: string) => listRows(table, [Query.equal(col, userId), Query.limit(500)]);
-  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks] = await Promise.all([
+  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions] = await Promise.all([
     getRow<ProfileRow>(TABLES.profiles, userId), by(TABLES.roleMemberships, 'userId'), by(TABLES.studentProfiles, 'userId'), by(TABLES.teacherProfiles, 'userId'),
     by(TABLES.learningRequests, 'studentId'), by(TABLES.learningRequests, 'teacherId'), by(TABLES.learningRelations, 'studentId'), by(TABLES.learningRelations, 'teacherId'),
     by(TABLES.evidenceItems, 'authorId'), by(TABLES.feedbackEntries, 'authorId'), by(TABLES.contacts, 'userId'), by(TABLES.blocks, 'blockerId'),
+    by(TABLES.evidenceRevisions, 'authorId'),
   ]);
   const messages = await by(TABLES.messages, 'senderId');
-  return { exportedAt: new Date().toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, feedback, messagesSent: messages, contacts, blocks };
+  return { exportedAt: new Date().toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, feedback, messagesSent: messages, contacts, blocks };
 }
 
 async function deleteAvatarFile(fileId: string | null | undefined): Promise<void> {

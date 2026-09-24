@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMe } from '@/features/identity/api';
-import { useCreateGoal, useCreateTask, useSetRelationStatus, useUpdateGoal, useUpdateTask, useWorkspace } from '@/features/learning/api';
-import { ProofSummary, nextActionText } from '@/features/learning/components';
+import { useCreateGoal, useCreateTask, useDeclineGoalCompletion, useRequestGoalCompletion, useSetRelationStatus, useUpdateGoal, useUpdateTask, useWorkspace } from '@/features/learning/api';
+import { ProofSummary, daysFromNow, evidenceTone, isOverdue, nextActionText, parseDueDate, toDateField } from '@/features/learning/components';
 import { Screen, Section, TwoColumn } from '@/shared/layout/screen';
 import { Avatar, Badge, Button, Card, ErrorState, InlineError, Input, Loading, PressableCard, Text, confirm as confirmDialog } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
@@ -21,9 +21,12 @@ export default function RelationWorkspace() {
   const createTask = useCreateTask(id);
   const updateTask = useUpdateTask(id);
   const setStatus = useSetRelationStatus(id);
+  const requestCompletion = useRequestGoalCompletion(id);
+  const declineCompletion = useDeclineGoalCompletion(id);
+  const [declining, setDeclining] = useState<{ goalId: string; note: string } | null>(null);
   const [goalForm, setGoalForm] = useState<{ title: string; description: string } | null>(null);
   const [endReason, setEndReason] = useState<string | null>(null);
-  const [taskForm, setTaskForm] = useState<{ title: string; instructions: string; goalId: string | null } | null>(null);
+  const [taskForm, setTaskForm] = useState<{ taskId?: string; title: string; instructions: string; goalId: string | null; due: string } | null>(null);
   if (ws.isLoading) return <Loading />;
   if (ws.isError || !ws.data) return <ErrorState error={ws.error} onRetry={() => ws.refetch()} />;
   const { relation, goals, tasks, recentEvidence, proof } = ws.data;
@@ -59,8 +62,8 @@ export default function RelationWorkspace() {
       <Section title={t('relation.goals')} right={active ? <Button size="sm" variant="ghost" title={t('relation.addGoal')} onPress={() => setGoalForm({ title: '', description: '' })} /> : undefined}>
         {goalForm ? (
           <Card className="gap-2">
-            <Input label={t('relation.evidenceTitle')} value={goalForm.title} onChangeText={(v) => setGoalForm({ ...goalForm, title: v })} maxLength={140} />
-            <Input label={t('onboarding.bio')} value={goalForm.description} onChangeText={(v) => setGoalForm({ ...goalForm, description: v })} multiline maxLength={1000} />
+            <Input label={t('relation.goalTitle')} value={goalForm.title} onChangeText={(v) => setGoalForm({ ...goalForm, title: v })} maxLength={140} />
+            <Input label={t('relation.goalDescription')} value={goalForm.description} onChangeText={(v) => setGoalForm({ ...goalForm, description: v })} multiline maxLength={1000} />
             <InlineError error={createGoal.error} />
             <View className="flex-row gap-2">
               <Button variant="secondary" className="flex-1" title={t('common.cancel')} onPress={() => setGoalForm(null)} />
@@ -69,23 +72,52 @@ export default function RelationWorkspace() {
           </Card>
         ) : null}
         {goals.length === 0 && !goalForm ? <Text variant="small" tone="secondary">{t('relation.noGoals')}</Text> : null}
-        <View className="gap-2">{goals.map((g) => <GoalRow key={g.id} g={g} current={relation.currentGoalId === g.id} canEdit={active && isTeacher} onAchieve={() => updateGoal.mutate({ goalId: g.id, input: { status: 'achieved' } })} />)}</View>
+        <InlineError error={updateGoal.error ?? requestCompletion.error ?? declineCompletion.error} />
+        <View className="gap-2">{goals.map((g) => (
+          <GoalRow key={g.id} g={g} current={relation.currentGoalId === g.id} active={active} isTeacher={!!isTeacher}
+            onAchieve={() => updateGoal.mutate({ goalId: g.id, input: { status: 'achieved' } })}
+            onDrop={() => confirm(t('relation.dropGoalConfirm'), () => updateGoal.mutate({ goalId: g.id, input: { status: 'dropped' } }))}
+            onRequest={() => requestCompletion.mutate(g.id)}
+            onDecline={() => setDeclining({ goalId: g.id, note: '' })} />
+        ))}</View>
+        {declining ? (
+          <Card className="mt-2 gap-2">
+            <Input label={t('relation.declineNote')} value={declining.note} onChangeText={(v) => setDeclining({ ...declining, note: v })} multiline maxLength={300} />
+            <View className="flex-row gap-2">
+              <Button variant="secondary" className="flex-1" title={t('common.cancel')} onPress={() => setDeclining(null)} />
+              <Button className="flex-1" title={t('relation.declineCompletion')} loading={declineCompletion.isPending}
+                onPress={() => declineCompletion.mutate({ goalId: declining.goalId, note: declining.note.trim() || undefined }, { onSuccess: () => setDeclining(null) })} />
+            </View>
+          </Card>
+        ) : null}
       </Section>
 
-      <Section title={t('relation.tasks')} right={active && isTeacher ? <Button size="sm" variant="ghost" title={t('relation.addTask')} onPress={() => setTaskForm({ title: '', instructions: '', goalId: activeGoals[0]?.id ?? null })} /> : undefined}>
+      <Section title={t('relation.tasks')} right={active && isTeacher ? <Button size="sm" variant="ghost" title={t('relation.addTask')} onPress={() => setTaskForm({ title: '', instructions: '', goalId: relation.currentGoalId ?? activeGoals[0]?.id ?? null, due: '' })} /> : undefined}>
         {taskForm ? (
           <Card className="gap-2">
-            <Input label={t('relation.evidenceTitle')} value={taskForm.title} onChangeText={(v) => setTaskForm({ ...taskForm, title: v })} maxLength={140} />
-            <Input label={t('onboarding.approach')} value={taskForm.instructions} onChangeText={(v) => setTaskForm({ ...taskForm, instructions: v })} multiline maxLength={2000} />
+            <Input label={t('relation.taskTitle')} value={taskForm.title} onChangeText={(v) => setTaskForm({ ...taskForm, title: v })} maxLength={140} />
+            <Input label={t('relation.taskInstructions')} value={taskForm.instructions} onChangeText={(v) => setTaskForm({ ...taskForm, instructions: v })} multiline maxLength={2000} />
             {activeGoals.length ? (
               <View className="flex-row flex-wrap gap-1">
                 {activeGoals.map((g) => <Button key={g.id} size="sm" variant={taskForm.goalId === g.id ? 'primary' : 'secondary'} title={g.title} onPress={() => setTaskForm({ ...taskForm, goalId: g.id })} />)}
               </View>
             ) : null}
-            <InlineError error={createTask.error} />
+            <Input label={t('relation.dueDate')} value={taskForm.due} onChangeText={(v) => setTaskForm({ ...taskForm, due: v })} hint={t('relation.dueDateHint')} placeholder="YYYY-MM-DD" maxLength={10}
+              error={parseDueDate(taskForm.due) === undefined ? t('relation.dueInvalid') : undefined} />
+            <View className="flex-row flex-wrap gap-1">
+              {([[1, 'd1'], [3, 'd3'], [7, 'd7']] as const).map(([n, k]) => <Button key={k} size="sm" variant={taskForm.due === daysFromNow(n) ? 'primary' : 'secondary'} title={t(`relation.dueIn.${k}`)} onPress={() => setTaskForm({ ...taskForm, due: daysFromNow(n) })} />)}
+              <Button size="sm" variant={!taskForm.due ? 'primary' : 'secondary'} title={t('relation.dueIn.none')} onPress={() => setTaskForm({ ...taskForm, due: '' })} />
+            </View>
+            <InlineError error={createTask.error ?? updateTask.error} />
             <View className="flex-row gap-2">
               <Button variant="secondary" className="flex-1" title={t('common.cancel')} onPress={() => setTaskForm(null)} />
-              <Button className="flex-1" title={t('common.save')} loading={createTask.isPending} disabled={taskForm.title.trim().length < 3} onPress={() => createTask.mutate({ title: taskForm.title.trim(), instructions: taskForm.instructions.trim(), goalId: taskForm.goalId }, { onSuccess: () => setTaskForm(null) })} />
+              <Button className="flex-1" title={t('common.save')} loading={createTask.isPending || updateTask.isPending} disabled={taskForm.title.trim().length < 3 || parseDueDate(taskForm.due) === undefined}
+                onPress={() => {
+                  const dueAt = parseDueDate(taskForm.due) ?? null;
+                  const done = { onSuccess: () => setTaskForm(null) };
+                  if (taskForm.taskId) updateTask.mutate({ taskId: taskForm.taskId, input: { title: taskForm.title.trim(), instructions: taskForm.instructions.trim(), dueAt } }, done);
+                  else createTask.mutate({ title: taskForm.title.trim(), instructions: taskForm.instructions.trim(), goalId: taskForm.goalId, dueAt }, done);
+                }} />
             </View>
           </Card>
         ) : null}
@@ -94,20 +126,22 @@ export default function RelationWorkspace() {
           {[...openTasks, ...tasks.filter((tk) => !openTasks.includes(tk))].map((tk) => (
             <TaskRow key={tk.id} task={tk} isTeacher={!!isTeacher} active={active}
               onSubmit={() => router.push({ pathname: '/(app)/relations/[id]/evidence/new', params: { id, taskId: tk.id } })}
-              onDone={() => updateTask.mutate({ taskId: tk.id, input: { status: 'done' } })} />
+              onDone={() => updateTask.mutate({ taskId: tk.id, input: { status: 'done' } })}
+              onEdit={() => setTaskForm({ taskId: tk.id, title: tk.title, instructions: tk.instructions, goalId: tk.goalId, due: toDateField(tk.dueAt) })}
+              onDrop={() => confirm(t('relation.dropTaskConfirm'), () => updateTask.mutate({ taskId: tk.id, input: { status: 'dropped' } }))} />
           ))}
         </View>
       </Section>
 
       <Section title={t('relation.evidence')} right={<View className="flex-row gap-1">
-        <Button size="sm" variant="ghost" title="All" onPress={() => router.push(`/(app)/relations/${id}/evidence`)} />
+        <Button size="sm" variant="ghost" title={t('relation.allEvidence')} onPress={() => router.push(`/(app)/relations/${id}/evidence`)} />
         {active && !isTeacher ? <Button size="sm" variant="ghost" title={t('relation.submitEvidence')} onPress={() => router.push(`/(app)/relations/${id}/evidence/new`)} /> : null}
       </View>}>
         {recentEvidence.length === 0 ? <Text variant="small" tone="secondary">{t('relation.noEvidence')}</Text> : null}
         <View className="gap-2">
           {recentEvidence.map((e) => (
             <PressableCard key={e.id} onPress={() => router.push(`/(app)/relations/${id}/evidence/${e.id}`)} className="gap-1">
-              <View className="flex-row items-center justify-between"><Text variant="body-strong" numberOfLines={1} className="flex-1">{e.title}</Text><Badge label={e.status} tone={e.status === 'submitted' ? 'warning' : 'success'} /></View>
+              <View className="flex-row items-center justify-between"><Text variant="body-strong" numberOfLines={1} className="flex-1">{e.title}</Text><Badge label={t(`relation.evidenceStatus.${e.status}`)} tone={evidenceTone(e.status)} /></View>
               <Text variant="caption" tone="tertiary">{fmt.relative(e.submittedAt)} · {e.feedback.length} {t('relation.feedback').toLowerCase()}</Text>
             </PressableCard>
           ))}
@@ -150,32 +184,51 @@ export default function RelationWorkspace() {
   );
 }
 
-function GoalRow({ g, current, canEdit, onAchieve }: { g: LearningGoal; current: boolean; canEdit: boolean; onAchieve: () => void }) {
+function GoalRow({ g, current, active, isTeacher, onAchieve, onDrop, onRequest, onDecline }: {
+  g: LearningGoal; current: boolean; active: boolean; isTeacher: boolean; onAchieve: () => void; onDrop: () => void; onRequest: () => void; onDecline: () => void;
+}) {
+  const open = active && g.status === 'active';
+  const requested = !!g.completionRequestedAt;
   return (
     <Card className="gap-1">
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row flex-wrap items-center gap-2">
         <Text variant="body-strong" className="flex-1">{g.title}</Text>
         {current ? <Badge label={t('home.currentFocus')} tone="primary" /> : null}
+        {g.status === 'active' && requested ? <Badge label={t('relation.completionRequested')} tone="warning" /> : null}
         <Badge label={t(`relation.goalStatus.${g.status}`)} tone={g.status === 'achieved' ? 'success' : 'neutral'} />
       </View>
       {g.description ? <Text variant="small" tone="secondary">{g.description}</Text> : null}
-      {canEdit && g.status === 'active' ? <Button size="sm" variant="ghost" className="self-start" title={t('relation.markAchieved')} onPress={onAchieve} /> : null}
+      {open ? (
+        <View className="flex-row flex-wrap gap-1">
+          {isTeacher ? <Button size="sm" variant={requested ? 'primary' : 'ghost'} title={requested ? t('relation.confirmCompletion') : t('relation.markAchieved')} onPress={onAchieve} /> : null}
+          {isTeacher && requested ? <Button size="sm" variant="ghost" title={t('relation.declineCompletion')} onPress={onDecline} /> : null}
+          {isTeacher && !requested ? <Button size="sm" variant="ghost" title={t('relation.dropGoal')} onPress={onDrop} /> : null}
+          {!isTeacher && !requested ? <Button size="sm" variant="ghost" title={t('relation.requestCompletion')} onPress={onRequest} /> : null}
+        </View>
+      ) : null}
     </Card>
   );
 }
 
-function TaskRow({ task, isTeacher, active, onSubmit, onDone }: { task: LearningTask; isTeacher: boolean; active: boolean; onSubmit: () => void; onDone: () => void }) {
+function TaskRow({ task, isTeacher, active, onSubmit, onDone, onEdit, onDrop }: { task: LearningTask; isTeacher: boolean; active: boolean; onSubmit: () => void; onDone: () => void; onEdit: () => void; onDrop: () => void }) {
   const tone = task.status === 'done' ? 'success' : task.status === 'submitted' ? 'warning' : 'neutral';
+  const overdue = isOverdue(task);
+  const closed = task.status === 'done' || task.status === 'dropped';
   return (
     <Card className="gap-1">
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row flex-wrap items-center gap-2">
         <Text variant="body-strong" className="flex-1">{task.title}</Text>
+        {overdue ? <Badge label={t('relation.overdue')} tone="danger" /> : null}
         <Badge label={t(`relation.taskStatus.${task.status}`)} tone={tone} />
       </View>
       {task.instructions ? <Text variant="small" tone="secondary">{task.instructions}</Text> : null}
-      {task.dueAt ? <Text variant="caption" tone="tertiary">{t('relation.due', { date: fmt.date(task.dueAt) })}</Text> : null}
-      {active && !isTeacher && (task.status === 'open' || task.status === 'reviewed') ? <Button size="sm" variant="ghost" className="self-start" title={t('relation.submitEvidence')} onPress={onSubmit} /> : null}
-      {active && isTeacher && task.status !== 'done' && task.status !== 'dropped' ? <Button size="sm" variant="ghost" className="self-start" title={t('relation.markDone')} onPress={onDone} /> : null}
+      {task.dueAt ? <Text variant="caption" tone={overdue ? 'danger' : 'tertiary'}>{t('relation.due', { date: fmt.date(task.dueAt) })}</Text> : null}
+      <View className="flex-row flex-wrap gap-1">
+        {active && !isTeacher && (task.status === 'open' || task.status === 'reviewed') ? <Button size="sm" variant="ghost" title={t('relation.submitEvidence')} onPress={onSubmit} /> : null}
+        {active && isTeacher && !closed ? <Button size="sm" variant="ghost" title={t('relation.markDone')} onPress={onDone} /> : null}
+        {active && isTeacher && !closed ? <Button size="sm" variant="ghost" title={t('relation.editTask')} onPress={onEdit} /> : null}
+        {active && isTeacher && !closed ? <Button size="sm" variant="ghost" title={t('relation.dropTask')} onPress={onDrop} /> : null}
+      </View>
     </Card>
   );
 }

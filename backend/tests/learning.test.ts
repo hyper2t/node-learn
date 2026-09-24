@@ -240,3 +240,94 @@ describe('deriveNextAction', () => {
     expect((await L.getWorkspace('rel1', T)).relation.nextAction).toMatchObject({ kind: 'teacher_review', count: 1 });
   });
 });
+
+describe('L3 evidence revision loop', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  it('needs_revision → revise (v2, history kept) → approved; no second review', async () => {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const P = await import('../src/services/proof');
+    const task = await L.createTask('rel1', T, { title: 'Essay' });
+    const ev = await P.submitEvidence(rel as never, S, { title: 'Draft', body: 'first try', taskId: task.id });
+    const fb = await P.addFeedback(rel as never, ev.id, T, { body: 'Add examples', outcome: 'needs_revision', markTaskDone: true });
+    expect(fb.outcome).toBe('needs_revision');
+    let item = await P.getEvidence('rel1', ev.id);
+    expect(item.status).toBe('needs_revision');
+    // Revision request never closes the task, even if markTaskDone was sent.
+    expect((await L.getWorkspace('rel1', T)).tasks[0]!.status).toBe('submitted');
+    expect((await L.getRelation('rel1', T)).nextAction.kind).toBe('student_revise');
+    expect(await errorOf(P.addFeedback(rel as never, ev.id, T, { body: 'again' }))).toMatchObject({ status: 409, details: { reason: 'evidence_awaiting_revision' } });
+
+    expect(await errorOf(P.reviseEvidence(rel as never, ev.id, T, { body: 'x' }))).toMatchObject({ status: 403 });
+    item = await P.reviseEvidence(rel as never, ev.id, S, { body: 'second try with examples' });
+    expect(item).toMatchObject({ status: 'revised', version: 2, body: 'second try with examples', title: 'Draft' });
+    expect(item.revisions).toEqual([expect.objectContaining({ version: 1, body: 'first try' })]);
+    expect((await L.getRelation('rel1', S)).nextAction.kind).toBe('teacher_review');
+    expect(await errorOf(P.reviseEvidence(rel as never, ev.id, S, { body: 'y' }))).toMatchObject({ status: 409 });
+
+    await P.addFeedback(rel as never, ev.id, T, { body: 'Great', markTaskDone: true });
+    expect((await P.getEvidence('rel1', ev.id)).status).toBe('reviewed');
+    expect((await L.getWorkspace('rel1', T)).tasks[0]!.status).toBe('done');
+    expect(await errorOf(P.addFeedback(rel as never, ev.id, T, { body: 'more' }))).toMatchObject({ status: 409, details: { reason: 'evidence_reviewed' } });
+    expect((await P.recomputeProof('rel1')).counts.revisions).toBe(1);
+    expect(db.notes.map((n) => n.type)).toEqual(['task.assigned', 'evidence.submitted', 'evidence.revision_requested', 'evidence.revised', 'feedback.added']);
+  });
+});
+
+describe('L3 goal completion', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+
+  it('student requests, teacher declines then confirms; focus moves to the next goal', async () => {
+    const rel = await seedRelation();
+    const L = await import('../src/services/learning');
+    const g1 = await L.createGoal(rel as never, T, { title: 'Fractions' });
+    const g2 = await L.createGoal({ ...rel, currentGoalId: g1.id } as never, T, { title: 'Decimals' });
+    expect((await L.getRelation('rel1', S)).currentGoalId).toBe(g1.id);
+
+    expect(await errorOf(L.requestGoalCompletion('rel1', g1.id, T))).toMatchObject({ status: 403 });
+    const req = await L.requestGoalCompletion('rel1', g1.id, S);
+    expect(req.completionRequestedAt).toBeTruthy();
+    expect((await L.getRelation('rel1', T)).nextAction.kind).toBe('teacher_confirm_goal');
+
+    expect(await errorOf(L.declineGoalCompletion('rel1', g1.id, S, undefined))).toMatchObject({ status: 403 });
+    const declined = await L.declineGoalCompletion('rel1', g1.id, T, 'Two more exercises');
+    expect(declined.completionRequestedAt).toBeNull();
+    expect(db.messages).toContainEqual(expect.objectContaining({ payload: { type: 'system', text: 'Goal "Fractions" is not complete yet. Two more exercises' } }));
+
+    await L.requestGoalCompletion('rel1', g1.id, S);
+    const achieved = await L.updateGoal('rel1', g1.id, T, { status: 'achieved' });
+    expect(achieved).toMatchObject({ status: 'achieved', completionRequestedAt: null });
+    expect((await L.getRelation('rel1', T)).currentGoalId).toBe(g2.id);
+    await L.updateGoal('rel1', g2.id, T, { status: 'dropped' });
+    expect((await L.getRelation('rel1', T)).currentGoalId).toBeNull();
+  });
+});
+
+describe('L3 task reminders', () => {
+  beforeEach(() => { db.tables.clear(); db.seq = 0; db.messages = []; db.notes = []; });
+  const now = new Date('2026-09-24T12:00:00.000Z');
+  const h = (n: number) => new Date(now.getTime() + n * 3_600_000).toISOString();
+
+  it('selectDueTasks picks due-soon and overdue open tasks only', async () => {
+    const { selectDueTasks } = await import('../src/services/reminders');
+    const task = (id: string, dueAt: string | null, status = 'open') => ({ $id: id, relationId: 'rel1', title: id, status, dueAt });
+    const out = selectDueTasks(now, [task('soon', h(5)), task('later', h(30)), task('late', h(-2)), task('ancient', h(-24 * 8)), task('done', h(-2), 'done'), task('none', null)]);
+    expect(out.map((r) => [r.taskId, r.kind])).toEqual([['soon', 'due_soon'], ['late', 'overdue']]);
+  });
+
+  it('notifies student (and teacher when overdue), skips inactive relations, dedupes per due date', async () => {
+    await seedRelation();
+    const { createRow } = await import('../src/db/repo');
+    const { TABLES } = await import('../src/db/schema');
+    await createRow(TABLES.learningTasks, { relationId: 'rel1', title: 'Soon', status: 'open', dueAt: h(5) }, 't1');
+    await createRow(TABLES.learningTasks, { relationId: 'rel1', title: 'Late', status: 'open', dueAt: h(-1) }, 't2');
+    await createRow(TABLES.learningRelations, { studentId: 's2', teacherId: T, status: 'paused' }, 'rel2');
+    await createRow(TABLES.learningTasks, { relationId: 'rel2', title: 'Paused', status: 'open', dueAt: h(-1) }, 't3');
+    const { runTaskReminders } = await import('../src/services/reminders');
+    const stats = await runTaskReminders(now);
+    expect(stats).toMatchObject({ dueSoon: 1, overdue: 1, skippedInactive: 1 });
+    expect(db.notes.map((n) => [n.userId, n.type])).toEqual([[S, 'task.due_soon'], [S, 'task.overdue'], [T, 'task.overdue']]);
+    expect(new Set(db.notes.map((n) => n.dedupeKey)).size).toBe(3);
+  });
+});

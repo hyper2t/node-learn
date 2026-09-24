@@ -59,7 +59,7 @@ export async function nextActionsFor(rels: LearningRelationRow[]): Promise<Map<s
   const ids = rels.filter((r) => r.status === 'active').map((r) => r.$id);
   if (!ids.length) return out;
   const [evidence, tasks, goals] = await Promise.all([
-    listRows<EvidenceItemRow>(TABLES.evidenceItems, [Query.equal('relationId', ids), Query.equal('status', ['submitted', 'revision_requested']), Query.limit(500)]),
+    listRows<EvidenceItemRow>(TABLES.evidenceItems, [Query.equal('relationId', ids), Query.equal('status', ['submitted', 'revised', 'needs_revision']), Query.limit(500)]),
     listRows<LearningTaskRow>(TABLES.learningTasks, [Query.equal('relationId', ids), Query.equal('status', 'open'), Query.limit(500)]),
     listRows<LearningGoalRow>(TABLES.learningGoals, [Query.equal('relationId', ids), Query.equal('status', 'active'), Query.limit(500)]),
   ]);
@@ -67,10 +67,10 @@ export async function nextActionsFor(rels: LearningRelationRow[]): Promise<Map<s
     const ev = evidence.filter((e) => e.relationId === id);
     out.set(id, deriveNextAction({
       status: 'active',
-      awaitingReview: ev.filter((e) => e.status === 'submitted').length,
-      awaitingRevision: ev.filter((e) => e.status === 'revision_requested').length,
+      awaitingReview: ev.filter((e) => e.status === 'submitted' || e.status === 'revised').length,
+      awaitingRevision: ev.filter((e) => e.status === 'needs_revision').length,
       openTaskDueDates: tasks.filter((t) => t.relationId === id).map((t) => t.dueAt),
-      goalCompletionRequests: goals.filter((g) => g.relationId === id && (g as LearningGoalRow & { completionRequestedAt?: string | null }).completionRequestedAt).length,
+      goalCompletionRequests: goals.filter((g) => g.relationId === id && g.completionRequestedAt).length,
     }));
   }
   return out;
@@ -170,20 +170,67 @@ export async function createGoal(rel: LearningRelationRow, actorId: string, inpu
   return toGoal(row);
 }
 
+/** When the focused goal is closed, focus moves to the oldest remaining active goal (or none). */
+async function nextFocus(relationId: string, excludeGoalId: string): Promise<string | null> {
+  const active = await listRows<LearningGoalRow>(TABLES.learningGoals, [Query.equal('relationId', relationId), Query.equal('status', 'active'), Query.orderAsc('createdAt'), Query.limit(20)]);
+  return active.find((g) => g.$id !== excludeGoalId)?.$id ?? null;
+}
+
+async function loadGoal(relationId: string, goalId: string): Promise<LearningGoalRow> {
+  const goal = await getRow<LearningGoalRow>(TABLES.learningGoals, goalId);
+  if (!goal || goal.relationId !== relationId) throw notFound('not_found', 'This goal could not be found.');
+  return goal;
+}
+
 export async function updateGoal(relationId: string, goalId: string, userId: string, patch: { title?: string; description?: string; status?: string }, requestId?: string): Promise<LearningGoal> {
   const rel = await requireRelationMember(relationId, userId);
   assertRelationWritable(rel);
-  const goal = await getRow<LearningGoalRow>(TABLES.learningGoals, goalId);
-  if (!goal || goal.relationId !== relationId) throw notFound('not_found', 'This goal could not be found.');
-  if (patch.status && patch.status !== goal.status && userId !== rel.teacherId) throw forbidden('Only the teacher can change a goal\'s status.');
-  const row = await updateRow<LearningGoalRow>(TABLES.learningGoals, goalId, patch);
-  await touch(rel);
-  if (patch.status === 'achieved' && goal.status !== 'achieved') {
+  const goal = await loadGoal(relationId, goalId);
+  const statusChange = patch.status && patch.status !== goal.status ? patch.status : null;
+  if (statusChange && userId !== rel.teacherId) throw forbidden('Only the teacher can change a goal\'s status.');
+  const row = await updateRow<LearningGoalRow>(TABLES.learningGoals, goalId, statusChange ? { ...patch, completionRequestedAt: null } : patch);
+  let focus: Record<string, unknown> = {};
+  if (statusChange && statusChange !== 'active' && rel.currentGoalId === goalId) focus = { currentGoalId: await nextFocus(relationId, goalId) };
+  if (statusChange === 'active' && !rel.currentGoalId) focus = { currentGoalId: goalId };
+  await touch(rel, focus);
+  if (statusChange === 'achieved') {
     await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'milestone_reached', payload: { type: 'milestone_reached', milestoneId: goalId, title: row.title }, requestId });
     await emitEvent({ eventType: 'goal.achieved', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { goalId }, requestId });
     await notify({ userId: rel.studentId, type: 'goal.achieved', title: 'Goal achieved', body: row.title, href: `/relations/${relationId}`, refType: 'learning_goal', refId: goalId, actorId: userId, dedupeKey: `goal.achieved:${goalId}` });
   }
   await recomputeProof(relationId);
+  return toGoal(row);
+}
+
+/** Learner asks the teacher to confirm a goal is achieved. */
+export async function requestGoalCompletion(relationId: string, goalId: string, userId: string, requestId?: string): Promise<LearningGoal> {
+  const rel = await requireRelationMember(relationId, userId);
+  if (userId !== rel.studentId) throw forbidden('Only the learner asks for a goal to be confirmed.');
+  assertRelationWritable(rel);
+  const goal = await loadGoal(relationId, goalId);
+  if (goal.status !== 'active') throw conflict('invalid_state', 'This goal is no longer active.');
+  if (goal.completionRequestedAt) return toGoal(goal);
+  const row = await updateRow<LearningGoalRow>(TABLES.learningGoals, goalId, { completionRequestedAt: new Date().toISOString() });
+  await touch(rel);
+  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'system', payload: { type: 'system', text: `Asked to confirm goal "${row.title}" as achieved.` }, requestId });
+  await emitEvent({ eventType: 'goal.completion_requested', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { goalId }, requestId });
+  await notify({ userId: rel.teacherId, type: 'goal.completion_requested', title: 'Confirm a completed goal', body: row.title, href: `/relations/${relationId}`, refType: 'learning_goal', refId: goalId, actorId: userId, dedupeKey: `goal.completion_requested:${goalId}:${row.completionRequestedAt}` });
+  return toGoal(row);
+}
+
+/** Teacher says "not yet": clears the request, optionally with a note that goes into the chat. */
+export async function declineGoalCompletion(relationId: string, goalId: string, userId: string, note: string | undefined, requestId?: string): Promise<LearningGoal> {
+  const rel = await requireRelationMember(relationId, userId);
+  if (userId !== rel.teacherId) throw forbidden('Only the teacher confirms goals.');
+  assertRelationWritable(rel);
+  const goal = await loadGoal(relationId, goalId);
+  if (!goal.completionRequestedAt) throw conflict('invalid_state', 'Nobody asked to confirm this goal.');
+  const row = await updateRow<LearningGoalRow>(TABLES.learningGoals, goalId, { completionRequestedAt: null });
+  await touch(rel);
+  const text = `Goal "${row.title}" is not complete yet.${note ? ` ${note}` : ''}`;
+  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: 'system', payload: { type: 'system', text }, requestId });
+  await emitEvent({ eventType: 'goal.completion_declined', aggregateType: 'learning_relation', aggregateId: relationId, actorId: userId, payload: { goalId }, requestId });
+  await notify({ userId: rel.studentId, type: 'goal.completion_declined', title: 'Goal not confirmed yet', body: note || row.title, href: `/relations/${relationId}`, refType: 'learning_goal', refId: goalId, actorId: userId, dedupeKey: `goal.completion_declined:${goalId}:${goal.completionRequestedAt}` });
   return toGoal(row);
 }
 

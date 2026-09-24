@@ -3,7 +3,7 @@ import { api, newIdempotencyKey } from '@/infrastructure/api';
 import { qk } from '@/state/query-keys';
 import type {
   CreateEvidenceInput, CreateFeedbackInput, CreateGoalInput, CreateTaskInput, EvidenceItem, Feedback, LearningGoal, LearningRelation, LearningTask, Page,
-  ProofRecord, RelationStatus, RelationWorkspace, Role, UpdateGoalInput, UpdateTaskInput,
+  ProofRecord, RelationStatus, RelationWorkspace, ReviseEvidenceInput, Role, UpdateGoalInput, UpdateTaskInput,
 } from '@/types/api';
 
 const idem = () => ({ idempotencyKey: newIdempotencyKey() });
@@ -20,6 +20,9 @@ export const learningApi = {
   evidenceItem: (id: string, evidenceId: string) => api.get<EvidenceItem>(`/v1/relations/${id}/evidence/${evidenceId}`),
   createEvidence: (id: string, input: CreateEvidenceInput) => api.post<EvidenceItem>(`/v1/relations/${id}/evidence`, input, idem()),
   createFeedback: (id: string, evidenceId: string, input: CreateFeedbackInput) => api.post<Feedback>(`/v1/relations/${id}/evidence/${evidenceId}/feedback`, input, idem()),
+  reviseEvidence: (id: string, evidenceId: string, input: ReviseEvidenceInput) => api.patch<EvidenceItem>(`/v1/relations/${id}/evidence/${evidenceId}`, input),
+  requestGoalCompletion: (id: string, goalId: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/request-completion`, {}, idem()),
+  declineGoalCompletion: (id: string, goalId: string, note?: string) => api.post<LearningGoal>(`/v1/relations/${id}/goals/${goalId}/decline-completion`, note ? { note } : {}, idem()),
   proof: (id: string) => api.get<ProofRecord>(`/v1/relations/${id}/proof`),
 };
 
@@ -52,3 +55,6 @@ export function useCreateTask(id: string) { const inv = useRelationInvalidate(id
 export function useUpdateTask(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { taskId: string; input: UpdateTaskInput }) => learningApi.updateTask(id, p.taskId, p.input), onSuccess: inv }); }
 export function useCreateEvidence(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (i: CreateEvidenceInput) => learningApi.createEvidence(id, i), onSuccess: inv }); }
 export function useCreateFeedback(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { evidenceId: string; input: CreateFeedbackInput }) => learningApi.createFeedback(id, p.evidenceId, p.input), onSuccess: inv }); }
+export function useReviseEvidence(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { evidenceId: string; input: ReviseEvidenceInput }) => learningApi.reviseEvidence(id, p.evidenceId, p.input), onSuccess: inv }); }
+export function useRequestGoalCompletion(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (goalId: string) => learningApi.requestGoalCompletion(id, goalId), onSuccess: inv }); }
+export function useDeclineGoalCompletion(id: string) { const inv = useRelationInvalidate(id); return useMutation({ mutationFn: (p: { goalId: string; note?: string }) => learningApi.declineGoalCompletion(id, p.goalId, p.note), onSuccess: inv }); }

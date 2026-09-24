@@ -5,8 +5,8 @@ import { idempotencyKeyOf, readJsonBody, readQuery } from '../lib/body';
 import { currentUser } from '../middleware/auth';
 import * as S from '../schemas';
 import { withIdempotency } from '../services/idempotency';
-import { createGoal, createTask, getRelation, getWorkspace, listRelations, requireRelationMember, updateGoal, updateRelationStatus, updateTask } from '../services/learning';
-import { addFeedback, getEvidence, listEvidence, recomputeProof, submitEvidence } from '../services/proof';
+import { createGoal, createTask, declineGoalCompletion, requestGoalCompletion, getRelation, getWorkspace, listRelations, requireRelationMember, updateGoal, updateRelationStatus, updateTask } from '../services/learning';
+import { addFeedback, getEvidence, listEvidence, recomputeProof, reviseEvidence, submitEvidence } from '../services/proof';
 
 export const relationRoutes = new Hono<AppEnv>();
 
@@ -29,6 +29,13 @@ relationRoutes.post('/:id/goals', async (c) => {
 });
 relationRoutes.patch('/:id/goals/:goalId', async (c) =>
   ok(c.get('requestId'), await updateGoal(c.req.param('id'), c.req.param('goalId'), currentUser(c).$id, await readJsonBody(c, S.updateGoal), c.get('requestId'))));
+
+relationRoutes.post('/:id/goals/:goalId/request-completion', async (c) =>
+  ok(c.get('requestId'), await requestGoalCompletion(c.req.param('id'), c.req.param('goalId'), currentUser(c).$id, c.get('requestId'))));
+relationRoutes.post('/:id/goals/:goalId/decline-completion', async (c) => {
+  const body = await readJsonBody(c, S.declineGoalCompletion);
+  return ok(c.get('requestId'), await declineGoalCompletion(c.req.param('id'), c.req.param('goalId'), currentUser(c).$id, body.note, c.get('requestId')));
+});
 
 relationRoutes.post('/:id/tasks', async (c) => {
   const user = currentUser(c);
@@ -55,6 +62,12 @@ relationRoutes.post('/:id/evidence', async (c) => {
 relationRoutes.get('/:id/evidence/:evidenceId', async (c) => {
   await requireRelationMember(c.req.param('id'), currentUser(c).$id);
   return ok(c.get('requestId'), await getEvidence(c.req.param('id'), c.req.param('evidenceId')));
+});
+relationRoutes.patch('/:id/evidence/:evidenceId', async (c) => {
+  const user = currentUser(c);
+  const rel = await requireRelationMember(c.req.param('id'), user.$id);
+  const body = await readJsonBody(c, S.reviseEvidence);
+  return ok(c.get('requestId'), await reviseEvidence(rel, c.req.param('evidenceId'), user.$id, body, c.get('requestId')));
 });
 relationRoutes.post('/:id/evidence/:evidenceId/feedback', async (c) => {
   const user = currentUser(c);

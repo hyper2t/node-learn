@@ -30523,7 +30523,8 @@ var TABLES = {
   uploadIntents: "upload_intents",
   notifications: "notifications",
   qaQuestions: "qa_questions",
-  qaAnswers: "qa_answers"
+  qaAnswers: "qa_answers",
+  evidenceRevisions: "evidence_revisions"
 };
 
 // src/services/retention.ts
@@ -30618,6 +30619,17 @@ async function purgeDeletedMemberData(stats, now, options) {
         }
       }
       if (evidenceRows.length < options.batchSize) break;
+    }
+    for (let batch = 0; batch < options.maxBatches; batch++) {
+      const revs = await listRows(TABLES.evidenceRevisions, [Query.equal("authorId", userId), Query.limit(options.batchSize), Query.offset(batch * options.batchSize)]);
+      if (!revs.length) break;
+      for (const rev of revs) {
+        if ((rev.attachmentFileIds?.length ?? 0) > 0) {
+          await updateRow(TABLES.evidenceRevisions, rev.$id, { attachmentFileIds: [] });
+          stats.evidenceAttachmentRefsCleared++;
+        }
+      }
+      if (revs.length < options.batchSize) break;
     }
     stats.deletedMemberQaQuestionsDeleted += await deleteRows(TABLES.qaQuestions, [Query.equal("authorId", userId)], options, async (question) => {
       stats.deletedMemberQaAnswersDeleted += await deleteRows(TABLES.qaAnswers, [Query.equal("questionId", question.$id)], options);

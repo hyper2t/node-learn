@@ -1,5 +1,5 @@
-import type { EvidenceItem, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationNextAction, RelationStatus, RequestKind, RequestStatus, TaskStatus, Attachment } from '../contracts/api';
-import type { EvidenceItemRow, FeedbackEntryRow, LearningGoalRow, LearningRelationRow, LearningRequestRow, LearningTaskRow, ProofRecordRow } from '../db/rows';
+import type { EvidenceItem, EvidenceRevision, EvidenceStatus, Feedback, GoalStatus, LearningGoal, LearningRelation, LearningRequest, LearningTask, ProofRecord, RelationNextAction, RelationStatus, RequestKind, RequestStatus, TaskStatus, Attachment } from '../contracts/api';
+import type { EvidenceItemRow, EvidenceRevisionRow, FeedbackEntryRow, LearningGoalRow, LearningRelationRow, LearningRequestRow, LearningTaskRow, ProofRecordRow } from '../db/rows';
 import type { PersonRef } from './profile';
 
 export const toLearningRequest = (r: LearningRequestRow, counterpart: PersonRef): LearningRequest => ({
@@ -18,7 +18,7 @@ export const toRelation = (r: LearningRelationRow, student: PersonRef, teacher: 
 });
 
 export const toGoal = (g: LearningGoalRow): LearningGoal => ({
-  id: g.$id, relationId: g.relationId, title: g.title, description: g.description ?? '', status: g.status as GoalStatus, createdBy: g.createdBy, createdAt: g.createdAt, updatedAt: g.updatedAt,
+  id: g.$id, relationId: g.relationId, title: g.title, description: g.description ?? '', status: g.status as GoalStatus, createdBy: g.createdBy, completionRequestedAt: g.completionRequestedAt ?? null, createdAt: g.createdAt, updatedAt: g.updatedAt,
 });
 
 export const toTask = (t: LearningTaskRow): LearningTask => ({
@@ -26,7 +26,9 @@ export const toTask = (t: LearningTaskRow): LearningTask => ({
   assignedBy: t.assignedBy, dueAt: t.dueAt, createdAt: t.createdAt, updatedAt: t.updatedAt,
 });
 
-export const toFeedback = (f: FeedbackEntryRow): Feedback => ({ id: f.$id, evidenceId: f.evidenceId, authorId: f.authorId, body: f.body ?? '', nextStep: f.nextStep ?? '', createdAt: f.createdAt });
+export const toFeedback = (f: FeedbackEntryRow): Feedback => ({ id: f.$id, evidenceId: f.evidenceId, authorId: f.authorId, body: f.body ?? '', nextStep: f.nextStep ?? '', outcome: f.outcome === 'needs_revision' ? 'needs_revision' : 'approved', createdAt: f.createdAt });
+
+export const toRevision = (r: EvidenceRevisionRow): EvidenceRevision => ({ version: r.version, title: r.title, body: r.body ?? '', attachmentFileIds: r.attachmentFileIds ?? [], createdAt: r.createdAt });
 
 export const toEvidence = (e: EvidenceItemRow, feedback: FeedbackEntryRow[], attachments: Attachment[] = []): EvidenceItem => ({
   id: e.$id, relationId: e.relationId, taskId: e.taskId, goalId: e.goalId, authorId: e.authorId, title: e.title, body: e.body ?? '',

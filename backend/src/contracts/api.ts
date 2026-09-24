@@ -169,6 +169,8 @@ export type LearningGoal = {
   description: string;
   status: GoalStatus;
   createdBy: string;
+  /** Set when the learner asks the teacher to confirm the goal is achieved. */
+  completionRequestedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -201,7 +203,12 @@ export type RelationWorkspace = {
 
 // ---------------------------------------------------------------- proof
 
-export type EvidenceStatus = 'submitted' | 'reviewed' | 'revised';
+/** submitted → reviewed | needs_revision; needs_revision → revised (resubmitted, awaiting review again) → reviewed | needs_revision. */
+export type EvidenceStatus = 'submitted' | 'reviewed' | 'needs_revision' | 'revised';
+export type FeedbackOutcome = 'approved' | 'needs_revision';
+
+/** Snapshot of an evidence item before a resubmission replaced it. */
+export type EvidenceRevision = { version: number; title: string; body: string; attachmentFileIds: string[]; createdAt: string };
 
 /** Attachment metadata plus a short-lived, member-only view URL minted by the BFF. */
 export type Attachment = {
@@ -229,6 +236,8 @@ export type EvidenceItem = {
   submittedAt: string;
   reviewedAt: string | null;
   feedback: Feedback[];
+  /** Earlier versions, newest first. Only filled on the detail endpoint. */
+  revisions?: EvidenceRevision[];
 };
 
 export type Feedback = {
@@ -238,11 +247,13 @@ export type Feedback = {
   body: string;
   /** Non-judgemental: what changed / what to try next. */
   nextStep: string;
+  outcome: FeedbackOutcome;
   createdAt: string;
 };
 
 export type CreateEvidenceInput = { title: string; body: string; taskId?: string | null; goalId?: string | null; attachmentFileIds?: string[] };
-export type CreateFeedbackInput = { body: string; nextStep?: string; markTaskDone?: boolean };
+export type CreateFeedbackInput = { body: string; nextStep?: string; markTaskDone?: boolean; outcome?: FeedbackOutcome };
+export type ReviseEvidenceInput = { title?: string; body?: string; attachmentFileIds?: string[] };
 
 /** Explainable projection, every number links back to evidence. */
 export type ProofRecord = {
@@ -347,6 +358,12 @@ export type NotificationType =
   | 'relation.ended'
   | 'goal.created'
   | 'goal.achieved'
+  | 'goal.completion_requested'
+  | 'goal.completion_declined'
+  | 'evidence.revision_requested'
+  | 'evidence.revised'
+  | 'task.due_soon'
+  | 'task.overdue'
   | 'connection.received'
   | 'connection.accepted'
   | 'qa.answered'

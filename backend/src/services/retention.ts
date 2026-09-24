@@ -1,7 +1,7 @@
 import type { Models } from 'node-appwrite';
 import { getStorage } from '../db/client';
 import { deleteRow, listRows, Query, updateRow } from '../db/repo';
-import type { AuditEventRow, EvidenceItemRow, IdempotencyKeyRow, MessageRow, NotificationRow, ProfileRow, QaAnswerRow, QaQuestionRow, ReportRow, UploadIntentRow } from '../db/rows';
+import type { AuditEventRow, EvidenceItemRow, EvidenceRevisionRow, IdempotencyKeyRow, MessageRow, NotificationRow, ProfileRow, QaAnswerRow, QaQuestionRow, ReportRow, UploadIntentRow } from '../db/rows';
 import { autoCloseCutoff } from './qa-policy';
 import { TABLES, type TableId } from '../db/schema';
 import { log } from '../log';
@@ -131,6 +131,18 @@ async function purgeDeletedMemberData(stats: RetentionPurgeStats, now: Date, opt
         }
       }
       if (evidenceRows.length < options.batchSize) break;
+    }
+    // Earlier versions of their evidence keep the text (the relation's history) but drop file references too.
+    for (let batch = 0; batch < options.maxBatches; batch++) {
+      const revs = await listRows<EvidenceRevisionRow>(TABLES.evidenceRevisions, [Query.equal('authorId', userId), Query.limit(options.batchSize), Query.offset(batch * options.batchSize)]);
+      if (!revs.length) break;
+      for (const rev of revs) {
+        if ((rev.attachmentFileIds?.length ?? 0) > 0) {
+          await updateRow(TABLES.evidenceRevisions, rev.$id, { attachmentFileIds: [] });
+          stats.evidenceAttachmentRefsCleared++;
+        }
+      }
+      if (revs.length < options.batchSize) break;
     }
 
     // Q&A: a deleted member's questions go (with every answer under them), as do their answers elsewhere.

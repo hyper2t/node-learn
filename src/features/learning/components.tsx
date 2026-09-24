@@ -2,9 +2,11 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Avatar, Badge, PressableCard, Text } from '@/shared/ui';
 import { fmt, t } from '@/shared/i18n';
-import type { LearningRelation, LearningRequest, ProofRecord, RelationNextAction, Role } from '@/types/api';
+import type { EvidenceStatus, LearningRelation, LearningRequest, ProofRecord, RelationNextAction, Role } from '@/types/api';
 
-/** Whose turn it is, phrased for the viewer. Returns null when there is nothing to say (relation not active). */
+export const evidenceTone = (s: EvidenceStatus) => (s === 'reviewed' ? 'success' : s === 'needs_revision' ? 'danger' : 'warning');
+export { daysFromNow, isOverdue, parseDueDate, toDateField } from './dates';
+
 export function nextActionText(next: RelationNextAction, viewerIsTeacher: boolean): { text: string; mine: boolean } | null {
   if (next.kind === 'none') return null;
   const teacherActs = next.kind.startsWith('teacher_');

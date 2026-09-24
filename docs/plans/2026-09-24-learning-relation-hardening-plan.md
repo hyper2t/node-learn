@@ -158,3 +158,16 @@
 
 ## 7. 顺序与提交
 L1 → L2 → L3，各阶段单独 commit（`fix(learning): …` / `feat(learning): …`），每次 commit+push 前征得确认。
+
+---
+
+## 8. 实施记录（与计划的偏差）
+- **L1**（6591b2b）：没有新增错误码，沿用 `invalid_state` / `duplicate_request`，原因放在 `details.reason`（`relation_not_active`、`pair_relation_paused` 等）。结束理由输入框、暂停确认、结束横幅提前在 L1 做了（后端要求理由，前端必须跟上）。
+- **L2**（40317ad）：按计划实现。
+- **L3**：
+  - 证据状态用 `needs_revision`，没用 `revision_requested`（`evidence_items.status` 是 varchar(16)，放不下）。`revised` = 已重交、等老师再看。
+  - 截止日期用文本框（YYYY-MM-DD）加"明天 / 3 天后 / 一周后 / 不设"快捷按钮，没用原生日期选择器，这样不用加新依赖，web 和原生行为一致。以后要换原生选择器，再按 Expo v57 文档用 `npx expo install` 安装。
+  - 截止日期统一存为所选日期当地时间 23:59。
+  - `learning_tasks` 新增索引 `ix_status_due`（status, dueAt），供每小时的提醒查询用。
+  - 提醒的去重 key 带上截止时间：老师改了截止日期后，会按新日期重新提醒。
+  - 重交时可以改标题、正文和附件；历史版本只保存附件 ID，不生成预览链接。

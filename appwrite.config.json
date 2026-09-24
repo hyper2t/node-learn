@@ -220,6 +220,49 @@
                     "value": "__SET_IN_APPWRITE_CONSOLE__"
                 }
             ]
+        },
+        {
+            "$id": "node-learn-reminders",
+            "name": "Node Learn Task Reminders",
+            "runtime": "node-22",
+            "path": "functions/node-learn-reminders",
+            "entrypoint": "src/main.js",
+            "execute": [],
+            "enabled": true,
+            "logging": true,
+            "events": [],
+            "schedule": "0 * * * *",
+            "timeout": 60,
+            "commands": "",
+            "scopes": [
+                "databases.read",
+                "tables.read",
+                "rows.read",
+                "rows.write"
+            ],
+            "specification": "s-0.5vcpu-512mb",
+            "vars": [
+                {
+                    "key": "NODE_ENV",
+                    "value": "production"
+                },
+                {
+                    "key": "APPWRITE_ENDPOINT",
+                    "value": "https://sfo.cloud.appwrite.io/v1"
+                },
+                {
+                    "key": "APPWRITE_PROJECT_ID",
+                    "value": "6ab149e4001d09a18de3"
+                },
+                {
+                    "key": "APPWRITE_DATABASE_ID",
+                    "value": "main"
+                },
+                {
+                    "key": "LOG_LEVEL",
+                    "value": "info"
+                }
+            ]
         }
     ],
     "sites": [
@@ -942,6 +985,12 @@
                     "size": 36
                 },
                 {
+                    "key": "completionRequestedAt",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false
+                },
+                {
                     "key": "createdAt",
                     "type": "datetime",
                     "required": true,
@@ -1050,6 +1099,15 @@
                     "columns": [
                         "relationId",
                         "status"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_status_due",
+                    "type": "key",
+                    "columns": [
+                        "status",
+                        "dueAt"
                     ],
                     "orders": []
                 }
@@ -1219,6 +1277,13 @@
                     "type": "text",
                     "required": false,
                     "array": false
+                },
+                {
+                    "key": "outcome",
+                    "type": "varchar",
+                    "required": false,
+                    "array": false,
+                    "size": 16
                 },
                 {
                     "key": "createdAt",
@@ -2697,6 +2762,94 @@
                     "type": "key",
                     "columns": [
                         "parentAnswerId"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "evidence_revisions",
+            "$permissions": [],
+            "databaseId": "main",
+            "name": "evidence_revisions",
+            "enabled": true,
+            "rowSecurity": true,
+            "columns": [
+                {
+                    "key": "evidenceId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "relationId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "authorId",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 36
+                },
+                {
+                    "key": "version",
+                    "type": "integer",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "title",
+                    "type": "varchar",
+                    "required": true,
+                    "array": false,
+                    "size": 120
+                },
+                {
+                    "key": "body",
+                    "type": "text",
+                    "required": false,
+                    "array": false
+                },
+                {
+                    "key": "attachmentFileIds",
+                    "type": "varchar",
+                    "required": false,
+                    "array": true,
+                    "size": 36
+                },
+                {
+                    "key": "createdAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                },
+                {
+                    "key": "updatedAt",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "ix_evidence_version",
+                    "type": "key",
+                    "columns": [
+                        "evidenceId",
+                        "version"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "ix_author",
+                    "type": "key",
+                    "columns": [
+                        "authorId"
                     ],
                     "orders": []
                 }

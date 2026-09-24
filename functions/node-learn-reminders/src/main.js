@@ -4226,81 +4226,6 @@ var init_config = __esm({
   }
 });
 
-// src/log.ts
-function setLogLevel(level) {
-  threshold = LEVELS[level];
-}
-function log(level, message, meta) {
-  if (LEVELS[level] < threshold) return;
-  const text = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), level, message, ...meta });
-  if (level === "error") console.error(text);
-  else if (level === "warn") console.warn(text);
-  else console.log(text);
-}
-var LEVELS, threshold;
-var init_log = __esm({
-  "src/log.ts"() {
-    "use strict";
-    LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
-    threshold = LEVELS.info;
-  }
-});
-
-// src/errors.ts
-function ok(requestId2, data, status = 200, headers = {}) {
-  const body2 = { requestId: requestId2, data, error: null };
-  return new Response(JSON.stringify(body2), { status, headers: { ...JSON_HEADERS, ...headers } });
-}
-function failure(requestId2, err) {
-  const body2 = { requestId: requestId2, data: null, error: { code: err.code, message: err.message, details: err.details } };
-  return new Response(JSON.stringify(body2), { status: err.status, headers: { ...JSON_HEADERS, ...err.headers } });
-}
-function toErrorResponse(err, context) {
-  if (err instanceof HttpError) return failure(context.requestId, err);
-  log("error", "unhandled_error", {
-    requestId: context.requestId,
-    path: context.path,
-    name: err instanceof Error ? err.name : typeof err,
-    message: err instanceof Error ? err.message : String(err)
-  });
-  return failure(context.requestId, internal());
-}
-var HttpError, unauthorized, forbidden, emailNotVerified, roleRequired, notFound, conflict, payloadTooLarge, validation, rateLimited, internal, serviceUnavailable, JSON_HEADERS;
-var init_errors2 = __esm({
-  "src/errors.ts"() {
-    "use strict";
-    init_log();
-    HttpError = class extends Error {
-      status;
-      code;
-      details;
-      headers;
-      constructor(status, code, message, opts = {}) {
-        super(message);
-        this.name = "HttpError";
-        this.status = status;
-        this.code = code;
-        this.details = opts.details;
-        this.headers = opts.headers ?? {};
-      }
-    };
-    unauthorized = (msg = "Sign in to continue.") => new HttpError(401, "unauthorized", msg);
-    forbidden = (msg = "You do not have access to this.") => new HttpError(403, "forbidden", msg);
-    emailNotVerified = () => new HttpError(403, "email_not_verified", "Verify your email to continue.");
-    roleRequired = (role2) => new HttpError(403, "role_required", `This action needs the ${role2} role.`);
-    notFound = (code, message) => new HttpError(404, code, message);
-    conflict = (code, message, details) => new HttpError(409, code, message, { details });
-    payloadTooLarge = (limitBytes) => new HttpError(413, "payload_too_large", `Request body exceeds ${limitBytes} bytes.`);
-    validation = (message, fields) => new HttpError(422, "validation", message, fields ? { details: { fields } } : {});
-    rateLimited = (retryAfterSeconds) => new HttpError(429, "rate_limited", "Too many requests. Try again shortly.", {
-      headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) }
-    });
-    internal = () => new HttpError(500, "internal", "Something went wrong. Try again shortly.");
-    serviceUnavailable = (msg = "This service is not available right now.") => new HttpError(503, "service_unavailable", msg);
-    JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
-  }
-});
-
 // node_modules/undici/lib/core/symbols.js
 var require_symbols = __commonJS({
   "node_modules/undici/lib/core/symbols.js"(exports2, module2) {
@@ -4444,12 +4369,12 @@ var require_errors = __commonJS({
     };
     var kResponseStatusCodeError = Symbol.for("undici.error.UND_ERR_RESPONSE_STATUS_CODE");
     var ResponseStatusCodeError = class extends UndiciError {
-      constructor(message, statusCode, headers, body2) {
+      constructor(message, statusCode, headers, body) {
         super(message);
         this.name = "ResponseStatusCodeError";
         this.message = message || "Response Status Code Error";
         this.code = "UND_ERR_RESPONSE_STATUS_CODE";
-        this.body = body2;
+        this.body = body;
         this.status = statusCode;
         this.statusCode = statusCode;
         this.headers = headers;
@@ -5005,8 +4930,8 @@ var require_util = __commonJS({
     var { tree } = require_tree();
     var [nodeMajor, nodeMinor] = process.versions.node.split(".").map((v) => Number(v));
     var BodyAsyncIterable = class {
-      constructor(body2) {
-        this[kBody] = body2;
+      constructor(body) {
+        this[kBody] = body;
         this[kBodyUsed] = false;
       }
       async *[Symbol.asyncIterator]() {
@@ -5015,26 +4940,26 @@ var require_util = __commonJS({
         yield* this[kBody];
       }
     };
-    function wrapRequestBody(body2) {
-      if (isStream(body2)) {
-        if (bodyLength(body2) === 0) {
-          body2.on("data", function() {
+    function wrapRequestBody(body) {
+      if (isStream(body)) {
+        if (bodyLength(body) === 0) {
+          body.on("data", function() {
             assert(false);
           });
         }
-        if (typeof body2.readableDidRead !== "boolean") {
-          body2[kBodyUsed] = false;
-          EE.prototype.on.call(body2, "data", function() {
+        if (typeof body.readableDidRead !== "boolean") {
+          body[kBodyUsed] = false;
+          EE.prototype.on.call(body, "data", function() {
             this[kBodyUsed] = true;
           });
         }
-        return body2;
-      } else if (body2 && typeof body2.pipeTo === "function") {
-        return new BodyAsyncIterable(body2);
-      } else if (body2 && typeof body2 !== "string" && !ArrayBuffer.isView(body2) && isIterable(body2)) {
-        return new BodyAsyncIterable(body2);
+        return body;
+      } else if (body && typeof body.pipeTo === "function") {
+        return new BodyAsyncIterable(body);
+      } else if (body && typeof body !== "string" && !ArrayBuffer.isView(body) && isIterable(body)) {
+        return new BodyAsyncIterable(body);
       } else {
-        return body2;
+        return body;
       }
     }
     function nop() {
@@ -5154,21 +5079,21 @@ var require_util = __commonJS({
     function isIterable(obj) {
       return !!(obj != null && (typeof obj[Symbol.iterator] === "function" || typeof obj[Symbol.asyncIterator] === "function"));
     }
-    function bodyLength(body2) {
-      if (body2 == null) {
+    function bodyLength(body) {
+      if (body == null) {
         return 0;
-      } else if (isStream(body2)) {
-        const state = body2._readableState;
+      } else if (isStream(body)) {
+        const state = body._readableState;
         return state && state.objectMode === false && state.ended === true && Number.isFinite(state.length) ? state.length : null;
-      } else if (isBlobLike(body2)) {
-        return body2.size != null ? body2.size : null;
-      } else if (isBuffer(body2)) {
-        return body2.byteLength;
+      } else if (isBlobLike(body)) {
+        return body.size != null ? body.size : null;
+      } else if (isBuffer(body)) {
+        return body.byteLength;
       }
       return null;
     }
-    function isDestroyed(body2) {
-      return body2 && !!(body2.destroyed || body2[kDestroyed] || stream.isDestroyed?.(body2));
+    function isDestroyed(body) {
+      return body && !!(body.destroyed || body[kDestroyed] || stream.isDestroyed?.(body));
     }
     function destroy(stream2, err) {
       if (stream2 == null || !isStream(stream2) || isDestroyed(stream2)) {
@@ -5283,14 +5208,14 @@ var require_util = __commonJS({
         }
       }
     }
-    function isDisturbed(body2) {
-      return !!(body2 && (stream.isDisturbed(body2) || body2[kBodyUsed]));
+    function isDisturbed(body) {
+      return !!(body && (stream.isDisturbed(body) || body[kBodyUsed]));
     }
-    function isErrored(body2) {
-      return !!(body2 && stream.isErrored(body2));
+    function isErrored(body) {
+      return !!(body && stream.isErrored(body));
     }
-    function isReadable(body2) {
-      return !!(body2 && stream.isReadable(body2));
+    function isReadable(body) {
+      return !!(body && stream.isReadable(body));
     }
     function getSocketInfo(socket) {
       return {
@@ -5705,11 +5630,11 @@ var require_request = __commonJS({
     var { headerNameLowerCasedRecord } = require_constants();
     var invalidPathRegex = /[^\u0021-\u00ff]/;
     var kHandler = Symbol("handler");
-    var Request2 = class {
+    var Request = class {
       constructor(origin, {
         path,
         method,
-        body: body2,
+        body,
         headers,
         query,
         idempotent,
@@ -5757,10 +5682,10 @@ var require_request = __commonJS({
         this.throwOnError = throwOnError === true;
         this.method = method;
         this.abort = null;
-        if (body2 == null) {
+        if (body == null) {
           this.body = null;
-        } else if (isStream(body2)) {
-          this.body = body2;
+        } else if (isStream(body)) {
+          this.body = body;
           const rState = this.body._readableState;
           if (!rState || !rState.autoDestroy) {
             this.endHandler = function autoDestroy() {
@@ -5776,16 +5701,16 @@ var require_request = __commonJS({
             }
           };
           this.body.on("error", this.errorHandler);
-        } else if (isBuffer(body2)) {
-          this.body = body2.byteLength ? body2 : null;
-        } else if (ArrayBuffer.isView(body2)) {
-          this.body = body2.buffer.byteLength ? Buffer.from(body2.buffer, body2.byteOffset, body2.byteLength) : null;
-        } else if (body2 instanceof ArrayBuffer) {
-          this.body = body2.byteLength ? Buffer.from(body2) : null;
-        } else if (typeof body2 === "string") {
-          this.body = body2.length ? Buffer.from(body2) : null;
-        } else if (isFormDataLike(body2) || isIterable(body2) || isBlobLike(body2)) {
-          this.body = body2;
+        } else if (isBuffer(body)) {
+          this.body = body.byteLength ? body : null;
+        } else if (ArrayBuffer.isView(body)) {
+          this.body = body.buffer.byteLength ? Buffer.from(body.buffer, body.byteOffset, body.byteLength) : null;
+        } else if (body instanceof ArrayBuffer) {
+          this.body = body.byteLength ? Buffer.from(body) : null;
+        } else if (typeof body === "string") {
+          this.body = body.length ? Buffer.from(body) : null;
+        } else if (isFormDataLike(body) || isIterable(body) || isBlobLike(body)) {
+          this.body = body;
         } else {
           throw new InvalidArgumentError("body must be a string, a Buffer, a Readable stream, an iterable, or an async iterable");
         }
@@ -6014,7 +5939,7 @@ var require_request = __commonJS({
         request.headers.push(key, val);
       }
     }
-    module2.exports = Request2;
+    module2.exports = Request;
   }
 });
 
@@ -6732,114 +6657,114 @@ var require_constants2 = __commonJS({
       LENIENT_FLAGS2[LENIENT_FLAGS2["CHUNKED_LENGTH"] = 2] = "CHUNKED_LENGTH";
       LENIENT_FLAGS2[LENIENT_FLAGS2["KEEP_ALIVE"] = 4] = "KEEP_ALIVE";
     })(LENIENT_FLAGS = exports2.LENIENT_FLAGS || (exports2.LENIENT_FLAGS = {}));
-    var METHODS2;
-    (function(METHODS3) {
-      METHODS3[METHODS3["DELETE"] = 0] = "DELETE";
-      METHODS3[METHODS3["GET"] = 1] = "GET";
-      METHODS3[METHODS3["HEAD"] = 2] = "HEAD";
-      METHODS3[METHODS3["POST"] = 3] = "POST";
-      METHODS3[METHODS3["PUT"] = 4] = "PUT";
-      METHODS3[METHODS3["CONNECT"] = 5] = "CONNECT";
-      METHODS3[METHODS3["OPTIONS"] = 6] = "OPTIONS";
-      METHODS3[METHODS3["TRACE"] = 7] = "TRACE";
-      METHODS3[METHODS3["COPY"] = 8] = "COPY";
-      METHODS3[METHODS3["LOCK"] = 9] = "LOCK";
-      METHODS3[METHODS3["MKCOL"] = 10] = "MKCOL";
-      METHODS3[METHODS3["MOVE"] = 11] = "MOVE";
-      METHODS3[METHODS3["PROPFIND"] = 12] = "PROPFIND";
-      METHODS3[METHODS3["PROPPATCH"] = 13] = "PROPPATCH";
-      METHODS3[METHODS3["SEARCH"] = 14] = "SEARCH";
-      METHODS3[METHODS3["UNLOCK"] = 15] = "UNLOCK";
-      METHODS3[METHODS3["BIND"] = 16] = "BIND";
-      METHODS3[METHODS3["REBIND"] = 17] = "REBIND";
-      METHODS3[METHODS3["UNBIND"] = 18] = "UNBIND";
-      METHODS3[METHODS3["ACL"] = 19] = "ACL";
-      METHODS3[METHODS3["REPORT"] = 20] = "REPORT";
-      METHODS3[METHODS3["MKACTIVITY"] = 21] = "MKACTIVITY";
-      METHODS3[METHODS3["CHECKOUT"] = 22] = "CHECKOUT";
-      METHODS3[METHODS3["MERGE"] = 23] = "MERGE";
-      METHODS3[METHODS3["M-SEARCH"] = 24] = "M-SEARCH";
-      METHODS3[METHODS3["NOTIFY"] = 25] = "NOTIFY";
-      METHODS3[METHODS3["SUBSCRIBE"] = 26] = "SUBSCRIBE";
-      METHODS3[METHODS3["UNSUBSCRIBE"] = 27] = "UNSUBSCRIBE";
-      METHODS3[METHODS3["PATCH"] = 28] = "PATCH";
-      METHODS3[METHODS3["PURGE"] = 29] = "PURGE";
-      METHODS3[METHODS3["MKCALENDAR"] = 30] = "MKCALENDAR";
-      METHODS3[METHODS3["LINK"] = 31] = "LINK";
-      METHODS3[METHODS3["UNLINK"] = 32] = "UNLINK";
-      METHODS3[METHODS3["SOURCE"] = 33] = "SOURCE";
-      METHODS3[METHODS3["PRI"] = 34] = "PRI";
-      METHODS3[METHODS3["DESCRIBE"] = 35] = "DESCRIBE";
-      METHODS3[METHODS3["ANNOUNCE"] = 36] = "ANNOUNCE";
-      METHODS3[METHODS3["SETUP"] = 37] = "SETUP";
-      METHODS3[METHODS3["PLAY"] = 38] = "PLAY";
-      METHODS3[METHODS3["PAUSE"] = 39] = "PAUSE";
-      METHODS3[METHODS3["TEARDOWN"] = 40] = "TEARDOWN";
-      METHODS3[METHODS3["GET_PARAMETER"] = 41] = "GET_PARAMETER";
-      METHODS3[METHODS3["SET_PARAMETER"] = 42] = "SET_PARAMETER";
-      METHODS3[METHODS3["REDIRECT"] = 43] = "REDIRECT";
-      METHODS3[METHODS3["RECORD"] = 44] = "RECORD";
-      METHODS3[METHODS3["FLUSH"] = 45] = "FLUSH";
-    })(METHODS2 = exports2.METHODS || (exports2.METHODS = {}));
+    var METHODS;
+    (function(METHODS2) {
+      METHODS2[METHODS2["DELETE"] = 0] = "DELETE";
+      METHODS2[METHODS2["GET"] = 1] = "GET";
+      METHODS2[METHODS2["HEAD"] = 2] = "HEAD";
+      METHODS2[METHODS2["POST"] = 3] = "POST";
+      METHODS2[METHODS2["PUT"] = 4] = "PUT";
+      METHODS2[METHODS2["CONNECT"] = 5] = "CONNECT";
+      METHODS2[METHODS2["OPTIONS"] = 6] = "OPTIONS";
+      METHODS2[METHODS2["TRACE"] = 7] = "TRACE";
+      METHODS2[METHODS2["COPY"] = 8] = "COPY";
+      METHODS2[METHODS2["LOCK"] = 9] = "LOCK";
+      METHODS2[METHODS2["MKCOL"] = 10] = "MKCOL";
+      METHODS2[METHODS2["MOVE"] = 11] = "MOVE";
+      METHODS2[METHODS2["PROPFIND"] = 12] = "PROPFIND";
+      METHODS2[METHODS2["PROPPATCH"] = 13] = "PROPPATCH";
+      METHODS2[METHODS2["SEARCH"] = 14] = "SEARCH";
+      METHODS2[METHODS2["UNLOCK"] = 15] = "UNLOCK";
+      METHODS2[METHODS2["BIND"] = 16] = "BIND";
+      METHODS2[METHODS2["REBIND"] = 17] = "REBIND";
+      METHODS2[METHODS2["UNBIND"] = 18] = "UNBIND";
+      METHODS2[METHODS2["ACL"] = 19] = "ACL";
+      METHODS2[METHODS2["REPORT"] = 20] = "REPORT";
+      METHODS2[METHODS2["MKACTIVITY"] = 21] = "MKACTIVITY";
+      METHODS2[METHODS2["CHECKOUT"] = 22] = "CHECKOUT";
+      METHODS2[METHODS2["MERGE"] = 23] = "MERGE";
+      METHODS2[METHODS2["M-SEARCH"] = 24] = "M-SEARCH";
+      METHODS2[METHODS2["NOTIFY"] = 25] = "NOTIFY";
+      METHODS2[METHODS2["SUBSCRIBE"] = 26] = "SUBSCRIBE";
+      METHODS2[METHODS2["UNSUBSCRIBE"] = 27] = "UNSUBSCRIBE";
+      METHODS2[METHODS2["PATCH"] = 28] = "PATCH";
+      METHODS2[METHODS2["PURGE"] = 29] = "PURGE";
+      METHODS2[METHODS2["MKCALENDAR"] = 30] = "MKCALENDAR";
+      METHODS2[METHODS2["LINK"] = 31] = "LINK";
+      METHODS2[METHODS2["UNLINK"] = 32] = "UNLINK";
+      METHODS2[METHODS2["SOURCE"] = 33] = "SOURCE";
+      METHODS2[METHODS2["PRI"] = 34] = "PRI";
+      METHODS2[METHODS2["DESCRIBE"] = 35] = "DESCRIBE";
+      METHODS2[METHODS2["ANNOUNCE"] = 36] = "ANNOUNCE";
+      METHODS2[METHODS2["SETUP"] = 37] = "SETUP";
+      METHODS2[METHODS2["PLAY"] = 38] = "PLAY";
+      METHODS2[METHODS2["PAUSE"] = 39] = "PAUSE";
+      METHODS2[METHODS2["TEARDOWN"] = 40] = "TEARDOWN";
+      METHODS2[METHODS2["GET_PARAMETER"] = 41] = "GET_PARAMETER";
+      METHODS2[METHODS2["SET_PARAMETER"] = 42] = "SET_PARAMETER";
+      METHODS2[METHODS2["REDIRECT"] = 43] = "REDIRECT";
+      METHODS2[METHODS2["RECORD"] = 44] = "RECORD";
+      METHODS2[METHODS2["FLUSH"] = 45] = "FLUSH";
+    })(METHODS = exports2.METHODS || (exports2.METHODS = {}));
     exports2.METHODS_HTTP = [
-      METHODS2.DELETE,
-      METHODS2.GET,
-      METHODS2.HEAD,
-      METHODS2.POST,
-      METHODS2.PUT,
-      METHODS2.CONNECT,
-      METHODS2.OPTIONS,
-      METHODS2.TRACE,
-      METHODS2.COPY,
-      METHODS2.LOCK,
-      METHODS2.MKCOL,
-      METHODS2.MOVE,
-      METHODS2.PROPFIND,
-      METHODS2.PROPPATCH,
-      METHODS2.SEARCH,
-      METHODS2.UNLOCK,
-      METHODS2.BIND,
-      METHODS2.REBIND,
-      METHODS2.UNBIND,
-      METHODS2.ACL,
-      METHODS2.REPORT,
-      METHODS2.MKACTIVITY,
-      METHODS2.CHECKOUT,
-      METHODS2.MERGE,
-      METHODS2["M-SEARCH"],
-      METHODS2.NOTIFY,
-      METHODS2.SUBSCRIBE,
-      METHODS2.UNSUBSCRIBE,
-      METHODS2.PATCH,
-      METHODS2.PURGE,
-      METHODS2.MKCALENDAR,
-      METHODS2.LINK,
-      METHODS2.UNLINK,
-      METHODS2.PRI,
+      METHODS.DELETE,
+      METHODS.GET,
+      METHODS.HEAD,
+      METHODS.POST,
+      METHODS.PUT,
+      METHODS.CONNECT,
+      METHODS.OPTIONS,
+      METHODS.TRACE,
+      METHODS.COPY,
+      METHODS.LOCK,
+      METHODS.MKCOL,
+      METHODS.MOVE,
+      METHODS.PROPFIND,
+      METHODS.PROPPATCH,
+      METHODS.SEARCH,
+      METHODS.UNLOCK,
+      METHODS.BIND,
+      METHODS.REBIND,
+      METHODS.UNBIND,
+      METHODS.ACL,
+      METHODS.REPORT,
+      METHODS.MKACTIVITY,
+      METHODS.CHECKOUT,
+      METHODS.MERGE,
+      METHODS["M-SEARCH"],
+      METHODS.NOTIFY,
+      METHODS.SUBSCRIBE,
+      METHODS.UNSUBSCRIBE,
+      METHODS.PATCH,
+      METHODS.PURGE,
+      METHODS.MKCALENDAR,
+      METHODS.LINK,
+      METHODS.UNLINK,
+      METHODS.PRI,
       // TODO(indutny): should we allow it with HTTP?
-      METHODS2.SOURCE
+      METHODS.SOURCE
     ];
     exports2.METHODS_ICE = [
-      METHODS2.SOURCE
+      METHODS.SOURCE
     ];
     exports2.METHODS_RTSP = [
-      METHODS2.OPTIONS,
-      METHODS2.DESCRIBE,
-      METHODS2.ANNOUNCE,
-      METHODS2.SETUP,
-      METHODS2.PLAY,
-      METHODS2.PAUSE,
-      METHODS2.TEARDOWN,
-      METHODS2.GET_PARAMETER,
-      METHODS2.SET_PARAMETER,
-      METHODS2.REDIRECT,
-      METHODS2.RECORD,
-      METHODS2.FLUSH,
+      METHODS.OPTIONS,
+      METHODS.DESCRIBE,
+      METHODS.ANNOUNCE,
+      METHODS.SETUP,
+      METHODS.PLAY,
+      METHODS.PAUSE,
+      METHODS.TEARDOWN,
+      METHODS.GET_PARAMETER,
+      METHODS.SET_PARAMETER,
+      METHODS.REDIRECT,
+      METHODS.RECORD,
+      METHODS.FLUSH,
       // For AirPlay
-      METHODS2.GET,
-      METHODS2.POST
+      METHODS.GET,
+      METHODS.POST
     ];
-    exports2.METHOD_MAP = utils_1.enumToMap(METHODS2);
+    exports2.METHOD_MAP = utils_1.enumToMap(METHODS);
     exports2.H_METHOD_MAP = {};
     Object.keys(exports2.METHOD_MAP).forEach((key) => {
       if (/^H/.test(key)) {
@@ -7293,11 +7218,11 @@ var require_data_url = __commonJS({
       }
       position.position++;
       const encodedBody = input.slice(mimeTypeLength + 1);
-      let body2 = stringPercentDecode(encodedBody);
+      let body = stringPercentDecode(encodedBody);
       if (/;(\u0020){0,}base64$/i.test(mimeType)) {
-        const stringBody = isomorphicDecode(body2);
-        body2 = forgivingBase64(stringBody);
-        if (body2 === "failure") {
+        const stringBody = isomorphicDecode(body);
+        body = forgivingBase64(stringBody);
+        if (body === "failure") {
           return "failure";
         }
         mimeType = mimeType.slice(0, -6);
@@ -7311,7 +7236,7 @@ var require_data_url = __commonJS({
       if (mimeTypeRecord === "failure") {
         mimeTypeRecord = parseMIMEType("text/plain;charset=US-ASCII");
       }
-      return { mimeType: mimeTypeRecord, body: body2 };
+      return { mimeType: mimeTypeRecord, body };
     }
     function URLSerializer(url, excludeFragment = false) {
       if (!excludeFragment) {
@@ -8587,12 +8512,12 @@ var require_util2 = __commonJS({
         }
       });
     }
-    async function fullyReadBody(body2, processBody, processBodyError) {
+    async function fullyReadBody(body, processBody, processBodyError) {
       const successSteps = processBody;
       const errorSteps = processBodyError;
       let reader;
       try {
-        reader = body2.stream.getReader();
+        reader = body.stream.getReader();
       } catch (e) {
         errorSteps(e);
         return;
@@ -8925,7 +8850,7 @@ var require_symbols2 = __commonJS({
 var require_file = __commonJS({
   "node_modules/undici/lib/web/fetch/file.js"(exports2, module2) {
     "use strict";
-    var { Blob: Blob2, File: File4 } = require("node:buffer");
+    var { Blob: Blob2, File: File3 } = require("node:buffer");
     var { kState } = require_symbols2();
     var { webidl } = require_webidl();
     var FileLike = class _FileLike {
@@ -8978,7 +8903,7 @@ var require_file = __commonJS({
     };
     webidl.converters.Blob = webidl.interfaceConverter(Blob2);
     function isFileLike(object) {
-      return object instanceof File4 || object && (typeof object.stream === "function" || typeof object.arrayBuffer === "function") && object[Symbol.toStringTag] === "File";
+      return object instanceof File3 || object && (typeof object.stream === "function" || typeof object.arrayBuffer === "function") && object[Symbol.toStringTag] === "File";
     }
     module2.exports = { FileLike, isFileLike };
   }
@@ -8995,8 +8920,8 @@ var require_formdata = __commonJS({
     var { webidl } = require_webidl();
     var { File: NativeFile } = require("node:buffer");
     var nodeUtil = require("node:util");
-    var File4 = globalThis.File ?? NativeFile;
-    var FormData3 = class _FormData {
+    var File3 = globalThis.File ?? NativeFile;
+    var FormData2 = class _FormData {
       constructor(form) {
         webidl.util.markAsUncloneable(this);
         if (form !== void 0) {
@@ -9098,8 +9023,8 @@ var require_formdata = __commonJS({
         return `FormData ${output.slice(output.indexOf("]") + 2)}`;
       }
     };
-    iteratorMixin("FormData", FormData3, kState, "name", "value");
-    Object.defineProperties(FormData3.prototype, {
+    iteratorMixin("FormData", FormData2, kState, "name", "value");
+    Object.defineProperties(FormData2.prototype, {
       append: kEnumerableProperty,
       delete: kEnumerableProperty,
       get: kEnumerableProperty,
@@ -9115,19 +9040,19 @@ var require_formdata = __commonJS({
       if (typeof value === "string") {
       } else {
         if (!isFileLike(value)) {
-          value = value instanceof Blob ? new File4([value], "blob", { type: value.type }) : new FileLike(value, "blob", { type: value.type });
+          value = value instanceof Blob ? new File3([value], "blob", { type: value.type }) : new FileLike(value, "blob", { type: value.type });
         }
         if (filename !== void 0) {
           const options = {
             type: value.type,
             lastModified: value.lastModified
           };
-          value = value instanceof NativeFile ? new File4([value], filename, options) : new FileLike(value, filename, options);
+          value = value instanceof NativeFile ? new File3([value], filename, options) : new FileLike(value, filename, options);
         }
       }
       return { name, value };
     }
-    module2.exports = { FormData: FormData3, makeEntry };
+    module2.exports = { FormData: FormData2, makeEntry };
   }
 });
 
@@ -9142,7 +9067,7 @@ var require_formdata_parser = __commonJS({
     var { makeEntry } = require_formdata();
     var assert = require("node:assert");
     var { File: NodeFile } = require("node:buffer");
-    var File4 = globalThis.File ?? NodeFile;
+    var File3 = globalThis.File ?? NodeFile;
     var formDataNameBuffer = Buffer.from('form-data; name="');
     var filenameBuffer = Buffer.from("; filename");
     var dd = Buffer.from("--");
@@ -9206,16 +9131,16 @@ var require_formdata_parser = __commonJS({
         }
         let { name, filename, contentType, encoding } = result;
         position.position += 2;
-        let body2;
+        let body;
         {
           const boundaryIndex = input.indexOf(boundary.subarray(2), position.position);
           if (boundaryIndex === -1) {
             return "failure";
           }
-          body2 = input.subarray(position.position, boundaryIndex - 4);
-          position.position += body2.length;
+          body = input.subarray(position.position, boundaryIndex - 4);
+          position.position += body.length;
           if (encoding === "base64") {
-            body2 = Buffer.from(body2.toString(), "base64");
+            body = Buffer.from(body.toString(), "base64");
           }
         }
         if (input[position.position] !== 13 || input[position.position + 1] !== 10) {
@@ -9229,9 +9154,9 @@ var require_formdata_parser = __commonJS({
           if (!isAsciiString(contentType)) {
             contentType = "";
           }
-          value = new File4([body2], filename, { type: contentType });
+          value = new File3([body], filename, { type: contentType });
         } else {
-          value = utf8DecodeBytes(Buffer.from(body2));
+          value = utf8DecodeBytes(Buffer.from(body));
         }
         assert(isUSVString(name));
         assert(typeof value === "string" && isUSVString(value) || isFileLike(value));
@@ -9397,7 +9322,7 @@ var require_body = __commonJS({
       extractMimeType,
       utf8DecodeBytes
     } = require_util2();
-    var { FormData: FormData3 } = require_formdata();
+    var { FormData: FormData2 } = require_formdata();
     var { kState } = require_symbols2();
     var { webidl } = require_webidl();
     var { Blob: Blob2 } = require("node:buffer");
@@ -9559,8 +9484,8 @@ Content-Type: ${value.type || "application/octet-stream"}\r
           type: "bytes"
         });
       }
-      const body2 = { stream, source, length };
-      return [body2, type];
+      const body = { stream, source, length };
+      return [body, type];
     }
     function safelyExtractBody(object, keepalive = false) {
       if (object instanceof ReadableStream) {
@@ -9569,13 +9494,13 @@ Content-Type: ${value.type || "application/octet-stream"}\r
       }
       return extractBody(object, keepalive);
     }
-    function cloneBody(instance, body2) {
-      const [out1, out2] = body2.stream.tee();
-      body2.stream = out1;
+    function cloneBody(instance, body) {
+      const [out1, out2] = body.stream.tee();
+      body.stream = out1;
       return {
         stream: out2,
-        length: body2.length,
-        source: body2.source
+        length: body.length,
+        source: body.source
       };
     }
     function throwIfAborted(state) {
@@ -9617,13 +9542,13 @@ Content-Type: ${value.type || "application/octet-stream"}\r
                   if (parsed === "failure") {
                     throw new TypeError("Failed to parse body as FormData.");
                   }
-                  const fd = new FormData3();
+                  const fd = new FormData2();
                   fd[kState] = parsed;
                   return fd;
                 }
                 case "application/x-www-form-urlencoded": {
                   const entries = new URLSearchParams(value.toString());
-                  const fd = new FormData3();
+                  const fd = new FormData2();
                   for (const [name, value2] of entries) {
                     fd.append(name, value2);
                   }
@@ -9670,8 +9595,8 @@ Content-Type: ${value.type || "application/octet-stream"}\r
       return promise.promise;
     }
     function bodyUnusable(object) {
-      const body2 = object[kState].body;
-      return body2 != null && (body2.stream.locked || util2.isDisturbed(body2.stream));
+      const body = object[kState].body;
+      return body != null && (body.stream.locked || util2.isDisturbed(body.stream));
     }
     function parseJSONFromBytes(bytes) {
       return JSON.parse(utf8DecodeBytes(bytes));
@@ -9921,14 +9846,14 @@ var require_client_h1 = __commonJS({
           }
           const offset = llhttp.llhttp_get_error_pos(this.ptr) - currentBufferPtr;
           if (ret !== constants.ERROR.OK) {
-            const body2 = data.subarray(offset);
+            const body = data.subarray(offset);
             if (ret === constants.ERROR.PAUSED_UPGRADE) {
-              this.onUpgrade(body2);
+              this.onUpgrade(body);
             } else if (ret === constants.ERROR.PAUSED) {
               this.paused = true;
-              socket.unshift(body2);
+              socket.unshift(body);
             } else {
-              throw this.createError(ret, body2);
+              throw this.createError(ret, body);
             }
           }
         } catch (err) {
@@ -10422,20 +10347,20 @@ var require_client_h1 = __commonJS({
     }
     function writeH1(client, request) {
       const { method, path, host, upgrade, blocking, reset } = request;
-      let { body: body2, headers, contentLength } = request;
+      let { body, headers, contentLength } = request;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
-      if (util2.isFormDataLike(body2)) {
+      if (util2.isFormDataLike(body)) {
         if (!extractBody) {
           extractBody = require_body().extractBody;
         }
-        const [bodyStream, contentType] = extractBody(body2);
+        const [bodyStream, contentType] = extractBody(body);
         if (request.contentType == null) {
           headers.push("content-type", contentType);
         }
-        body2 = bodyStream.stream;
+        body = bodyStream.stream;
         contentLength = bodyStream.length;
-      } else if (util2.isBlobLike(body2) && request.contentType == null) {
-        const contentType = body2.type;
+      } else if (util2.isBlobLike(body) && request.contentType == null) {
+        const contentType = body.type;
         if (contentType) {
           const contentTypeValue = `${contentType}`;
           if (!util2.isValidHeaderValue(contentTypeValue)) {
@@ -10445,10 +10370,10 @@ var require_client_h1 = __commonJS({
           headers.push("content-type", contentTypeValue);
         }
       }
-      if (body2 && typeof body2.read === "function") {
-        body2.read(0);
+      if (body && typeof body.read === "function") {
+        body.read(0);
       }
-      const bodyLength = util2.bodyLength(body2);
+      const bodyLength = util2.bodyLength(body);
       contentLength = bodyLength ?? contentLength;
       if (contentLength === null) {
         contentLength = request.contentLength;
@@ -10470,7 +10395,7 @@ var require_client_h1 = __commonJS({
           return;
         }
         util2.errorRequest(client, request, err || new RequestAbortedError());
-        util2.destroy(body2);
+        util2.destroy(body);
         util2.destroy(socket, new InformationalError("aborted"));
       };
       try {
@@ -10531,26 +10456,26 @@ upgrade: ${upgrade}\r
       if (channels.sendHeaders.hasSubscribers) {
         channels.sendHeaders.publish({ request, headers: header, socket });
       }
-      if (!body2 || bodyLength === 0) {
+      if (!body || bodyLength === 0) {
         writeBuffer(abort, null, client, request, socket, contentLength, header, expectsPayload);
-      } else if (util2.isBuffer(body2)) {
-        writeBuffer(abort, body2, client, request, socket, contentLength, header, expectsPayload);
-      } else if (util2.isBlobLike(body2)) {
-        if (typeof body2.stream === "function") {
-          writeIterable(abort, body2.stream(), client, request, socket, contentLength, header, expectsPayload);
+      } else if (util2.isBuffer(body)) {
+        writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload);
+      } else if (util2.isBlobLike(body)) {
+        if (typeof body.stream === "function") {
+          writeIterable(abort, body.stream(), client, request, socket, contentLength, header, expectsPayload);
         } else {
-          writeBlob(abort, body2, client, request, socket, contentLength, header, expectsPayload);
+          writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload);
         }
-      } else if (util2.isStream(body2)) {
-        writeStream(abort, body2, client, request, socket, contentLength, header, expectsPayload);
-      } else if (util2.isIterable(body2)) {
-        writeIterable(abort, body2, client, request, socket, contentLength, header, expectsPayload);
+      } else if (util2.isStream(body)) {
+        writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload);
+      } else if (util2.isIterable(body)) {
+        writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload);
       } else {
         assert(false);
       }
       return true;
     }
-    function writeStream(abort, body2, client, request, socket, contentLength, header, expectsPayload) {
+    function writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
       let finished = false;
       const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });
@@ -10570,13 +10495,13 @@ upgrade: ${upgrade}\r
         if (finished) {
           return;
         }
-        if (body2.resume) {
-          body2.resume();
+        if (body.resume) {
+          body.resume();
         }
       };
       const onClose = function() {
         queueMicrotask(() => {
-          body2.removeListener("error", onFinished);
+          body.removeListener("error", onFinished);
         });
         if (!finished) {
           const err = new RequestAbortedError();
@@ -10590,7 +10515,7 @@ upgrade: ${upgrade}\r
         finished = true;
         assert(socket.destroyed || socket[kWriting] && client[kRunning] <= 1);
         socket.off("drain", onDrain).off("error", onFinished);
-        body2.removeListener("data", onData).removeListener("end", onFinished).removeListener("close", onClose);
+        body.removeListener("data", onData).removeListener("end", onFinished).removeListener("close", onClose);
         if (!err) {
           try {
             writer.end();
@@ -10600,28 +10525,28 @@ upgrade: ${upgrade}\r
         }
         writer.destroy(err);
         if (err && (err.code !== "UND_ERR_INFO" || err.message !== "reset")) {
-          util2.destroy(body2, err);
+          util2.destroy(body, err);
         } else {
-          util2.destroy(body2);
+          util2.destroy(body);
         }
       };
-      body2.on("data", onData).on("end", onFinished).on("error", onFinished).on("close", onClose);
-      if (body2.resume) {
-        body2.resume();
+      body.on("data", onData).on("end", onFinished).on("error", onFinished).on("close", onClose);
+      if (body.resume) {
+        body.resume();
       }
       socket.on("drain", onDrain).on("error", onFinished);
-      if (body2.errorEmitted ?? body2.errored) {
-        setImmediate(() => onFinished(body2.errored));
-      } else if (body2.endEmitted ?? body2.readableEnded) {
+      if (body.errorEmitted ?? body.errored) {
+        setImmediate(() => onFinished(body.errored));
+      } else if (body.endEmitted ?? body.readableEnded) {
         setImmediate(() => onFinished(null));
       }
-      if (body2.closeEmitted ?? body2.closed) {
+      if (body.closeEmitted ?? body.closed) {
         setImmediate(onClose);
       }
     }
-    function writeBuffer(abort, body2, client, request, socket, contentLength, header, expectsPayload) {
+    function writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload) {
       try {
-        if (!body2) {
+        if (!body) {
           if (contentLength === 0) {
             socket.write(`${header}content-length: 0\r
 \r
@@ -10631,15 +10556,15 @@ upgrade: ${upgrade}\r
             socket.write(`${header}\r
 `, "latin1");
           }
-        } else if (util2.isBuffer(body2)) {
-          assert(contentLength === body2.byteLength, "buffer body must have content length");
+        } else if (util2.isBuffer(body)) {
+          assert(contentLength === body.byteLength, "buffer body must have content length");
           socket.cork();
           socket.write(`${header}content-length: ${contentLength}\r
 \r
 `, "latin1");
-          socket.write(body2);
+          socket.write(body);
           socket.uncork();
-          request.onBodySent(body2);
+          request.onBodySent(body);
           if (!expectsPayload && request.reset !== false) {
             socket[kReset] = true;
           }
@@ -10650,13 +10575,13 @@ upgrade: ${upgrade}\r
         abort(err);
       }
     }
-    async function writeBlob(abort, body2, client, request, socket, contentLength, header, expectsPayload) {
-      assert(contentLength === body2.size, "blob body must have content length");
+    async function writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload) {
+      assert(contentLength === body.size, "blob body must have content length");
       try {
-        if (contentLength != null && contentLength !== body2.size) {
+        if (contentLength != null && contentLength !== body.size) {
           throw new RequestContentLengthMismatchError();
         }
-        const buffer = Buffer.from(await body2.arrayBuffer());
+        const buffer = Buffer.from(await body.arrayBuffer());
         socket.cork();
         socket.write(`${header}content-length: ${contentLength}\r
 \r
@@ -10673,7 +10598,7 @@ upgrade: ${upgrade}\r
         abort(err);
       }
     }
-    async function writeIterable(abort, body2, client, request, socket, contentLength, header, expectsPayload) {
+    async function writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "iterator body cannot be pipelined");
       let callback = null;
       function onDrain() {
@@ -10694,7 +10619,7 @@ upgrade: ${upgrade}\r
       socket.on("close", onDrain).on("drain", onDrain);
       const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });
       try {
-        for await (const chunk of body2) {
+        for await (const chunk of body) {
           if (socket[kError]) {
             throw socket[kError];
           }
@@ -11023,7 +10948,7 @@ var require_client_h2 = __commonJS({
     function writeH2(client, request) {
       const session = client[kHTTP2Session];
       const { method, path, host, upgrade, expectContinue, signal, headers: reqHeaders } = request;
-      let { body: body2 } = request;
+      let { body } = request;
       if (upgrade) {
         util2.errorRequest(client, request, new Error("Upgrade not supported for H2"));
         return false;
@@ -11057,7 +10982,7 @@ var require_client_h2 = __commonJS({
         if (stream != null) {
           util2.destroy(stream, err);
         }
-        util2.destroy(body2, err);
+        util2.destroy(body, err);
         client[kQueue][client[kRunningIdx]++] = null;
         client[kResume]();
       };
@@ -11092,15 +11017,15 @@ var require_client_h2 = __commonJS({
       headers[HTTP2_HEADER_PATH] = path;
       headers[HTTP2_HEADER_SCHEME] = "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH";
-      if (body2 && typeof body2.read === "function") {
-        body2.read(0);
+      if (body && typeof body.read === "function") {
+        body.read(0);
       }
-      let contentLength = util2.bodyLength(body2);
-      if (util2.isFormDataLike(body2)) {
+      let contentLength = util2.bodyLength(body);
+      if (util2.isFormDataLike(body)) {
         extractBody ??= require_body().extractBody;
-        const [bodyStream, contentType] = extractBody(body2);
+        const [bodyStream, contentType] = extractBody(body);
         headers["content-type"] = contentType;
-        body2 = bodyStream.stream;
+        body = bodyStream.stream;
         contentLength = bodyStream.length;
       }
       if (contentLength == null) {
@@ -11117,11 +11042,11 @@ var require_client_h2 = __commonJS({
         process.emitWarning(new RequestContentLengthMismatchError());
       }
       if (contentLength != null) {
-        assert(body2, "no body must not have content length");
+        assert(body, "no body must not have content length");
         headers[HTTP2_HEADER_CONTENT_LENGTH] = `${contentLength}`;
       }
       session.ref();
-      const shouldEndStream = method === "GET" || method === "HEAD" || body2 === null;
+      const shouldEndStream = method === "GET" || method === "HEAD" || body === null;
       if (expectContinue) {
         headers[HTTP2_HEADER_EXPECT] = "100-continue";
         stream = session.request(headers, { endStream: shouldEndStream, signal });
@@ -11178,7 +11103,7 @@ var require_client_h2 = __commonJS({
       });
       return true;
       function writeBodyH2() {
-        if (!body2 || contentLength === 0) {
+        if (!body || contentLength === 0) {
           writeBuffer(
             abort,
             stream,
@@ -11189,23 +11114,23 @@ var require_client_h2 = __commonJS({
             contentLength,
             expectsPayload
           );
-        } else if (util2.isBuffer(body2)) {
+        } else if (util2.isBuffer(body)) {
           writeBuffer(
             abort,
             stream,
-            body2,
+            body,
             client,
             request,
             client[kSocket],
             contentLength,
             expectsPayload
           );
-        } else if (util2.isBlobLike(body2)) {
-          if (typeof body2.stream === "function") {
+        } else if (util2.isBlobLike(body)) {
+          if (typeof body.stream === "function") {
             writeIterable(
               abort,
               stream,
-              body2.stream(),
+              body.stream(),
               client,
               request,
               client[kSocket],
@@ -11216,7 +11141,7 @@ var require_client_h2 = __commonJS({
             writeBlob(
               abort,
               stream,
-              body2,
+              body,
               client,
               request,
               client[kSocket],
@@ -11224,22 +11149,22 @@ var require_client_h2 = __commonJS({
               expectsPayload
             );
           }
-        } else if (util2.isStream(body2)) {
+        } else if (util2.isStream(body)) {
           writeStream(
             abort,
             client[kSocket],
             expectsPayload,
             stream,
-            body2,
+            body,
             client,
             request,
             contentLength
           );
-        } else if (util2.isIterable(body2)) {
+        } else if (util2.isIterable(body)) {
           writeIterable(
             abort,
             stream,
-            body2,
+            body,
             client,
             request,
             client[kSocket],
@@ -11251,15 +11176,15 @@ var require_client_h2 = __commonJS({
         }
       }
     }
-    function writeBuffer(abort, h2stream, body2, client, request, socket, contentLength, expectsPayload) {
+    function writeBuffer(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {
       try {
-        if (body2 != null && util2.isBuffer(body2)) {
-          assert(contentLength === body2.byteLength, "buffer body must have content length");
+        if (body != null && util2.isBuffer(body)) {
+          assert(contentLength === body.byteLength, "buffer body must have content length");
           h2stream.cork();
-          h2stream.write(body2);
+          h2stream.write(body);
           h2stream.uncork();
           h2stream.end();
-          request.onBodySent(body2);
+          request.onBodySent(body);
         }
         if (!expectsPayload) {
           socket[kReset] = true;
@@ -11270,10 +11195,10 @@ var require_client_h2 = __commonJS({
         abort(error);
       }
     }
-    function writeStream(abort, socket, expectsPayload, h2stream, body2, client, request, contentLength) {
+    function writeStream(abort, socket, expectsPayload, h2stream, body, client, request, contentLength) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
       const pipe = pipeline(
-        body2,
+        body,
         h2stream,
         (err) => {
           if (err) {
@@ -11294,13 +11219,13 @@ var require_client_h2 = __commonJS({
         request.onBodySent(chunk);
       }
     }
-    async function writeBlob(abort, h2stream, body2, client, request, socket, contentLength, expectsPayload) {
-      assert(contentLength === body2.size, "blob body must have content length");
+    async function writeBlob(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {
+      assert(contentLength === body.size, "blob body must have content length");
       try {
-        if (contentLength != null && contentLength !== body2.size) {
+        if (contentLength != null && contentLength !== body.size) {
           throw new RequestContentLengthMismatchError();
         }
-        const buffer = Buffer.from(await body2.arrayBuffer());
+        const buffer = Buffer.from(await body.arrayBuffer());
         h2stream.cork();
         h2stream.write(buffer);
         h2stream.uncork();
@@ -11315,7 +11240,7 @@ var require_client_h2 = __commonJS({
         abort(err);
       }
     }
-    async function writeIterable(abort, h2stream, body2, client, request, socket, contentLength, expectsPayload) {
+    async function writeIterable(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "iterator body cannot be pipelined");
       let callback = null;
       function onDrain() {
@@ -11335,7 +11260,7 @@ var require_client_h2 = __commonJS({
       });
       h2stream.on("close", onDrain).on("drain", onDrain);
       try {
-        for await (const chunk of body2) {
+        for await (const chunk of body) {
           if (socket[kError]) {
             throw socket[kError];
           }
@@ -11373,8 +11298,8 @@ var require_redirect_handler = __commonJS({
     var redirectableStatusCodes = [300, 301, 302, 303, 307, 308];
     var kBody = Symbol("body");
     var BodyAsyncIterable = class {
-      constructor(body2) {
-        this[kBody] = body2;
+      constructor(body) {
+        this[kBody] = body;
         this[kBodyUsed] = false;
       }
       async *[Symbol.asyncIterator]() {
@@ -11484,11 +11409,11 @@ var require_redirect_handler = __commonJS({
         }
       }
     }
-    function shouldRemoveHeader(header, removeContent2, unknownOrigin) {
+    function shouldRemoveHeader(header, removeContent, unknownOrigin) {
       if (header.length === 4) {
         return util2.headerNameToString(header) === "host";
       }
-      if (removeContent2 && util2.headerNameToString(header).startsWith("content-")) {
+      if (removeContent && util2.headerNameToString(header).startsWith("content-")) {
         return true;
       }
       if (unknownOrigin && (header.length === 13 || header.length === 6 || header.length === 19)) {
@@ -11497,17 +11422,17 @@ var require_redirect_handler = __commonJS({
       }
       return false;
     }
-    function cleanRequestHeaders(headers, removeContent2, unknownOrigin) {
+    function cleanRequestHeaders(headers, removeContent, unknownOrigin) {
       const ret = [];
       if (Array.isArray(headers)) {
         for (let i = 0; i < headers.length; i += 2) {
-          if (!shouldRemoveHeader(headers[i], removeContent2, unknownOrigin)) {
+          if (!shouldRemoveHeader(headers[i], removeContent, unknownOrigin)) {
             ret.push(headers[i], headers[i + 1]);
           }
         }
       } else if (headers && typeof headers === "object") {
         for (const key of Object.keys(headers)) {
-          if (!shouldRemoveHeader(key, removeContent2, unknownOrigin)) {
+          if (!shouldRemoveHeader(key, removeContent, unknownOrigin)) {
             ret.push(key, headers[key]);
           }
         }
@@ -11551,7 +11476,7 @@ var require_client = __commonJS({
     var http = require("node:http");
     var util2 = require_util();
     var { channels } = require_diagnostics();
-    var Request2 = require_request();
+    var Request = require_request();
     var DispatcherBase = require_dispatcher_base();
     var {
       InvalidArgumentError,
@@ -11793,7 +11718,7 @@ var require_client = __commonJS({
       }
       [kDispatch](opts, handler) {
         const origin = opts.origin || this[kUrl].origin;
-        const request = new Request2(origin, opts, handler);
+        const request = new Request(origin, opts, handler);
         this[kQueue].push(request);
         if (this[kResuming]) {
         } else if (util2.bodyLength(request.body) == null && util2.isIterable(request.body)) {
@@ -13485,7 +13410,7 @@ var require_readable = __commonJS({
         return this[kBody];
       }
       async dump(opts) {
-        let limit2 = Number.isFinite(opts?.limit) ? opts.limit : 128 * 1024;
+        let limit = Number.isFinite(opts?.limit) ? opts.limit : 128 * 1024;
         const signal = opts?.signal;
         if (signal != null && (typeof signal !== "object" || !("aborted" in signal))) {
           throw new InvalidArgumentError("signal must be an AbortSignal");
@@ -13495,7 +13420,7 @@ var require_readable = __commonJS({
           return null;
         }
         return await new Promise((resolve2, reject) => {
-          if (this[kContentLength] > limit2) {
+          if (this[kContentLength] > limit) {
             this.destroy(new AbortError());
           }
           const onAbort = () => {
@@ -13510,8 +13435,8 @@ var require_readable = __commonJS({
               resolve2(null);
             }
           }).on("error", noop).on("data", function(chunk) {
-            limit2 -= chunk.length;
-            if (limit2 <= 0) {
+            limit -= chunk.length;
+            if (limit <= 0) {
               this.destroy();
             }
           }).resume();
@@ -13613,18 +13538,18 @@ var require_readable = __commonJS({
       return buffer;
     }
     function consumeEnd(consume2) {
-      const { type, body: body2, resolve: resolve2, stream, length } = consume2;
+      const { type, body, resolve: resolve2, stream, length } = consume2;
       try {
         if (type === "text") {
-          resolve2(chunksDecode(body2, length));
+          resolve2(chunksDecode(body, length));
         } else if (type === "json") {
-          resolve2(JSON.parse(chunksDecode(body2, length)));
+          resolve2(JSON.parse(chunksDecode(body, length)));
         } else if (type === "arrayBuffer") {
-          resolve2(chunksConcat(body2, length).buffer);
+          resolve2(chunksConcat(body, length).buffer);
         } else if (type === "blob") {
-          resolve2(new Blob(body2, { type: stream[kContentType] }));
+          resolve2(new Blob(body, { type: stream[kContentType] }));
         } else if (type === "bytes") {
-          resolve2(chunksConcat(body2, length));
+          resolve2(chunksConcat(body, length));
         }
         consumeFinish(consume2);
       } catch (err) {
@@ -13664,12 +13589,12 @@ var require_util3 = __commonJS({
     } = require_errors();
     var { chunksDecode } = require_readable();
     var CHUNK_LIMIT = 128 * 1024;
-    async function getResolveErrorBodyCallback({ callback, body: body2, contentType, statusCode, statusMessage, headers }) {
-      assert(body2);
+    async function getResolveErrorBodyCallback({ callback, body, contentType, statusCode, statusMessage, headers }) {
+      assert(body);
       let chunks = [];
       let length = 0;
       try {
-        for await (const chunk of body2) {
+        for await (const chunk of body) {
           chunks.push(chunk);
           length += chunk.length;
           if (length > CHUNK_LIMIT) {
@@ -13731,7 +13656,7 @@ var require_api_request = __commonJS({
         if (!opts || typeof opts !== "object") {
           throw new InvalidArgumentError("invalid opts");
         }
-        const { signal, method, opaque, body: body2, onInfo, responseHeaders, throwOnError, highWaterMark } = opts;
+        const { signal, method, opaque, body, onInfo, responseHeaders, throwOnError, highWaterMark } = opts;
         try {
           if (typeof callback !== "function") {
             throw new InvalidArgumentError("invalid callback");
@@ -13750,8 +13675,8 @@ var require_api_request = __commonJS({
           }
           super("UNDICI_REQUEST");
         } catch (err) {
-          if (util2.isStream(body2)) {
-            util2.destroy(body2.on("error", util2.nop), err);
+          if (util2.isStream(body)) {
+            util2.destroy(body.on("error", util2.nop), err);
           }
           throw err;
         }
@@ -13761,7 +13686,7 @@ var require_api_request = __commonJS({
         this.callback = callback;
         this.res = null;
         this.abort = null;
-        this.body = body2;
+        this.body = body;
         this.trailers = {};
         this.context = null;
         this.onInfo = onInfo || null;
@@ -13770,8 +13695,8 @@ var require_api_request = __commonJS({
         this.signal = signal;
         this.reason = null;
         this.removeAbortListener = null;
-        if (util2.isStream(body2)) {
-          body2.on("error", (err) => {
+        if (util2.isStream(body)) {
+          body.on("error", (err) => {
             this.onError(err);
           });
         }
@@ -13855,7 +13780,7 @@ var require_api_request = __commonJS({
         this.res.push(null);
       }
       onError(err) {
-        const { res, callback, body: body2, opaque } = this;
+        const { res, callback, body, opaque } = this;
         if (callback) {
           this.callback = null;
           queueMicrotask(() => {
@@ -13868,9 +13793,9 @@ var require_api_request = __commonJS({
             util2.destroy(res, err);
           });
         }
-        if (body2) {
+        if (body) {
           this.body = null;
-          util2.destroy(body2, err);
+          util2.destroy(body, err);
         }
         if (this.removeAbortListener) {
           res?.off("close", this.removeAbortListener);
@@ -13969,7 +13894,7 @@ var require_api_stream = __commonJS({
         if (!opts || typeof opts !== "object") {
           throw new InvalidArgumentError("invalid opts");
         }
-        const { signal, method, opaque, body: body2, onInfo, responseHeaders, throwOnError } = opts;
+        const { signal, method, opaque, body, onInfo, responseHeaders, throwOnError } = opts;
         try {
           if (typeof callback !== "function") {
             throw new InvalidArgumentError("invalid callback");
@@ -13988,8 +13913,8 @@ var require_api_stream = __commonJS({
           }
           super("UNDICI_STREAM");
         } catch (err) {
-          if (util2.isStream(body2)) {
-            util2.destroy(body2.on("error", util2.nop), err);
+          if (util2.isStream(body)) {
+            util2.destroy(body.on("error", util2.nop), err);
           }
           throw err;
         }
@@ -14001,11 +13926,11 @@ var require_api_stream = __commonJS({
         this.abort = null;
         this.context = null;
         this.trailers = null;
-        this.body = body2;
+        this.body = body;
         this.onInfo = onInfo || null;
         this.throwOnError = throwOnError || false;
-        if (util2.isStream(body2)) {
-          body2.on("error", (err) => {
+        if (util2.isStream(body)) {
+          body.on("error", (err) => {
             this.onError(err);
           });
         }
@@ -14086,7 +14011,7 @@ var require_api_stream = __commonJS({
         res.end();
       }
       onError(err) {
-        const { res, callback, opaque, body: body2 } = this;
+        const { res, callback, opaque, body } = this;
         removeSignal(this);
         this.factory = null;
         if (res) {
@@ -14098,9 +14023,9 @@ var require_api_stream = __commonJS({
             this.runInAsyncScope(callback, null, err, { opaque });
           });
         }
-        if (body2) {
+        if (body) {
           this.body = null;
-          util2.destroy(body2, err);
+          util2.destroy(body, err);
         }
       }
     };
@@ -14207,9 +14132,9 @@ var require_api_pipeline = __commonJS({
           readableObjectMode: opts.objectMode,
           autoDestroy: true,
           read: () => {
-            const { body: body2 } = this;
-            if (body2?.resume) {
-              body2.resume();
+            const { body } = this;
+            if (body?.resume) {
+              body.resume();
             }
           },
           write: (chunk, encoding, callback) => {
@@ -14221,14 +14146,14 @@ var require_api_pipeline = __commonJS({
             }
           },
           destroy: (err, callback) => {
-            const { body: body2, req, res, ret, abort } = this;
+            const { body, req, res, ret, abort } = this;
             if (!err && !ret._readableState.endEmitted) {
               err = new RequestAbortedError();
             }
             if (abort && err) {
               abort();
             }
-            util2.destroy(body2, err);
+            util2.destroy(body, err);
             util2.destroy(req, err);
             util2.destroy(res, err);
             removeSignal(this);
@@ -14262,11 +14187,11 @@ var require_api_pipeline = __commonJS({
           return;
         }
         this.res = new PipelineResponse(resume);
-        let body2;
+        let body;
         try {
           this.handler = null;
           const headers = this.responseHeaders === "raw" ? util2.parseRawHeaders(rawHeaders) : util2.parseHeaders(rawHeaders);
-          body2 = this.runInAsyncScope(handler, null, {
+          body = this.runInAsyncScope(handler, null, {
             statusCode,
             headers,
             opaque,
@@ -14277,13 +14202,13 @@ var require_api_pipeline = __commonJS({
           this.res.on("error", util2.nop);
           throw err;
         }
-        if (!body2 || typeof body2.on !== "function") {
+        if (!body || typeof body.on !== "function") {
           throw new InvalidReturnValueError("expected Readable");
         }
-        body2.on("data", (chunk) => {
-          const { ret, body: body3 } = this;
-          if (!ret.push(chunk) && body3.pause) {
-            body3.pause();
+        body.on("data", (chunk) => {
+          const { ret, body: body2 } = this;
+          if (!ret.push(chunk) && body2.pause) {
+            body2.pause();
           }
         }).on("error", (err) => {
           const { ret } = this;
@@ -14297,7 +14222,7 @@ var require_api_pipeline = __commonJS({
             util2.destroy(ret, new RequestAbortedError());
           }
         });
-        this.body = body2;
+        this.body = body;
       }
       onData(chunk) {
         const { res } = this;
@@ -14592,15 +14517,15 @@ var require_mock_utils = __commonJS({
         isPromise
       }
     } = require("node:util");
-    function matchValue(match2, value) {
-      if (typeof match2 === "string") {
-        return match2 === value;
+    function matchValue(match, value) {
+      if (typeof match === "string") {
+        return match === value;
       }
-      if (match2 instanceof RegExp) {
-        return match2.test(value);
+      if (match instanceof RegExp) {
+        return match.test(value);
       }
-      if (typeof match2 === "function") {
-        return match2(value) === true;
+      if (typeof match === "function") {
+        return match(value) === true;
       }
       return false;
     }
@@ -14666,10 +14591,10 @@ var require_mock_utils = __commonJS({
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path, method, body: body2, headers }) {
+    function matchKey(mockDispatch2, { path, method, body, headers }) {
       const pathMatch = matchValue(mockDispatch2.path, path);
       const methodMatch = matchValue(mockDispatch2.method, method);
-      const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body2) : true;
+      const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
       return pathMatch && methodMatch && bodyMatch && headersMatch;
     }
@@ -14697,7 +14622,7 @@ var require_mock_utils = __commonJS({
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for method '${key.method}' on path '${resolvedPath}'`);
       }
-      matchedMockDispatches = matchedMockDispatches.filter(({ body: body2 }) => typeof body2 !== "undefined" ? matchValue(body2, key.body) : true);
+      matchedMockDispatches = matchedMockDispatches.filter(({ body }) => typeof body !== "undefined" ? matchValue(body, key.body) : true);
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for body '${key.body}' on path '${resolvedPath}'`);
       }
@@ -14727,11 +14652,11 @@ var require_mock_utils = __commonJS({
       }
     }
     function buildKey(opts) {
-      const { path, method, body: body2, headers, query } = opts;
+      const { path, method, body, headers, query } = opts;
       return {
         path,
         method,
-        body: body2,
+        body,
         headers,
         query
       };
@@ -14756,9 +14681,9 @@ var require_mock_utils = __commonJS({
     function getStatusText(statusCode) {
       return STATUS_CODES[statusCode] || "unknown";
     }
-    async function getResponse(body2) {
+    async function getResponse(body) {
       const buffers = [];
-      for await (const data of body2) {
+      for await (const data of body) {
         buffers.push(data);
       }
       return Buffer.concat(buffers).toString("utf8");
@@ -14788,12 +14713,12 @@ var require_mock_utils = __commonJS({
       }
       function handleReply(mockDispatches, _data = data) {
         const optsHeaders = Array.isArray(opts.headers) ? buildHeadersFromArray(opts.headers) : opts.headers;
-        const body2 = typeof _data === "function" ? _data({ ...opts, headers: optsHeaders }) : _data;
-        if (isPromise(body2)) {
-          body2.then((newData) => handleReply(mockDispatches, newData));
+        const body = typeof _data === "function" ? _data({ ...opts, headers: optsHeaders }) : _data;
+        if (isPromise(body)) {
+          body.then((newData) => handleReply(mockDispatches, newData));
           return;
         }
-        const responseData = getResponseData(body2);
+        const responseData = getResponseData(body);
         const responseHeaders = generateKeyValues(headers);
         const responseTrailers = generateKeyValues(trailers);
         handler.onConnect?.((err) => handler.onError(err), null);
@@ -15563,7 +15488,7 @@ var require_dns = __commonJS({
   "node_modules/undici/lib/interceptor/dns.js"(exports2, module2) {
     "use strict";
     var { isIP } = require("node:net");
-    var { lookup: lookup3 } = require("node:dns");
+    var { lookup } = require("node:dns");
     var DecoratorHandler = require_decorator_handler();
     var { InvalidArgumentError, InformationalError } = require_errors();
     var maxInt = Math.pow(2, 31) - 1;
@@ -15653,7 +15578,7 @@ var require_dns = __commonJS({
         }
       }
       #defaultLookup(origin, opts, cb) {
-        lookup3(
+        lookup(
           origin.hostname,
           {
             all: true,
@@ -16086,7 +16011,7 @@ var require_headers = __commonJS({
         }
       }
     };
-    var Headers2 = class _Headers {
+    var Headers = class _Headers {
       #guard;
       #headersList;
       constructor(init = void 0) {
@@ -16236,13 +16161,13 @@ var require_headers = __commonJS({
         o.#headersList = list;
       }
     };
-    var { getHeadersGuard, setHeadersGuard, getHeadersList, setHeadersList } = Headers2;
-    Reflect.deleteProperty(Headers2, "getHeadersGuard");
-    Reflect.deleteProperty(Headers2, "setHeadersGuard");
-    Reflect.deleteProperty(Headers2, "getHeadersList");
-    Reflect.deleteProperty(Headers2, "setHeadersList");
-    iteratorMixin("Headers", Headers2, kHeadersSortedMap, 0, 1);
-    Object.defineProperties(Headers2.prototype, {
+    var { getHeadersGuard, setHeadersGuard, getHeadersList, setHeadersList } = Headers;
+    Reflect.deleteProperty(Headers, "getHeadersGuard");
+    Reflect.deleteProperty(Headers, "setHeadersGuard");
+    Reflect.deleteProperty(Headers, "getHeadersList");
+    Reflect.deleteProperty(Headers, "setHeadersList");
+    iteratorMixin("Headers", Headers, kHeadersSortedMap, 0, 1);
+    Object.defineProperties(Headers.prototype, {
       append: kEnumerableProperty,
       delete: kEnumerableProperty,
       get: kEnumerableProperty,
@@ -16260,7 +16185,7 @@ var require_headers = __commonJS({
     webidl.converters.HeadersInit = function(V, prefix, argument) {
       if (webidl.util.Type(V) === "Object") {
         const iterator = Reflect.get(V, Symbol.iterator);
-        if (!util2.types.isProxy(V) && iterator === Headers2.prototype.entries) {
+        if (!util2.types.isProxy(V) && iterator === Headers.prototype.entries) {
           try {
             return getHeadersList(V).entriesList;
           } catch {
@@ -16281,7 +16206,7 @@ var require_headers = __commonJS({
       fill,
       // for test.
       compareHeaderName,
-      Headers: Headers2,
+      Headers,
       HeadersList,
       getHeadersGuard,
       setHeadersGuard,
@@ -16295,7 +16220,7 @@ var require_headers = __commonJS({
 var require_response = __commonJS({
   "node_modules/undici/lib/web/fetch/response.js"(exports2, module2) {
     "use strict";
-    var { Headers: Headers2, HeadersList, fill, getHeadersGuard, setHeadersGuard, setHeadersList } = require_headers();
+    var { Headers, HeadersList, fill, getHeadersGuard, setHeadersGuard, setHeadersList } = require_headers();
     var { extractBody, cloneBody, mixinBody, hasFinalizationRegistry, streamRegistry, bodyUnusable } = require_body();
     var util2 = require_util();
     var nodeUtil = require("node:util");
@@ -16316,7 +16241,7 @@ var require_response = __commonJS({
     } = require_constants3();
     var { kState, kHeaders } = require_symbols2();
     var { webidl } = require_webidl();
-    var { FormData: FormData3 } = require_formdata();
+    var { FormData: FormData2 } = require_formdata();
     var { URLSerializer } = require_data_url();
     var { kConstruct } = require_symbols();
     var assert = require("node:assert");
@@ -16337,9 +16262,9 @@ var require_response = __commonJS({
         const bytes = textEncoder.encode(
           serializeJavascriptValueToJSONString(data)
         );
-        const body2 = extractBody(bytes);
+        const body = extractBody(bytes);
         const responseObject = fromInnerResponse(makeResponse({}), "response");
-        initializeResponse(responseObject, init, { body: body2[0], type: "application/json" });
+        initializeResponse(responseObject, init, { body: body[0], type: "application/json" });
         return responseObject;
       }
       // Creates a redirect Response that redirects to url with status status.
@@ -16363,22 +16288,22 @@ var require_response = __commonJS({
         return responseObject;
       }
       // https://fetch.spec.whatwg.org/#dom-response
-      constructor(body2 = null, init = {}) {
+      constructor(body = null, init = {}) {
         webidl.util.markAsUncloneable(this);
-        if (body2 === kConstruct) {
+        if (body === kConstruct) {
           return;
         }
-        if (body2 !== null) {
-          body2 = webidl.converters.BodyInit(body2);
+        if (body !== null) {
+          body = webidl.converters.BodyInit(body);
         }
         init = webidl.converters.ResponseInit(init);
         this[kState] = makeResponse({});
-        this[kHeaders] = new Headers2(kConstruct);
+        this[kHeaders] = new Headers(kConstruct);
         setHeadersGuard(this[kHeaders], "response");
         setHeadersList(this[kHeaders], this[kState].headersList);
         let bodyWithType = null;
-        if (body2 != null) {
-          const [extractedBody, type] = extractBody(body2);
+        if (body != null) {
+          const [extractedBody, type] = extractBody(body);
           bodyWithType = { body: extractedBody, type };
         }
         initializeResponse(this, init, bodyWithType);
@@ -16583,7 +16508,7 @@ var require_response = __commonJS({
       assert(isCancelled(fetchParams));
       return isAborted2(fetchParams) ? makeNetworkError(Object.assign(new DOMException("The operation was aborted.", "AbortError"), { cause: err })) : makeNetworkError(Object.assign(new DOMException("Request was cancelled."), { cause: err }));
     }
-    function initializeResponse(response, init, body2) {
+    function initializeResponse(response, init, body) {
       if (init.status !== null && (init.status < 200 || init.status > 599)) {
         throw new RangeError('init["status"] must be in the range of 200 to 599, inclusive.');
       }
@@ -16601,23 +16526,23 @@ var require_response = __commonJS({
       if ("headers" in init && init.headers != null) {
         fill(response[kHeaders], init.headers);
       }
-      if (body2) {
+      if (body) {
         if (nullBodyStatus.includes(response.status)) {
           throw webidl.errors.exception({
             header: "Response constructor",
             message: `Invalid response status code ${response.status}`
           });
         }
-        response[kState].body = body2.body;
-        if (body2.type != null && !response[kState].headersList.contains("content-type", true)) {
-          response[kState].headersList.append("content-type", body2.type, true);
+        response[kState].body = body.body;
+        if (body.type != null && !response[kState].headersList.contains("content-type", true)) {
+          response[kState].headersList.append("content-type", body.type, true);
         }
       }
     }
     function fromInnerResponse(innerResponse, guard) {
       const response = new Response2(kConstruct);
       response[kState] = innerResponse;
-      response[kHeaders] = new Headers2(kConstruct);
+      response[kHeaders] = new Headers(kConstruct);
       setHeadersList(response[kHeaders], innerResponse.headersList);
       setHeadersGuard(response[kHeaders], guard);
       if (hasFinalizationRegistry && innerResponse.body?.stream) {
@@ -16629,7 +16554,7 @@ var require_response = __commonJS({
       ReadableStream
     );
     webidl.converters.FormData = webidl.interfaceConverter(
-      FormData3
+      FormData2
     );
     webidl.converters.URLSearchParams = webidl.interfaceConverter(
       URLSearchParams
@@ -16737,7 +16662,7 @@ var require_request2 = __commonJS({
   "node_modules/undici/lib/web/fetch/request.js"(exports2, module2) {
     "use strict";
     var { extractBody, mixinBody, cloneBody, bodyUnusable } = require_body();
-    var { Headers: Headers2, fill: fillHeaders, HeadersList, setHeadersGuard, getHeadersGuard, setHeadersList, getHeadersList } = require_headers();
+    var { Headers, fill: fillHeaders, HeadersList, setHeadersGuard, getHeadersGuard, setHeadersList, getHeadersList } = require_headers();
     var { FinalizationRegistry: FinalizationRegistry2 } = require_dispatcher_weakref()();
     var util2 = require_util();
     var nodeUtil = require("node:util");
@@ -16793,7 +16718,7 @@ var require_request2 = __commonJS({
       }
     }
     var patchMethodWarning = false;
-    var Request2 = class _Request {
+    var Request = class _Request {
       // https://fetch.spec.whatwg.org/#dom-request
       constructor(input, init = {}) {
         webidl.util.markAsUncloneable(this);
@@ -17005,7 +16930,7 @@ var require_request2 = __commonJS({
             requestFinalizer.register(ac, { signal, abort }, abort);
           }
         }
-        this[kHeaders] = new Headers2(kConstruct);
+        this[kHeaders] = new Headers(kConstruct);
         setHeadersList(this[kHeaders], request.headersList);
         setHeadersGuard(this[kHeaders], "request");
         if (mode === "no-cors") {
@@ -17240,7 +17165,7 @@ var require_request2 = __commonJS({
         return `Request ${nodeUtil.formatWithOptions(options, properties)}`;
       }
     };
-    mixinBody(Request2);
+    mixinBody(Request);
     function makeRequest(init) {
       return {
         method: init.method ?? "GET",
@@ -17291,15 +17216,15 @@ var require_request2 = __commonJS({
       return newRequest;
     }
     function fromInnerRequest(innerRequest, signal, guard) {
-      const request = new Request2(kConstruct);
+      const request = new Request(kConstruct);
       request[kState] = innerRequest;
       request[kSignal] = signal;
-      request[kHeaders] = new Headers2(kConstruct);
+      request[kHeaders] = new Headers(kConstruct);
       setHeadersList(request[kHeaders], innerRequest.headersList);
       setHeadersGuard(request[kHeaders], guard);
       return request;
     }
-    Object.defineProperties(Request2.prototype, {
+    Object.defineProperties(Request.prototype, {
       method: kEnumerableProperty,
       url: kEnumerableProperty,
       headers: kEnumerableProperty,
@@ -17326,13 +17251,13 @@ var require_request2 = __commonJS({
       }
     });
     webidl.converters.Request = webidl.interfaceConverter(
-      Request2
+      Request
     );
     webidl.converters.RequestInfo = function(V, prefix, argument) {
       if (typeof V === "string") {
         return webidl.converters.USVString(V, prefix, argument);
       }
-      if (V instanceof Request2) {
+      if (V instanceof Request) {
         return webidl.converters.Request(V, prefix, argument);
       }
       return webidl.converters.USVString(V, prefix, argument);
@@ -17423,7 +17348,7 @@ var require_request2 = __commonJS({
         converter: webidl.converters.any
       }
     ]);
-    module2.exports = { Request: Request2, makeRequest, fromInnerRequest, cloneRequest };
+    module2.exports = { Request, makeRequest, fromInnerRequest, cloneRequest };
   }
 });
 
@@ -17439,7 +17364,7 @@ var require_fetch = __commonJS({
       fromInnerResponse
     } = require_response();
     var { HeadersList } = require_headers();
-    var { Request: Request2, cloneRequest } = require_request2();
+    var { Request, cloneRequest } = require_request2();
     var zlib = require("node:zlib");
     var {
       bytesMatch,
@@ -17534,7 +17459,7 @@ var require_fetch = __commonJS({
       let p = createDeferredPromise();
       let requestObject;
       try {
-        requestObject = new Request2(input, init);
+        requestObject = new Request(input, init);
       } catch (e) {
         p.reject(e);
         return p.promise;
@@ -18249,11 +18174,11 @@ var require_fetch = __commonJS({
         }();
       }
       try {
-        const { body: body2, status, statusText, headersList, socket } = await dispatch({ body: requestBody });
+        const { body, status, statusText, headersList, socket } = await dispatch({ body: requestBody });
         if (socket) {
           response = makeResponse({ status, statusText, headersList, socket });
         } else {
-          const iterator = body2[Symbol.asyncIterator]();
+          const iterator = body[Symbol.asyncIterator]();
           fetchParams.controller.next = () => iterator.next();
           response = makeResponse({ status, statusText, headersList });
         }
@@ -18348,7 +18273,7 @@ var require_fetch = __commonJS({
         fetchParams.controller.connection.destroy();
       }
       return response;
-      function dispatch({ body: body2 }) {
+      function dispatch({ body }) {
         const url = requestCurrentURL(request);
         const agent = fetchParams.controller.dispatcher;
         return new Promise((resolve2, reject) => agent.dispatch(
@@ -18356,7 +18281,7 @@ var require_fetch = __commonJS({
             path: url.pathname + url.search,
             origin: url.origin,
             method: request.method,
-            body: agent.isMockActive ? request.body && (request.body.source || request.body.stream) : body2,
+            body: agent.isMockActive ? request.body && (request.body.source || request.body.stream) : body,
             headers: request.headersList.entries,
             maxRedirections: 0,
             upgrade: request.mode === "websocket" ? "websocket" : void 0
@@ -18879,7 +18804,7 @@ var require_util4 = __commonJS({
     var { serializeAMimeType, parseMIMEType } = require_data_url();
     var { types } = require("node:util");
     var { StringDecoder } = require("string_decoder");
-    var { btoa: btoa2 } = require("node:buffer");
+    var { btoa } = require("node:buffer");
     var staticPropertyDescriptors = {
       enumerable: true,
       writable: false,
@@ -18971,9 +18896,9 @@ var require_util4 = __commonJS({
           dataURL += ";base64,";
           const decoder = new StringDecoder("latin1");
           for (const chunk of bytes) {
-            dataURL += btoa2(decoder.write(chunk));
+            dataURL += btoa(decoder.write(chunk));
           }
-          dataURL += btoa2(decoder.end());
+          dataURL += btoa(decoder.end());
           return dataURL;
         }
         case "Text": {
@@ -19356,7 +19281,7 @@ var require_cache = __commonJS({
     var { kEnumerableProperty, isDisturbed } = require_util();
     var { webidl } = require_webidl();
     var { Response: Response2, cloneResponse, fromInnerResponse } = require_response();
-    var { Request: Request2, fromInnerRequest } = require_request2();
+    var { Request, fromInnerRequest } = require_request2();
     var { kState } = require_symbols2();
     var { fetching } = require_fetch();
     var { urlIsHttpHttpsScheme, createDeferredPromise, readAllBytes } = require_util2();
@@ -19407,7 +19332,7 @@ var require_cache = __commonJS({
         const prefix = "Cache.addAll";
         webidl.argumentLengthCheck(arguments, 1, prefix);
         const responsePromises = [];
-        const requestList2 = [];
+        const requestList = [];
         for (let request of requests) {
           if (request === void 0) {
             throw webidl.errors.conversionFailed({
@@ -19430,7 +19355,7 @@ var require_cache = __commonJS({
         }
         const fetchControllers = [];
         for (const request of requests) {
-          const r = new Request2(request)[kState];
+          const r = new Request(request)[kState];
           if (!urlIsHttpHttpsScheme(r.url)) {
             throw webidl.errors.exception({
               header: prefix,
@@ -19439,7 +19364,7 @@ var require_cache = __commonJS({
           }
           r.initiator = "fetch";
           r.destination = "subresource";
-          requestList2.push(r);
+          requestList.push(r);
           const responsePromise = createDeferredPromise();
           fetchControllers.push(fetching({
             request: r,
@@ -19483,7 +19408,7 @@ var require_cache = __commonJS({
           const operation = {
             type: "put",
             // 7.3.2
-            request: requestList2[index],
+            request: requestList[index],
             // 7.3.3
             response
             // 7.3.4
@@ -19514,10 +19439,10 @@ var require_cache = __commonJS({
         request = webidl.converters.RequestInfo(request, prefix, "request");
         response = webidl.converters.Response(response, prefix, "response");
         let innerRequest = null;
-        if (request instanceof Request2) {
+        if (request instanceof Request) {
           innerRequest = request[kState];
         } else {
-          innerRequest = new Request2(request)[kState];
+          innerRequest = new Request(request)[kState];
         }
         if (!urlIsHttpHttpsScheme(innerRequest.url) || innerRequest.method !== "GET") {
           throw webidl.errors.exception({
@@ -19595,14 +19520,14 @@ var require_cache = __commonJS({
         request = webidl.converters.RequestInfo(request, prefix, "request");
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
         let r = null;
-        if (request instanceof Request2) {
+        if (request instanceof Request) {
           r = request[kState];
           if (r.method !== "GET" && !options.ignoreMethod) {
             return false;
           }
         } else {
           assert(typeof request === "string");
-          r = new Request2(request)[kState];
+          r = new Request(request)[kState];
         }
         const operations = [];
         const operation = {
@@ -19641,13 +19566,13 @@ var require_cache = __commonJS({
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
         let r = null;
         if (request !== void 0) {
-          if (request instanceof Request2) {
+          if (request instanceof Request) {
             r = request[kState];
             if (r.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
           } else if (typeof request === "string") {
-            r = new Request2(request)[kState];
+            r = new Request(request)[kState];
           }
         }
         const promise = createDeferredPromise();
@@ -19663,16 +19588,16 @@ var require_cache = __commonJS({
           }
         }
         queueMicrotask(() => {
-          const requestList2 = [];
+          const requestList = [];
           for (const request2 of requests) {
             const requestObject = fromInnerRequest(
               request2,
               new AbortController().signal,
               "immutable"
             );
-            requestList2.push(requestObject);
+            requestList.push(requestObject);
           }
-          promise.resolve(Object.freeze(requestList2));
+          promise.resolve(Object.freeze(requestList));
         });
         return promise.promise;
       }
@@ -19682,8 +19607,8 @@ var require_cache = __commonJS({
        * @returns {requestResponseList}
        */
       #batchCacheOperations(operations) {
-        const cache3 = this.#relevantRequestResponseList;
-        const backupCache = [...cache3];
+        const cache = this.#relevantRequestResponseList;
+        const backupCache = [...cache];
         const addedItems = [];
         const resultList = [];
         try {
@@ -19710,9 +19635,9 @@ var require_cache = __commonJS({
                 return [];
               }
               for (const requestResponse of requestResponses) {
-                const idx = cache3.indexOf(requestResponse);
+                const idx = cache.indexOf(requestResponse);
                 assert(idx !== -1);
-                cache3.splice(idx, 1);
+                cache.splice(idx, 1);
               }
             } else if (operation.type === "put") {
               if (operation.response == null) {
@@ -19742,11 +19667,11 @@ var require_cache = __commonJS({
               }
               requestResponses = this.#queryCache(operation.request);
               for (const requestResponse of requestResponses) {
-                const idx = cache3.indexOf(requestResponse);
+                const idx = cache.indexOf(requestResponse);
                 assert(idx !== -1);
-                cache3.splice(idx, 1);
+                cache.splice(idx, 1);
               }
-              cache3.push([operation.request, operation.response]);
+              cache.push([operation.request, operation.response]);
               addedItems.push([operation.request, operation.response]);
             }
             resultList.push([operation.request, operation.response]);
@@ -19813,13 +19738,13 @@ var require_cache = __commonJS({
       #internalMatchAll(request, options, maxResponses = Infinity) {
         let r = null;
         if (request !== void 0) {
-          if (request instanceof Request2) {
+          if (request instanceof Request) {
             r = request[kState];
             if (r.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
           } else if (typeof request === "string") {
-            r = new Request2(request)[kState];
+            r = new Request(request)[kState];
           }
         }
         const responses = [];
@@ -19920,13 +19845,13 @@ var require_cachestorage = __commonJS({
         if (options.cacheName != null) {
           if (this.#caches.has(options.cacheName)) {
             const cacheList = this.#caches.get(options.cacheName);
-            const cache3 = new Cache(kConstruct, cacheList);
-            return await cache3.match(request, options);
+            const cache = new Cache(kConstruct, cacheList);
+            return await cache.match(request, options);
           }
         } else {
           for (const cacheList of this.#caches.values()) {
-            const cache3 = new Cache(kConstruct, cacheList);
-            const response = await cache3.match(request, options);
+            const cache = new Cache(kConstruct, cacheList);
+            const response = await cache.match(request, options);
             if (response !== void 0) {
               return response;
             }
@@ -19956,12 +19881,12 @@ var require_cachestorage = __commonJS({
         webidl.argumentLengthCheck(arguments, 1, prefix);
         cacheName = webidl.converters.DOMString(cacheName, prefix, "cacheName");
         if (this.#caches.has(cacheName)) {
-          const cache4 = this.#caches.get(cacheName);
-          return new Cache(kConstruct, cache4);
+          const cache2 = this.#caches.get(cacheName);
+          return new Cache(kConstruct, cache2);
         }
-        const cache3 = [];
-        this.#caches.set(cacheName, cache3);
-        return new Cache(kConstruct, cache3);
+        const cache = [];
+        this.#caches.set(cacheName, cache);
+        return new Cache(kConstruct, cache);
       }
       /**
        * @see https://w3c.github.io/ServiceWorker/#cache-storage-delete
@@ -20366,10 +20291,10 @@ var require_cookies = __commonJS({
     var { parseSetCookie } = require_parse();
     var { stringify } = require_util6();
     var { webidl } = require_webidl();
-    var { Headers: Headers2 } = require_headers();
+    var { Headers } = require_headers();
     function getCookies(headers) {
       webidl.argumentLengthCheck(arguments, 1, "getCookies");
-      webidl.brandCheck(headers, Headers2, { strict: false });
+      webidl.brandCheck(headers, Headers, { strict: false });
       const cookie = headers.get("cookie");
       const out = {};
       if (!cookie) {
@@ -20382,7 +20307,7 @@ var require_cookies = __commonJS({
       return out;
     }
     function deleteCookie(headers, name, attributes) {
-      webidl.brandCheck(headers, Headers2, { strict: false });
+      webidl.brandCheck(headers, Headers, { strict: false });
       const prefix = "deleteCookie";
       webidl.argumentLengthCheck(arguments, 2, prefix);
       name = webidl.converters.DOMString(name, prefix, "name");
@@ -20396,7 +20321,7 @@ var require_cookies = __commonJS({
     }
     function getSetCookies(headers) {
       webidl.argumentLengthCheck(arguments, 1, "getSetCookies");
-      webidl.brandCheck(headers, Headers2, { strict: false });
+      webidl.brandCheck(headers, Headers, { strict: false });
       const cookies = headers.getSetCookie();
       if (!cookies) {
         return [];
@@ -20405,7 +20330,7 @@ var require_cookies = __commonJS({
     }
     function setCookie(headers, cookie) {
       webidl.argumentLengthCheck(arguments, 2, "setCookie");
-      webidl.brandCheck(headers, Headers2, { strict: false });
+      webidl.brandCheck(headers, Headers, { strict: false });
       cookie = webidl.converters.Cookie(cookie);
       const str = stringify(cookie);
       if (str) {
@@ -20846,7 +20771,7 @@ var require_util7 = __commonJS({
     function isClosing(ws) {
       return ws[kReadyState] === states.CLOSING;
     }
-    function isClosed2(ws) {
+    function isClosed(ws) {
       return ws[kReadyState] === states.CLOSED;
     }
     function fireEvent(e, target, eventFactory = (type, init) => new Event(type, init), eventInitDict = {}) {
@@ -20984,7 +20909,7 @@ var require_util7 = __commonJS({
       isConnecting,
       isEstablished,
       isClosing,
-      isClosed: isClosed2,
+      isClosed,
       fireEvent,
       isValidSubprotocol,
       isValidStatusCode,
@@ -21090,12 +21015,12 @@ var require_connection = __commonJS({
       kReceivedClose,
       kResponse
     } = require_symbols5();
-    var { fireEvent, failWebsocketConnection, isClosing, isClosed: isClosed2, isEstablished, parseExtensions } = require_util7();
+    var { fireEvent, failWebsocketConnection, isClosing, isClosed, isEstablished, parseExtensions } = require_util7();
     var { channels } = require_diagnostics();
     var { CloseEvent } = require_events();
     var { makeRequest } = require_request2();
     var { fetching } = require_fetch();
-    var { Headers: Headers2, getHeadersList } = require_headers();
+    var { Headers, getHeadersList } = require_headers();
     var { getDecodeSplit } = require_util2();
     var { WebsocketFrameSend } = require_frame();
     var crypto2;
@@ -21117,7 +21042,7 @@ var require_connection = __commonJS({
         redirect: "error"
       });
       if (options.headers) {
-        const headersList = getHeadersList(new Headers2(options.headers));
+        const headersList = getHeadersList(new Headers(options.headers));
         request.headersList = headersList;
       }
       const keyValue = crypto2.randomBytes(16).toString("base64");
@@ -21188,7 +21113,7 @@ var require_connection = __commonJS({
       return controller;
     }
     function closeWebSocketConnection(ws, code, reason, reasonByteLength) {
-      if (isClosing(ws) || isClosed2(ws)) {
+      if (isClosing(ws) || isClosed(ws)) {
       } else if (!isEstablished(ws)) {
         failWebsocketConnection(ws, "Connection was closed before it was established.");
         ws[kReadyState] = states.CLOSING;
@@ -21523,13 +21448,13 @@ var require_receiver = __commonJS({
             if (this.#byteOffset < this.#info.payloadLength) {
               return callback();
             }
-            const body2 = this.consume(this.#info.payloadLength);
+            const body = this.consume(this.#info.payloadLength);
             if (isControlFrame(this.#info.opcode)) {
-              this.#loop = this.parseControlFrame(body2);
+              this.#loop = this.parseControlFrame(body);
               this.#state = parserStates.INFO;
             } else {
               if (!this.#info.compressed) {
-                if (!this.writeFragments(body2)) {
+                if (!this.writeFragments(body)) {
                   return;
                 }
                 if (this.#maxPayloadSize > 0 && this.#fragmentsBytes > this.#maxPayloadSize) {
@@ -21542,7 +21467,7 @@ var require_receiver = __commonJS({
                 this.#state = parserStates.INFO;
               } else {
                 this.#extensions.get("permessage-deflate").decompress(
-                  body2,
+                  body,
                   this.#info.fin,
                   (error, data) => {
                     if (error) {
@@ -21655,14 +21580,14 @@ var require_receiver = __commonJS({
        * Parses control frames.
        * @param {Buffer} body
        */
-      parseControlFrame(body2) {
+      parseControlFrame(body) {
         const { opcode, payloadLength } = this.#info;
         if (opcode === opcodes.CLOSE) {
           if (payloadLength === 1) {
             failWebsocketConnection(this.ws, "Received close frame with a 1-byte body.");
             return false;
           }
-          this.#info.closeInfo = this.parseCloseBody(body2);
+          this.#info.closeInfo = this.parseCloseBody(body);
           if (this.#info.closeInfo.error) {
             const { code, reason } = this.#info.closeInfo;
             closeWebSocketConnection(this.ws, code, reason, reason.length);
@@ -21670,12 +21595,12 @@ var require_receiver = __commonJS({
             return false;
           }
           if (this.ws[kSentClose] !== sentCloseFrameState.SENT) {
-            let body3 = emptyBuffer;
+            let body2 = emptyBuffer;
             if (this.#info.closeInfo.code) {
-              body3 = Buffer.allocUnsafe(2);
-              body3.writeUInt16BE(this.#info.closeInfo.code, 0);
+              body2 = Buffer.allocUnsafe(2);
+              body2.writeUInt16BE(this.#info.closeInfo.code, 0);
             }
-            const closeFrame = new WebsocketFrameSend(body3);
+            const closeFrame = new WebsocketFrameSend(body2);
             this.ws[kResponse].socket.write(
               closeFrame.createFrame(opcodes.CLOSE),
               (err) => {
@@ -21690,18 +21615,18 @@ var require_receiver = __commonJS({
           return false;
         } else if (opcode === opcodes.PING) {
           if (!this.ws[kReceivedClose]) {
-            const frame = new WebsocketFrameSend(body2);
+            const frame = new WebsocketFrameSend(body);
             this.ws[kResponse].socket.write(frame.createFrame(opcodes.PONG));
             if (channels.ping.hasSubscribers) {
               channels.ping.publish({
-                payload: body2
+                payload: body
               });
             }
           }
         } else if (opcode === opcodes.PONG) {
           if (channels.pong.hasSubscribers) {
             channels.pong.publish({
-              payload: body2
+              payload: body
             });
           }
         }
@@ -22574,7 +22499,7 @@ var require_eventsource = __commonJS({
     var experimentalWarned = false;
     var defaultReconnectionTime = 3e3;
     var CONNECTING = 0;
-    var OPEN2 = 1;
+    var OPEN = 1;
     var CLOSED = 2;
     var ANONYMOUS = "anonymous";
     var USE_CREDENTIALS = "use-credentials";
@@ -22706,7 +22631,7 @@ var require_eventsource = __commonJS({
             this.dispatchEvent(new Event("error"));
             return;
           }
-          this.#readyState = OPEN2;
+          this.#readyState = OPEN;
           this.dispatchEvent(new Event("open"));
           this.#state.origin = response.urlList[response.urlList.length - 1].origin;
           const eventSourceStream = new EventSourceStream({
@@ -22812,7 +22737,7 @@ var require_eventsource = __commonJS({
         __proto__: null,
         configurable: false,
         enumerable: true,
-        value: OPEN2,
+        value: OPEN,
         writable: false
       },
       CLOSED: {
@@ -23133,7 +23058,7 @@ var require_bignumber = __commonJS({
   "node_modules/bignumber.js/bignumber.js"(exports2, module2) {
     (function(globalObject) {
       "use strict";
-      var BigNumber, isNumeric = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i, mathceil = Math.ceil, mathfloor = Math.floor, bignumberError = "[BigNumber Error] ", tooManyDigits = bignumberError + "Number primitive has more than 15 significant digits: ", BASE = 1e14, LOG_BASE = 14, MAX_SAFE_INTEGER = 9007199254740991, POWS_TEN = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13], SQRT_BASE = 1e7, MAX2 = 1e9;
+      var BigNumber, isNumeric = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i, mathceil = Math.ceil, mathfloor = Math.floor, bignumberError = "[BigNumber Error] ", tooManyDigits = bignumberError + "Number primitive has more than 15 significant digits: ", BASE = 1e14, LOG_BASE = 14, MAX_SAFE_INTEGER = 9007199254740991, POWS_TEN = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13], SQRT_BASE = 1e7, MAX = 1e9;
       function clone(configObject) {
         var div, convertBase, parseNumeric, P = BigNumber2.prototype = { constructor: BigNumber2, toString: null, valueOf: null }, ONE = new BigNumber2(1), DECIMAL_PLACES = 20, ROUNDING_MODE = 4, TO_EXP_NEG = -7, TO_EXP_POS = 21, MIN_EXP = -1e7, MAX_EXP = 1e7, CRYPTO = false, MODULO_MODE = 1, POW_PRECISION = 0, FORMAT = {
           prefix: "",
@@ -23277,7 +23202,7 @@ var require_bignumber = __commonJS({
             if (typeof obj == "object") {
               if (obj.hasOwnProperty(p = "DECIMAL_PLACES")) {
                 v = obj[p];
-                intCheck(v, 0, MAX2, p);
+                intCheck(v, 0, MAX, p);
                 DECIMAL_PLACES = v;
               }
               if (obj.hasOwnProperty(p = "ROUNDING_MODE")) {
@@ -23288,24 +23213,24 @@ var require_bignumber = __commonJS({
               if (obj.hasOwnProperty(p = "EXPONENTIAL_AT")) {
                 v = obj[p];
                 if (v && v.pop) {
-                  intCheck(v[0], -MAX2, 0, p);
-                  intCheck(v[1], 0, MAX2, p);
+                  intCheck(v[0], -MAX, 0, p);
+                  intCheck(v[1], 0, MAX, p);
                   TO_EXP_NEG = v[0];
                   TO_EXP_POS = v[1];
                 } else {
-                  intCheck(v, -MAX2, MAX2, p);
+                  intCheck(v, -MAX, MAX, p);
                   TO_EXP_NEG = -(TO_EXP_POS = v < 0 ? -v : v);
                 }
               }
               if (obj.hasOwnProperty(p = "RANGE")) {
                 v = obj[p];
                 if (v && v.pop) {
-                  intCheck(v[0], -MAX2, -1, p);
-                  intCheck(v[1], 1, MAX2, p);
+                  intCheck(v[0], -MAX, -1, p);
+                  intCheck(v[1], 1, MAX, p);
                   MIN_EXP = v[0];
                   MAX_EXP = v[1];
                 } else {
-                  intCheck(v, -MAX2, MAX2, p);
+                  intCheck(v, -MAX, MAX, p);
                   if (v) {
                     MIN_EXP = -(MAX_EXP = v < 0 ? -v : v);
                   } else {
@@ -23337,7 +23262,7 @@ var require_bignumber = __commonJS({
               }
               if (obj.hasOwnProperty(p = "POW_PRECISION")) {
                 v = obj[p];
-                intCheck(v, 0, MAX2, p);
+                intCheck(v, 0, MAX, p);
                 POW_PRECISION = v;
               }
               if (obj.hasOwnProperty(p = "FORMAT")) {
@@ -23375,7 +23300,7 @@ var require_bignumber = __commonJS({
           if (!BigNumber2.DEBUG) return true;
           var i, n, c = v.c, e = v.e, s = v.s;
           out: if ({}.toString.call(c) == "[object Array]") {
-            if ((s === 1 || s === -1) && e >= -MAX2 && e <= MAX2 && e === mathfloor(e)) {
+            if ((s === 1 || s === -1) && e >= -MAX && e <= MAX && e === mathfloor(e)) {
               if (c[0] === 0) {
                 if (e === 0 && c.length === 1) return true;
                 break out;
@@ -23411,7 +23336,7 @@ var require_bignumber = __commonJS({
           return function(dp) {
             var a, b, e, k, v, i = 0, c = [], rand = new BigNumber2(ONE);
             if (dp == null) dp = DECIMAL_PLACES;
-            else intCheck(dp, 0, MAX2);
+            else intCheck(dp, 0, MAX);
             k = mathceil(dp / LOG_BASE);
             if (CRYPTO) {
               if (crypto.getRandomValues) {
@@ -23879,7 +23804,7 @@ var require_bignumber = __commonJS({
         P.decimalPlaces = P.dp = function(dp, rm) {
           var c, n, v, x = this;
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX);
             if (rm == null) rm = ROUNDING_MODE;
             else intCheck(rm, 0, 8);
             return round(new BigNumber2(x), dp + x.e + 1, rm);
@@ -24199,7 +24124,7 @@ var require_bignumber = __commonJS({
         P.precision = P.sd = function(sd, rm) {
           var c, n, v, x = this;
           if (sd != null && sd !== !!sd) {
-            intCheck(sd, 1, MAX2);
+            intCheck(sd, 1, MAX);
             if (rm == null) rm = ROUNDING_MODE;
             else intCheck(rm, 0, 8);
             return round(new BigNumber2(x), sd, rm);
@@ -24274,14 +24199,14 @@ var require_bignumber = __commonJS({
         };
         P.toExponential = function(dp, rm) {
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX);
             dp++;
           }
           return format(this, dp, rm, 1);
         };
         P.toFixed = function(dp, rm) {
           if (dp != null) {
-            intCheck(dp, 0, MAX2);
+            intCheck(dp, 0, MAX);
             dp = dp + this.e + 1;
           }
           return format(this, dp, rm);
@@ -24370,7 +24295,7 @@ var require_bignumber = __commonJS({
           return +valueOf(this);
         };
         P.toPrecision = function(sd, rm) {
-          if (sd != null) intCheck(sd, 1, MAX2);
+          if (sd != null) intCheck(sd, 1, MAX);
           return format(this, sd, rm, 2);
         };
         P.toString = function(b) {
@@ -24950,7 +24875,7 @@ var init_query = __esm({
     _Query.orderRandom = () => new _Query("orderRandom").toString();
     _Query.cursorAfter = (documentId) => new _Query("cursorAfter", void 0, documentId).toString();
     _Query.cursorBefore = (documentId) => new _Query("cursorBefore", void 0, documentId).toString();
-    _Query.limit = (limit2) => new _Query("limit", void 0, limit2).toString();
+    _Query.limit = (limit) => new _Query("limit", void 0, limit).toString();
     _Query.offset = (offset) => new _Query("offset", void 0, offset).toString();
     _Query.contains = (attribute, value) => new _Query("contains", attribute, value).toString();
     _Query.containsAny = (attribute, value) => new _Query("containsAny", attribute, value).toString();
@@ -25708,1666 +25633,9 @@ var init_client = __esm({
 });
 
 // node_modules/node-appwrite/dist/services/account.mjs
-var Account;
 var init_account = __esm({
   "node_modules/node-appwrite/dist/services/account.mjs"() {
     init_client();
-    Account = class {
-      constructor(client) {
-        this.client = client;
-      }
-      /**
-       * Get the currently logged in user.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.User<Preferences>>}
-       */
-      get() {
-        const apiPath = "/account";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      create(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            name: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      listConsents(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            total: rest[0]
-          };
-        }
-        const queries = params.queries;
-        const total = params.total;
-        const apiPath = "/account/consents";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      getConsent(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            consentId: paramsOrFirst
-          };
-        }
-        const consentId = params.consentId;
-        if (typeof consentId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "consentId"'
-          );
-        }
-        const apiPath = "/account/consents/{consentId}".replace(
-          "{consentId}",
-          encodeURIComponent(String(consentId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      deleteConsent(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            consentId: paramsOrFirst
-          };
-        }
-        const consentId = params.consentId;
-        if (typeof consentId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "consentId"'
-          );
-        }
-        const apiPath = "/account/consents/{consentId}".replace(
-          "{consentId}",
-          encodeURIComponent(String(consentId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      listConsentTokens(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            consentId: paramsOrFirst,
-            queries: rest[0],
-            total: rest[1]
-          };
-        }
-        const consentId = params.consentId;
-        const queries = params.queries;
-        const total = params.total;
-        if (typeof consentId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "consentId"'
-          );
-        }
-        const apiPath = "/account/consents/{consentId}/tokens".replace(
-          "{consentId}",
-          encodeURIComponent(String(consentId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      getConsentToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            consentId: paramsOrFirst,
-            tokenId: rest[0]
-          };
-        }
-        const consentId = params.consentId;
-        const tokenId = params.tokenId;
-        if (typeof consentId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "consentId"'
-          );
-        }
-        if (typeof tokenId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "tokenId"'
-          );
-        }
-        const apiPath = "/account/consents/{consentId}/tokens/{tokenId}".replace("{consentId}", encodeURIComponent(String(consentId))).replace("{tokenId}", encodeURIComponent(String(tokenId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      deleteConsentToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            consentId: paramsOrFirst,
-            tokenId: rest[0]
-          };
-        }
-        const consentId = params.consentId;
-        const tokenId = params.tokenId;
-        if (typeof consentId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "consentId"'
-          );
-        }
-        if (typeof tokenId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "tokenId"'
-          );
-        }
-        const apiPath = "/account/consents/{consentId}/tokens/{tokenId}".replace("{consentId}", encodeURIComponent(String(consentId))).replace("{tokenId}", encodeURIComponent(String(tokenId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      updateEmail(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            email: paramsOrFirst,
-            password: rest[0]
-          };
-        }
-        const email = params.email;
-        const password = params.password;
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account/email";
-        const apiPayload = {};
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      listIdentities(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            total: rest[0]
-          };
-        }
-        const queries = params.queries;
-        const total = params.total;
-        const apiPath = "/account/identities";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      deleteIdentity(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            identityId: paramsOrFirst
-          };
-        }
-        const identityId = params.identityId;
-        if (typeof identityId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "identityId"'
-          );
-        }
-        const apiPath = "/account/identities/{identityId}".replace(
-          "{identityId}",
-          encodeURIComponent(String(identityId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      listLogs(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            total: rest[0]
-          };
-        }
-        const queries = params.queries;
-        const total = params.total;
-        const apiPath = "/account/logs";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateMFA(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            mfa: paramsOrFirst
-          };
-        }
-        const mfa = params.mfa;
-        if (typeof mfa === "undefined") {
-          throw new AppwriteException('Missing required parameter: "mfa"');
-        }
-        const apiPath = "/account/mfa";
-        const apiPayload = {};
-        if (typeof mfa !== "undefined") {
-          apiPayload["mfa"] = mfa;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      createMfaAuthenticator(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "type" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst
-          };
-        }
-        const type = params.type;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createMFAAuthenticator(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "type" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst
-          };
-        }
-        const type = params.type;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateMfaAuthenticator(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && ("type" in paramsOrFirst || "otp" in paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst,
-            otp: rest[0]
-          };
-        }
-        const type = params.type;
-        const otp = params.otp;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        if (typeof otp === "undefined") {
-          throw new AppwriteException('Missing required parameter: "otp"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        if (typeof otp !== "undefined") {
-          apiPayload["otp"] = otp;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      updateMFAAuthenticator(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && ("type" in paramsOrFirst || "otp" in paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst,
-            otp: rest[0]
-          };
-        }
-        const type = params.type;
-        const otp = params.otp;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        if (typeof otp === "undefined") {
-          throw new AppwriteException('Missing required parameter: "otp"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        if (typeof otp !== "undefined") {
-          apiPayload["otp"] = otp;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      deleteMfaAuthenticator(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "type" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst
-          };
-        }
-        const type = params.type;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      deleteMFAAuthenticator(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "type" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            type: paramsOrFirst
-          };
-        }
-        const type = params.type;
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/account/mfa/authenticators/{type}".replace(
-          "{type}",
-          encodeURIComponent(String(type))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      createMfaChallenge(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "factor" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            factor: paramsOrFirst
-          };
-        }
-        const factor = params.factor;
-        if (typeof factor === "undefined") {
-          throw new AppwriteException('Missing required parameter: "factor"');
-        }
-        const apiPath = "/account/mfa/challenges";
-        const apiPayload = {};
-        if (typeof factor !== "undefined") {
-          apiPayload["factor"] = factor;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createMFAChallenge(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "factor" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            factor: paramsOrFirst
-          };
-        }
-        const factor = params.factor;
-        if (typeof factor === "undefined") {
-          throw new AppwriteException('Missing required parameter: "factor"');
-        }
-        const apiPath = "/account/mfa/challenges";
-        const apiPayload = {};
-        if (typeof factor !== "undefined") {
-          apiPayload["factor"] = factor;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateMfaChallenge(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            challengeId: paramsOrFirst,
-            otp: rest[0]
-          };
-        }
-        const challengeId = params.challengeId;
-        const otp = params.otp;
-        if (typeof challengeId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "challengeId"'
-          );
-        }
-        if (typeof otp === "undefined") {
-          throw new AppwriteException('Missing required parameter: "otp"');
-        }
-        const apiPath = "/account/mfa/challenges";
-        const apiPayload = {};
-        if (typeof challengeId !== "undefined") {
-          apiPayload["challengeId"] = challengeId;
-        }
-        if (typeof otp !== "undefined") {
-          apiPayload["otp"] = otp;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      updateMFAChallenge(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            challengeId: paramsOrFirst,
-            otp: rest[0]
-          };
-        }
-        const challengeId = params.challengeId;
-        const otp = params.otp;
-        if (typeof challengeId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "challengeId"'
-          );
-        }
-        if (typeof otp === "undefined") {
-          throw new AppwriteException('Missing required parameter: "otp"');
-        }
-        const apiPath = "/account/mfa/challenges";
-        const apiPayload = {};
-        if (typeof challengeId !== "undefined") {
-          apiPayload["challengeId"] = challengeId;
-        }
-        if (typeof otp !== "undefined") {
-          apiPayload["otp"] = otp;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * List the factors available on the account to be used as a MFA challange.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaFactors>}
-       * @deprecated This API has been deprecated since 1.8.0. Please use `Account.listMFAFactors` instead.
-       */
-      listMfaFactors() {
-        const apiPath = "/account/mfa/factors";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * List the factors available on the account to be used as a MFA challange.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaFactors>}
-       */
-      listMFAFactors() {
-        const apiPath = "/account/mfa/factors";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Get recovery codes that can be used as backup for MFA flow. Before getting codes, they must be generated using [createMfaRecoveryCodes](/docs/references/cloud/client-web/account#createMfaRecoveryCodes) method. An OTP challenge is required to read recovery codes.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       * @deprecated This API has been deprecated since 1.8.0. Please use `Account.getMFARecoveryCodes` instead.
-       */
-      getMfaRecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Get recovery codes that can be used as backup for MFA flow. Before getting codes, they must be generated using [createMfaRecoveryCodes](/docs/references/cloud/client-web/account#createMfaRecoveryCodes) method. An OTP challenge is required to read recovery codes.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       */
-      getMFARecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Generate recovery codes as backup for MFA flow. It's recommended to generate and show then immediately after user successfully adds their authehticator. Recovery codes can be used as a MFA verification type in [createMfaChallenge](/docs/references/cloud/client-web/account#createMfaChallenge) method.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       * @deprecated This API has been deprecated since 1.8.0. Please use `Account.createMFARecoveryCodes` instead.
-       */
-      createMfaRecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Generate recovery codes as backup for MFA flow. It's recommended to generate and show then immediately after user successfully adds their authehticator. Recovery codes can be used as a MFA verification type in [createMfaChallenge](/docs/references/cloud/client-web/account#createMfaChallenge) method.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       */
-      createMFARecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Regenerate recovery codes that can be used as backup for MFA flow. Before regenerating codes, they must be first generated using [createMfaRecoveryCodes](/docs/references/cloud/client-web/account#createMfaRecoveryCodes) method. An OTP challenge is required to regenreate recovery codes.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       * @deprecated This API has been deprecated since 1.8.0. Please use `Account.updateMFARecoveryCodes` instead.
-       */
-      updateMfaRecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Regenerate recovery codes that can be used as backup for MFA flow. Before regenerating codes, they must be first generated using [createMfaRecoveryCodes](/docs/references/cloud/client-web/account#createMfaRecoveryCodes) method. An OTP challenge is required to regenreate recovery codes.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.MfaRecoveryCodes>}
-       */
-      updateMFARecoveryCodes() {
-        const apiPath = "/account/mfa/recovery-codes";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updateName(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            name: paramsOrFirst
-          };
-        }
-        const name = params.name;
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/account/name";
-        const apiPayload = {};
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updatePassword(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            password: paramsOrFirst,
-            oldPassword: rest[0]
-          };
-        }
-        const password = params.password;
-        const oldPassword = params.oldPassword;
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account/password";
-        const apiPayload = {};
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof oldPassword !== "undefined") {
-          apiPayload["oldPassword"] = oldPassword;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updatePhone(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            phone: paramsOrFirst,
-            password: rest[0]
-          };
-        }
-        const phone = params.phone;
-        const password = params.password;
-        if (typeof phone === "undefined") {
-          throw new AppwriteException('Missing required parameter: "phone"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account/phone";
-        const apiPayload = {};
-        if (typeof phone !== "undefined") {
-          apiPayload["phone"] = phone;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Get the preferences as a key-value object for the currently logged in user.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Preferences>}
-       */
-      getPrefs() {
-        const apiPath = "/account/prefs";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updatePrefs(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && "prefs" in paramsOrFirst) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            prefs: paramsOrFirst
-          };
-        }
-        const prefs = params.prefs;
-        if (typeof prefs === "undefined") {
-          throw new AppwriteException('Missing required parameter: "prefs"');
-        }
-        const apiPath = "/account/prefs";
-        const apiPayload = {};
-        if (typeof prefs !== "undefined") {
-          apiPayload["prefs"] = prefs;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      createRecovery(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            email: paramsOrFirst,
-            url: rest[0]
-          };
-        }
-        const email = params.email;
-        const url = params.url;
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof url === "undefined") {
-          throw new AppwriteException('Missing required parameter: "url"');
-        }
-        const apiPath = "/account/recovery";
-        const apiPayload = {};
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof url !== "undefined") {
-          apiPayload["url"] = url;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateRecovery(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0],
-            password: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        const password = params.password;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account/recovery";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Get the list of active sessions across different devices for the currently logged in user.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.SessionList>}
-       */
-      listSessions() {
-        const apiPath = "/account/sessions";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Delete all sessions from the user account and remove any sessions cookies from the end client.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<{}>}
-       */
-      deleteSessions() {
-        const apiPath = "/account/sessions";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Use this endpoint to allow a new user to register an anonymous account in your project. This route will also create a new session for the user. To allow the new user to convert an anonymous account to a normal account, you need to update its [email and password](https://appwrite.io/docs/references/cloud/client-web/account#updateEmail) or create an [OAuth2 session](https://appwrite.io/docs/references/cloud/client-web/account#CreateOAuth2Session).
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.Session>}
-       */
-      createAnonymousSession() {
-        const apiPath = "/account/sessions/anonymous";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createEmailPasswordSession(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            email: paramsOrFirst,
-            password: rest[0]
-          };
-        }
-        const email = params.email;
-        const password = params.password;
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/account/sessions/email";
-        const apiPayload = {};
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateMagicURLSession(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/sessions/magic-url";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      updatePhoneSession(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/sessions/phone";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      createSession(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/sessions/token";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      getSession(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            sessionId: paramsOrFirst
-          };
-        }
-        const sessionId = params.sessionId;
-        if (typeof sessionId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "sessionId"'
-          );
-        }
-        const apiPath = "/account/sessions/{sessionId}".replace(
-          "{sessionId}",
-          encodeURIComponent(String(sessionId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateSession(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            sessionId: paramsOrFirst
-          };
-        }
-        const sessionId = params.sessionId;
-        if (typeof sessionId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "sessionId"'
-          );
-        }
-        const apiPath = "/account/sessions/{sessionId}".replace(
-          "{sessionId}",
-          encodeURIComponent(String(sessionId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      deleteSession(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            sessionId: paramsOrFirst
-          };
-        }
-        const sessionId = params.sessionId;
-        if (typeof sessionId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "sessionId"'
-          );
-        }
-        const apiPath = "/account/sessions/{sessionId}".replace(
-          "{sessionId}",
-          encodeURIComponent(String(sessionId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Block the currently logged in user account. Behind the scene, the user record is not deleted but permanently blocked from any access. To completely delete a user, use the Users API instead.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.User<Preferences>>}
-       */
-      updateStatus() {
-        const apiPath = "/account/status";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      createEmailToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            phrase: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const phrase = params.phrase;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        const apiPath = "/account/tokens/email";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof phrase !== "undefined") {
-          apiPayload["phrase"] = phrase;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createMagicURLToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            url: rest[1],
-            phrase: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const url = params.url;
-        const phrase = params.phrase;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        const apiPath = "/account/tokens/magic-url";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof url !== "undefined") {
-          apiPayload["url"] = url;
-        }
-        if (typeof phrase !== "undefined") {
-          apiPayload["phrase"] = phrase;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createOAuth2Token(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst) && ("provider" in paramsOrFirst || "success" in paramsOrFirst || "failure" in paramsOrFirst || "scopes" in paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            provider: paramsOrFirst,
-            success: rest[0],
-            failure: rest[1],
-            scopes: rest[2]
-          };
-        }
-        const provider = params.provider;
-        const success = params.success;
-        const failure2 = params.failure;
-        const scopes = params.scopes;
-        if (typeof provider === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "provider"'
-          );
-        }
-        const apiPath = "/account/tokens/oauth2/{provider}".replace(
-          "{provider}",
-          encodeURIComponent(String(provider))
-        );
-        const apiPayload = {};
-        if (typeof success !== "undefined") {
-          apiPayload["success"] = success;
-        }
-        if (typeof failure2 !== "undefined") {
-          apiPayload["failure"] = failure2;
-        }
-        if (typeof scopes !== "undefined") {
-          apiPayload["scopes"] = scopes;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "text/html"
-        };
-        return this.client.redirect("get", uri, apiHeaders, apiPayload);
-      }
-      createPhoneToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            phone: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const phone = params.phone;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof phone === "undefined") {
-          throw new AppwriteException('Missing required parameter: "phone"');
-        }
-        const apiPath = "/account/tokens/phone";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof phone !== "undefined") {
-          apiPayload["phone"] = phone;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createEmailVerification(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            url: paramsOrFirst
-          };
-        }
-        const url = params.url;
-        if (typeof url === "undefined") {
-          throw new AppwriteException('Missing required parameter: "url"');
-        }
-        const apiPath = "/account/verifications/email";
-        const apiPayload = {};
-        if (typeof url !== "undefined") {
-          apiPayload["url"] = url;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createVerification(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            url: paramsOrFirst
-          };
-        }
-        const url = params.url;
-        if (typeof url === "undefined") {
-          throw new AppwriteException('Missing required parameter: "url"');
-        }
-        const apiPath = "/account/verifications/email";
-        const apiPayload = {};
-        if (typeof url !== "undefined") {
-          apiPayload["url"] = url;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateEmailVerification(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/verifications/email";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      updateVerification(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/verifications/email";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      /**
-       * Use this endpoint to send a verification SMS to the currently logged in user. This endpoint is meant for use after updating a user's phone number using the [accountUpdatePhone](https://appwrite.io/docs/references/cloud/client-web/account#updatePhone) endpoint. Learn more about how to [complete the verification process](https://appwrite.io/docs/references/cloud/client-web/account#updatePhoneVerification). The verification code sent to the user's phone number is valid for 15 minutes.
-       *
-       * @throws {AppwriteException}
-       * @returns {Promise<Models.Token>}
-       */
-      createPhoneVerification() {
-        const apiPath = "/account/verifications/phone";
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updatePhoneVerification(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            secret: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/account/verifications/phone";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-    };
   }
 });
 
@@ -27518,641 +25786,9 @@ var init_sites = __esm({
 });
 
 // node_modules/node-appwrite/dist/services/storage.mjs
-var Storage;
 var init_storage = __esm({
   "node_modules/node-appwrite/dist/services/storage.mjs"() {
     init_client();
-    Storage = class {
-      constructor(client) {
-        this.client = client;
-      }
-      listBuckets(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            search: rest[0],
-            total: rest[1]
-          };
-        }
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        const apiPath = "/storage/buckets";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createBucket(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            name: rest[0],
-            permissions: rest[1],
-            fileSecurity: rest[2],
-            enabled: rest[3],
-            maximumFileSize: rest[4],
-            allowedFileExtensions: rest[5],
-            compression: rest[6],
-            encryption: rest[7],
-            antivirus: rest[8],
-            transformations: rest[9]
-          };
-        }
-        const bucketId = params.bucketId;
-        const name = params.name;
-        const permissions = params.permissions;
-        const fileSecurity = params.fileSecurity;
-        const enabled = params.enabled;
-        const maximumFileSize = params.maximumFileSize;
-        const allowedFileExtensions = params.allowedFileExtensions;
-        const compression = params.compression;
-        const encryption = params.encryption;
-        const antivirus = params.antivirus;
-        const transformations = params.transformations;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/storage/buckets";
-        const apiPayload = {};
-        if (typeof bucketId !== "undefined") {
-          apiPayload["bucketId"] = bucketId;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        if (typeof permissions !== "undefined") {
-          apiPayload["permissions"] = permissions;
-        }
-        if (typeof fileSecurity !== "undefined") {
-          apiPayload["fileSecurity"] = fileSecurity;
-        }
-        if (typeof enabled !== "undefined") {
-          apiPayload["enabled"] = enabled;
-        }
-        if (typeof maximumFileSize !== "undefined") {
-          apiPayload["maximumFileSize"] = maximumFileSize;
-        }
-        if (typeof allowedFileExtensions !== "undefined") {
-          apiPayload["allowedFileExtensions"] = allowedFileExtensions;
-        }
-        if (typeof compression !== "undefined") {
-          apiPayload["compression"] = compression;
-        }
-        if (typeof encryption !== "undefined") {
-          apiPayload["encryption"] = encryption;
-        }
-        if (typeof antivirus !== "undefined") {
-          apiPayload["antivirus"] = antivirus;
-        }
-        if (typeof transformations !== "undefined") {
-          apiPayload["transformations"] = transformations;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      getBucket(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst
-          };
-        }
-        const bucketId = params.bucketId;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        const apiPath = "/storage/buckets/{bucketId}".replace(
-          "{bucketId}",
-          encodeURIComponent(String(bucketId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateBucket(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            name: rest[0],
-            permissions: rest[1],
-            fileSecurity: rest[2],
-            enabled: rest[3],
-            maximumFileSize: rest[4],
-            allowedFileExtensions: rest[5],
-            compression: rest[6],
-            encryption: rest[7],
-            antivirus: rest[8],
-            transformations: rest[9]
-          };
-        }
-        const bucketId = params.bucketId;
-        const name = params.name;
-        const permissions = params.permissions;
-        const fileSecurity = params.fileSecurity;
-        const enabled = params.enabled;
-        const maximumFileSize = params.maximumFileSize;
-        const allowedFileExtensions = params.allowedFileExtensions;
-        const compression = params.compression;
-        const encryption = params.encryption;
-        const antivirus = params.antivirus;
-        const transformations = params.transformations;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}".replace(
-          "{bucketId}",
-          encodeURIComponent(String(bucketId))
-        );
-        const apiPayload = {};
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        if (typeof permissions !== "undefined") {
-          apiPayload["permissions"] = permissions;
-        }
-        if (typeof fileSecurity !== "undefined") {
-          apiPayload["fileSecurity"] = fileSecurity;
-        }
-        if (typeof enabled !== "undefined") {
-          apiPayload["enabled"] = enabled;
-        }
-        if (typeof maximumFileSize !== "undefined") {
-          apiPayload["maximumFileSize"] = maximumFileSize;
-        }
-        if (typeof allowedFileExtensions !== "undefined") {
-          apiPayload["allowedFileExtensions"] = allowedFileExtensions;
-        }
-        if (typeof compression !== "undefined") {
-          apiPayload["compression"] = compression;
-        }
-        if (typeof encryption !== "undefined") {
-          apiPayload["encryption"] = encryption;
-        }
-        if (typeof antivirus !== "undefined") {
-          apiPayload["antivirus"] = antivirus;
-        }
-        if (typeof transformations !== "undefined") {
-          apiPayload["transformations"] = transformations;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      deleteBucket(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst
-          };
-        }
-        const bucketId = params.bucketId;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        const apiPath = "/storage/buckets/{bucketId}".replace(
-          "{bucketId}",
-          encodeURIComponent(String(bucketId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      listFiles(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            queries: rest[0],
-            search: rest[1],
-            total: rest[2]
-          };
-        }
-        const bucketId = params.bucketId;
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files".replace(
-          "{bucketId}",
-          encodeURIComponent(String(bucketId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createFile(paramsOrFirst, ...rest) {
-        let params;
-        let onProgress;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-          onProgress = paramsOrFirst == null ? void 0 : paramsOrFirst.onProgress;
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            file: rest[1],
-            permissions: rest[2],
-            folder: rest[3]
-          };
-          onProgress = rest[4];
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const file = params.file;
-        const permissions = params.permissions;
-        const folder = params.folder;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        if (typeof file === "undefined") {
-          throw new AppwriteException('Missing required parameter: "file"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files".replace(
-          "{bucketId}",
-          encodeURIComponent(String(bucketId))
-        );
-        const apiPayload = {};
-        if (typeof fileId !== "undefined") {
-          apiPayload["fileId"] = fileId;
-        }
-        if (typeof file !== "undefined") {
-          apiPayload["file"] = file;
-        }
-        if (typeof permissions !== "undefined") {
-          apiPayload["permissions"] = permissions;
-        }
-        if (typeof folder !== "undefined") {
-          apiPayload["folder"] = folder;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "multipart/form-data",
-          accept: "application/json"
-        };
-        return this.client.chunkedUpload(
-          "post",
-          uri,
-          apiHeaders,
-          apiPayload,
-          onProgress
-        );
-      }
-      getFile(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateFile(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            name: rest[1],
-            permissions: rest[2]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const name = params.name;
-        const permissions = params.permissions;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        if (typeof permissions !== "undefined") {
-          apiPayload["permissions"] = permissions;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      deleteFile(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      getFileDownload(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            token: rest[1]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const token = params.token;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}/download".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof token !== "undefined") {
-          apiPayload["token"] = token;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "*/*"
-        };
-        return this.client.call(
-          "get",
-          uri,
-          apiHeaders,
-          apiPayload,
-          "arrayBuffer"
-        );
-      }
-      getFilePreview(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            width: rest[1],
-            height: rest[2],
-            gravity: rest[3],
-            quality: rest[4],
-            borderWidth: rest[5],
-            borderColor: rest[6],
-            borderRadius: rest[7],
-            opacity: rest[8],
-            rotation: rest[9],
-            background: rest[10],
-            output: rest[11],
-            token: rest[12]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const width = params.width;
-        const height = params.height;
-        const gravity = params.gravity;
-        const quality = params.quality;
-        const borderWidth = params.borderWidth;
-        const borderColor = params.borderColor;
-        const borderRadius = params.borderRadius;
-        const opacity = params.opacity;
-        const rotation = params.rotation;
-        const background = params.background;
-        const output = params.output;
-        const token = params.token;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}/preview".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof width !== "undefined") {
-          apiPayload["width"] = width;
-        }
-        if (typeof height !== "undefined") {
-          apiPayload["height"] = height;
-        }
-        if (typeof gravity !== "undefined") {
-          apiPayload["gravity"] = gravity;
-        }
-        if (typeof quality !== "undefined") {
-          apiPayload["quality"] = quality;
-        }
-        if (typeof borderWidth !== "undefined") {
-          apiPayload["borderWidth"] = borderWidth;
-        }
-        if (typeof borderColor !== "undefined") {
-          apiPayload["borderColor"] = borderColor;
-        }
-        if (typeof borderRadius !== "undefined") {
-          apiPayload["borderRadius"] = borderRadius;
-        }
-        if (typeof opacity !== "undefined") {
-          apiPayload["opacity"] = opacity;
-        }
-        if (typeof rotation !== "undefined") {
-          apiPayload["rotation"] = rotation;
-        }
-        if (typeof background !== "undefined") {
-          apiPayload["background"] = background;
-        }
-        if (typeof output !== "undefined") {
-          apiPayload["output"] = output;
-        }
-        if (typeof token !== "undefined") {
-          apiPayload["token"] = token;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "image/*"
-        };
-        return this.client.call(
-          "get",
-          uri,
-          apiHeaders,
-          apiPayload,
-          "arrayBuffer"
-        );
-      }
-      getFileView(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            token: rest[1]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const token = params.token;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/storage/buckets/{bucketId}/files/{fileId}/view".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof token !== "undefined") {
-          apiPayload["token"] = token;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "*/*"
-        };
-        return this.client.call(
-          "get",
-          uri,
-          apiHeaders,
-          apiPayload,
-          "arrayBuffer"
-        );
-      }
-    };
   }
 });
 
@@ -28761,7 +26397,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const status = params.status;
-        const limit2 = params.limit;
+        const limit = params.limit;
         const offset = params.offset;
         if (typeof databaseId === "undefined") {
           throw new AppwriteException(
@@ -28776,8 +26412,8 @@ var init_tables_db = __esm({
         if (typeof status !== "undefined") {
           apiPayload["status"] = status;
         }
-        if (typeof limit2 !== "undefined") {
-          apiPayload["limit"] = limit2;
+        if (typeof limit !== "undefined") {
+          apiPayload["limit"] = limit;
         }
         if (typeof offset !== "undefined") {
           apiPayload["offset"] = offset;
@@ -31728,7 +29364,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const data = params.data;
         const permissions = params.permissions;
         const transactionId = params.transactionId;
@@ -31742,7 +29378,7 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
         if (typeof data === "undefined") {
@@ -31750,8 +29386,8 @@ var init_tables_db = __esm({
         }
         const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId)));
         const apiPayload = {};
-        if (typeof rowId2 !== "undefined") {
-          apiPayload["rowId"] = rowId2;
+        if (typeof rowId !== "undefined") {
+          apiPayload["rowId"] = rowId;
         }
         if (typeof data !== "undefined") {
           apiPayload["data"] = data;
@@ -31964,7 +29600,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const queries = params.queries;
         const transactionId = params.transactionId;
         if (typeof databaseId === "undefined") {
@@ -31977,10 +29613,10 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId)));
         const apiPayload = {};
         if (typeof queries !== "undefined") {
           apiPayload["queries"] = queries;
@@ -32011,7 +29647,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const data = params.data;
         const permissions = params.permissions;
         const transactionId = params.transactionId;
@@ -32025,10 +29661,10 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId)));
         const apiPayload = {};
         if (typeof data !== "undefined") {
           apiPayload["data"] = data;
@@ -32063,7 +29699,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const data = params.data;
         const permissions = params.permissions;
         const transactionId = params.transactionId;
@@ -32077,10 +29713,10 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId)));
         const apiPayload = {};
         if (typeof data !== "undefined") {
           apiPayload["data"] = data;
@@ -32113,7 +29749,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const transactionId = params.transactionId;
         if (typeof databaseId === "undefined") {
           throw new AppwriteException(
@@ -32125,10 +29761,10 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId)));
         const apiPayload = {};
         if (typeof transactionId !== "undefined") {
           apiPayload["transactionId"] = transactionId;
@@ -32157,7 +29793,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const column = params.column;
         const value = params.value;
         const min = params.min;
@@ -32172,13 +29808,13 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
         if (typeof column === "undefined") {
           throw new AppwriteException('Missing required parameter: "column"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}/{column}/decrement".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2))).replace("{column}", encodeURIComponent(String(column)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}/{column}/decrement".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId))).replace("{column}", encodeURIComponent(String(column)));
         const apiPayload = {};
         if (typeof value !== "undefined") {
           apiPayload["value"] = value;
@@ -32214,7 +29850,7 @@ var init_tables_db = __esm({
         }
         const databaseId = params.databaseId;
         const tableId = params.tableId;
-        const rowId2 = params.rowId;
+        const rowId = params.rowId;
         const column = params.column;
         const value = params.value;
         const max = params.max;
@@ -32229,13 +29865,13 @@ var init_tables_db = __esm({
             'Missing required parameter: "tableId"'
           );
         }
-        if (typeof rowId2 === "undefined") {
+        if (typeof rowId === "undefined") {
           throw new AppwriteException('Missing required parameter: "rowId"');
         }
         if (typeof column === "undefined") {
           throw new AppwriteException('Missing required parameter: "column"');
         }
-        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}/{column}/increment".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId2))).replace("{column}", encodeURIComponent(String(column)));
+        const apiPath = "/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}/{column}/increment".replace("{databaseId}", encodeURIComponent(String(databaseId))).replace("{tableId}", encodeURIComponent(String(tableId))).replace("{rowId}", encodeURIComponent(String(rowId))).replace("{column}", encodeURIComponent(String(column)));
         const apiPayload = {};
         if (typeof value !== "undefined") {
           apiPayload["value"] = value;
@@ -32259,2650 +29895,23 @@ var init_tables_db = __esm({
 });
 
 // node_modules/node-appwrite/dist/services/teams.mjs
-var Teams;
 var init_teams = __esm({
   "node_modules/node-appwrite/dist/services/teams.mjs"() {
     init_client();
-    Teams = class {
-      constructor(client) {
-        this.client = client;
-      }
-      list(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            search: rest[0],
-            total: rest[1]
-          };
-        }
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        const apiPath = "/teams";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      create(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            name: rest[0],
-            roles: rest[1]
-          };
-        }
-        const teamId = params.teamId;
-        const name = params.name;
-        const roles = params.roles;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/teams";
-        const apiPayload = {};
-        if (typeof teamId !== "undefined") {
-          apiPayload["teamId"] = teamId;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        if (typeof roles !== "undefined") {
-          apiPayload["roles"] = roles;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      get(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst
-          };
-        }
-        const teamId = params.teamId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        const apiPath = "/teams/{teamId}".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateName(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            name: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const name = params.name;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/teams/{teamId}".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      delete(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst
-          };
-        }
-        const teamId = params.teamId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        const apiPath = "/teams/{teamId}".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      listInstallations(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            queries: rest[0],
-            total: rest[1]
-          };
-        }
-        const teamId = params.teamId;
-        const queries = params.queries;
-        const total = params.total;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        const apiPath = "/teams/{teamId}/installations".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createInstallation(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            appId: rest[0],
-            authorizationDetails: rest[1]
-          };
-        }
-        const teamId = params.teamId;
-        const appId = params.appId;
-        const authorizationDetails = params.authorizationDetails;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof appId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "appId"');
-        }
-        const apiPath = "/teams/{teamId}/installations".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof appId !== "undefined") {
-          apiPayload["appId"] = appId;
-        }
-        if (typeof authorizationDetails !== "undefined") {
-          apiPayload["authorizationDetails"] = authorizationDetails;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      getInstallation(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            installationId: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const installationId = params.installationId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof installationId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "installationId"'
-          );
-        }
-        const apiPath = "/teams/{teamId}/installations/{installationId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{installationId}",
-          encodeURIComponent(String(installationId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateInstallation(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            installationId: rest[0],
-            authorizationDetails: rest[1]
-          };
-        }
-        const teamId = params.teamId;
-        const installationId = params.installationId;
-        const authorizationDetails = params.authorizationDetails;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof installationId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "installationId"'
-          );
-        }
-        const apiPath = "/teams/{teamId}/installations/{installationId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{installationId}",
-          encodeURIComponent(String(installationId))
-        );
-        const apiPayload = {};
-        if (typeof authorizationDetails !== "undefined") {
-          apiPayload["authorizationDetails"] = authorizationDetails;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      deleteInstallation(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            installationId: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const installationId = params.installationId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof installationId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "installationId"'
-          );
-        }
-        const apiPath = "/teams/{teamId}/installations/{installationId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{installationId}",
-          encodeURIComponent(String(installationId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      listMemberships(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            queries: rest[0],
-            search: rest[1],
-            total: rest[2]
-          };
-        }
-        const teamId = params.teamId;
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        const apiPath = "/teams/{teamId}/memberships".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createMembership(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            roles: rest[0],
-            email: rest[1],
-            userId: rest[2],
-            phone: rest[3],
-            url: rest[4],
-            name: rest[5]
-          };
-        }
-        const teamId = params.teamId;
-        const roles = params.roles;
-        const email = params.email;
-        const userId = params.userId;
-        const phone = params.phone;
-        const url = params.url;
-        const name = params.name;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof roles === "undefined") {
-          throw new AppwriteException('Missing required parameter: "roles"');
-        }
-        const apiPath = "/teams/{teamId}/memberships".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof phone !== "undefined") {
-          apiPayload["phone"] = phone;
-        }
-        if (typeof roles !== "undefined") {
-          apiPayload["roles"] = roles;
-        }
-        if (typeof url !== "undefined") {
-          apiPayload["url"] = url;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      getMembership(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            membershipId: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const membershipId = params.membershipId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof membershipId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "membershipId"'
-          );
-        }
-        const apiPath = "/teams/{teamId}/memberships/{membershipId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{membershipId}",
-          encodeURIComponent(String(membershipId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateMembership(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            membershipId: rest[0],
-            roles: rest[1]
-          };
-        }
-        const teamId = params.teamId;
-        const membershipId = params.membershipId;
-        const roles = params.roles;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof membershipId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "membershipId"'
-          );
-        }
-        if (typeof roles === "undefined") {
-          throw new AppwriteException('Missing required parameter: "roles"');
-        }
-        const apiPath = "/teams/{teamId}/memberships/{membershipId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{membershipId}",
-          encodeURIComponent(String(membershipId))
-        );
-        const apiPayload = {};
-        if (typeof roles !== "undefined") {
-          apiPayload["roles"] = roles;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      deleteMembership(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            membershipId: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const membershipId = params.membershipId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof membershipId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "membershipId"'
-          );
-        }
-        const apiPath = "/teams/{teamId}/memberships/{membershipId}".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{membershipId}",
-          encodeURIComponent(String(membershipId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      updateMembershipStatus(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            membershipId: rest[0],
-            userId: rest[1],
-            secret: rest[2]
-          };
-        }
-        const teamId = params.teamId;
-        const membershipId = params.membershipId;
-        const userId = params.userId;
-        const secret = params.secret;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof membershipId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "membershipId"'
-          );
-        }
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof secret === "undefined") {
-          throw new AppwriteException('Missing required parameter: "secret"');
-        }
-        const apiPath = "/teams/{teamId}/memberships/{membershipId}/status".replace("{teamId}", encodeURIComponent(String(teamId))).replace(
-          "{membershipId}",
-          encodeURIComponent(String(membershipId))
-        );
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof secret !== "undefined") {
-          apiPayload["secret"] = secret;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      getPrefs(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst
-          };
-        }
-        const teamId = params.teamId;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        const apiPath = "/teams/{teamId}/prefs".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updatePrefs(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            teamId: paramsOrFirst,
-            prefs: rest[0]
-          };
-        }
-        const teamId = params.teamId;
-        const prefs = params.prefs;
-        if (typeof teamId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "teamId"');
-        }
-        if (typeof prefs === "undefined") {
-          throw new AppwriteException('Missing required parameter: "prefs"');
-        }
-        const apiPath = "/teams/{teamId}/prefs".replace(
-          "{teamId}",
-          encodeURIComponent(String(teamId))
-        );
-        const apiPayload = {};
-        if (typeof prefs !== "undefined") {
-          apiPayload["prefs"] = prefs;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-    };
   }
 });
 
 // node_modules/node-appwrite/dist/services/tokens.mjs
-var Tokens;
 var init_tokens = __esm({
   "node_modules/node-appwrite/dist/services/tokens.mjs"() {
     init_client();
-    Tokens = class {
-      constructor(client) {
-        this.client = client;
-      }
-      list(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            queries: rest[1],
-            total: rest[2]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const queries = params.queries;
-        const total = params.total;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/tokens/buckets/{bucketId}/files/{fileId}".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createFileToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            bucketId: paramsOrFirst,
-            fileId: rest[0],
-            expire: rest[1]
-          };
-        }
-        const bucketId = params.bucketId;
-        const fileId = params.fileId;
-        const expire = params.expire;
-        if (typeof bucketId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "bucketId"'
-          );
-        }
-        if (typeof fileId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "fileId"');
-        }
-        const apiPath = "/tokens/buckets/{bucketId}/files/{fileId}".replace("{bucketId}", encodeURIComponent(String(bucketId))).replace("{fileId}", encodeURIComponent(String(fileId)));
-        const apiPayload = {};
-        if (typeof expire !== "undefined") {
-          apiPayload["expire"] = expire;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      get(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            tokenId: paramsOrFirst
-          };
-        }
-        const tokenId = params.tokenId;
-        if (typeof tokenId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "tokenId"'
-          );
-        }
-        const apiPath = "/tokens/{tokenId}".replace(
-          "{tokenId}",
-          encodeURIComponent(String(tokenId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      update(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            tokenId: paramsOrFirst,
-            expire: rest[0]
-          };
-        }
-        const tokenId = params.tokenId;
-        const expire = params.expire;
-        if (typeof tokenId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "tokenId"'
-          );
-        }
-        const apiPath = "/tokens/{tokenId}".replace(
-          "{tokenId}",
-          encodeURIComponent(String(tokenId))
-        );
-        const apiPayload = {};
-        if (typeof expire !== "undefined") {
-          apiPayload["expire"] = expire;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      delete(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            tokenId: paramsOrFirst
-          };
-        }
-        const tokenId = params.tokenId;
-        if (typeof tokenId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "tokenId"'
-          );
-        }
-        const apiPath = "/tokens/{tokenId}".replace(
-          "{tokenId}",
-          encodeURIComponent(String(tokenId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-    };
   }
 });
 
 // node_modules/node-appwrite/dist/services/users.mjs
-var Users;
 var init_users = __esm({
   "node_modules/node-appwrite/dist/services/users.mjs"() {
     init_client();
-    Users = class {
-      constructor(client) {
-        this.client = client;
-      }
-      list(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            search: rest[0],
-            total: rest[1]
-          };
-        }
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        const apiPath = "/users";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      create(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            phone: rest[1],
-            password: rest[2],
-            name: rest[3]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const phone = params.phone;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof phone !== "undefined") {
-          apiPayload["phone"] = phone;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createArgon2User(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            name: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/argon2";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createBcryptUser(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            name: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/bcrypt";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      listIdentities(paramsOrFirst, ...rest) {
-        let params;
-        if (!paramsOrFirst || paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            queries: paramsOrFirst,
-            search: rest[0],
-            total: rest[1]
-          };
-        }
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        const apiPath = "/users/identities";
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      deleteIdentity(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            identityId: paramsOrFirst
-          };
-        }
-        const identityId = params.identityId;
-        if (typeof identityId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "identityId"'
-          );
-        }
-        const apiPath = "/users/identities/{identityId}".replace(
-          "{identityId}",
-          encodeURIComponent(String(identityId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      createMD5User(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            name: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/md5";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createPHPassUser(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            name: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/phpass";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createScryptUser(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            passwordSalt: rest[2],
-            passwordCpu: rest[3],
-            passwordMemory: rest[4],
-            passwordParallel: rest[5],
-            passwordLength: rest[6],
-            name: rest[7]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const passwordSalt = params.passwordSalt;
-        const passwordCpu = params.passwordCpu;
-        const passwordMemory = params.passwordMemory;
-        const passwordParallel = params.passwordParallel;
-        const passwordLength = params.passwordLength;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        if (typeof passwordSalt === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordSalt"'
-          );
-        }
-        if (typeof passwordCpu === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordCpu"'
-          );
-        }
-        if (typeof passwordMemory === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordMemory"'
-          );
-        }
-        if (typeof passwordParallel === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordParallel"'
-          );
-        }
-        if (typeof passwordLength === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordLength"'
-          );
-        }
-        const apiPath = "/users/scrypt";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof passwordSalt !== "undefined") {
-          apiPayload["passwordSalt"] = passwordSalt;
-        }
-        if (typeof passwordCpu !== "undefined") {
-          apiPayload["passwordCpu"] = passwordCpu;
-        }
-        if (typeof passwordMemory !== "undefined") {
-          apiPayload["passwordMemory"] = passwordMemory;
-        }
-        if (typeof passwordParallel !== "undefined") {
-          apiPayload["passwordParallel"] = passwordParallel;
-        }
-        if (typeof passwordLength !== "undefined") {
-          apiPayload["passwordLength"] = passwordLength;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createScryptModifiedUser(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            passwordSalt: rest[2],
-            passwordSaltSeparator: rest[3],
-            passwordSignerKey: rest[4],
-            name: rest[5]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const passwordSalt = params.passwordSalt;
-        const passwordSaltSeparator = params.passwordSaltSeparator;
-        const passwordSignerKey = params.passwordSignerKey;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        if (typeof passwordSalt === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordSalt"'
-          );
-        }
-        if (typeof passwordSaltSeparator === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordSaltSeparator"'
-          );
-        }
-        if (typeof passwordSignerKey === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "passwordSignerKey"'
-          );
-        }
-        const apiPath = "/users/scrypt-modified";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof passwordSalt !== "undefined") {
-          apiPayload["passwordSalt"] = passwordSalt;
-        }
-        if (typeof passwordSaltSeparator !== "undefined") {
-          apiPayload["passwordSaltSeparator"] = passwordSaltSeparator;
-        }
-        if (typeof passwordSignerKey !== "undefined") {
-          apiPayload["passwordSignerKey"] = passwordSignerKey;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      createSHAUser(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0],
-            password: rest[1],
-            passwordVersion: rest[2],
-            name: rest[3]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        const password = params.password;
-        const passwordVersion = params.passwordVersion;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/sha";
-        const apiPayload = {};
-        if (typeof userId !== "undefined") {
-          apiPayload["userId"] = userId;
-        }
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        if (typeof passwordVersion !== "undefined") {
-          apiPayload["passwordVersion"] = passwordVersion;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      get(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      delete(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      updateEmail(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            email: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const email = params.email;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof email === "undefined") {
-          throw new AppwriteException('Missing required parameter: "email"');
-        }
-        const apiPath = "/users/{userId}/email".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof email !== "undefined") {
-          apiPayload["email"] = email;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updateImpersonator(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            impersonator: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const impersonator = params.impersonator;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof impersonator === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "impersonator"'
-          );
-        }
-        const apiPath = "/users/{userId}/impersonator".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof impersonator !== "undefined") {
-          apiPayload["impersonator"] = impersonator;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      createJWT(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            sessionId: rest[0],
-            duration: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const sessionId = params.sessionId;
-        const duration = params.duration;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/jwts".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof sessionId !== "undefined") {
-          apiPayload["sessionId"] = sessionId;
-        }
-        if (typeof duration !== "undefined") {
-          apiPayload["duration"] = duration;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateLabels(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            labels: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const labels = params.labels;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof labels === "undefined") {
-          throw new AppwriteException('Missing required parameter: "labels"');
-        }
-        const apiPath = "/users/{userId}/labels".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof labels !== "undefined") {
-          apiPayload["labels"] = labels;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      listLogs(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            queries: rest[0],
-            total: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const queries = params.queries;
-        const total = params.total;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/logs".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      listMemberships(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            queries: rest[0],
-            search: rest[1],
-            total: rest[2]
-          };
-        }
-        const userId = params.userId;
-        const queries = params.queries;
-        const search = params.search;
-        const total = params.total;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/memberships".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof search !== "undefined") {
-          apiPayload["search"] = search;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateMfa(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            mfa: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const mfa = params.mfa;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof mfa === "undefined") {
-          throw new AppwriteException('Missing required parameter: "mfa"');
-        }
-        const apiPath = "/users/{userId}/mfa".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof mfa !== "undefined") {
-          apiPayload["mfa"] = mfa;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updateMFA(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            mfa: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const mfa = params.mfa;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof mfa === "undefined") {
-          throw new AppwriteException('Missing required parameter: "mfa"');
-        }
-        const apiPath = "/users/{userId}/mfa".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof mfa !== "undefined") {
-          apiPayload["mfa"] = mfa;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      deleteMfaAuthenticator(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            type: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const type = params.type;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/users/{userId}/mfa/authenticators/{type}".replace("{userId}", encodeURIComponent(String(userId))).replace("{type}", encodeURIComponent(String(type)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      deleteMFAAuthenticator(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            type: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const type = params.type;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof type === "undefined") {
-          throw new AppwriteException('Missing required parameter: "type"');
-        }
-        const apiPath = "/users/{userId}/mfa/authenticators/{type}".replace("{userId}", encodeURIComponent(String(userId))).replace("{type}", encodeURIComponent(String(type)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      getMFAChallenge(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            challengeId: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const challengeId = params.challengeId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof challengeId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "challengeId"'
-          );
-        }
-        const apiPath = "/users/{userId}/mfa/challenges/{challengeId}".replace("{userId}", encodeURIComponent(String(userId))).replace("{challengeId}", encodeURIComponent(String(challengeId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      listMfaFactors(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/factors".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      listMFAFactors(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/factors".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      getMfaRecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      getMFARecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateMfaRecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      updateMFARecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("put", uri, apiHeaders, apiPayload);
-      }
-      createMfaRecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      createMFARecoveryCodes(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/mfa/recovery-codes".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updateName(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            name: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof name === "undefined") {
-          throw new AppwriteException('Missing required parameter: "name"');
-        }
-        const apiPath = "/users/{userId}/name".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updatePassword(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            password: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const password = params.password;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof password === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "password"'
-          );
-        }
-        const apiPath = "/users/{userId}/password".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof password !== "undefined") {
-          apiPayload["password"] = password;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updatePhone(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            number: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const number = params.number;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof number === "undefined") {
-          throw new AppwriteException('Missing required parameter: "number"');
-        }
-        const apiPath = "/users/{userId}/phone".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof number !== "undefined") {
-          apiPayload["number"] = number;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      getPrefs(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/prefs".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updatePrefs(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            prefs: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const prefs = params.prefs;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof prefs === "undefined") {
-          throw new AppwriteException('Missing required parameter: "prefs"');
-        }
-        const apiPath = "/users/{userId}/prefs".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof prefs !== "undefined") {
-          apiPayload["prefs"] = prefs;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      listSessions(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            total: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const total = params.total;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/sessions".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createSession(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/sessions".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      deleteSessions(paramsOrFirst) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst
-          };
-        }
-        const userId = params.userId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/sessions".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      deleteSession(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            sessionId: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const sessionId = params.sessionId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof sessionId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "sessionId"'
-          );
-        }
-        const apiPath = "/users/{userId}/sessions/{sessionId}".replace("{userId}", encodeURIComponent(String(userId))).replace("{sessionId}", encodeURIComponent(String(sessionId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      updateStatus(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            status: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const status = params.status;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof status === "undefined") {
-          throw new AppwriteException('Missing required parameter: "status"');
-        }
-        const apiPath = "/users/{userId}/status".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof status !== "undefined") {
-          apiPayload["status"] = status;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      listTargets(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            queries: rest[0],
-            total: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const queries = params.queries;
-        const total = params.total;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/targets".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof queries !== "undefined") {
-          apiPayload["queries"] = queries;
-        }
-        if (typeof total !== "undefined") {
-          apiPayload["total"] = total;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      createTarget(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            targetId: rest[0],
-            providerType: rest[1],
-            identifier: rest[2],
-            providerId: rest[3],
-            name: rest[4]
-          };
-        }
-        const userId = params.userId;
-        const targetId = params.targetId;
-        const providerType = params.providerType;
-        const identifier = params.identifier;
-        const providerId = params.providerId;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof targetId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "targetId"'
-          );
-        }
-        if (typeof providerType === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "providerType"'
-          );
-        }
-        if (typeof identifier === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "identifier"'
-          );
-        }
-        const apiPath = "/users/{userId}/targets".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof targetId !== "undefined") {
-          apiPayload["targetId"] = targetId;
-        }
-        if (typeof providerType !== "undefined") {
-          apiPayload["providerType"] = providerType;
-        }
-        if (typeof identifier !== "undefined") {
-          apiPayload["identifier"] = identifier;
-        }
-        if (typeof providerId !== "undefined") {
-          apiPayload["providerId"] = providerId;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      getTarget(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            targetId: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const targetId = params.targetId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof targetId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "targetId"'
-          );
-        }
-        const apiPath = "/users/{userId}/targets/{targetId}".replace("{userId}", encodeURIComponent(String(userId))).replace("{targetId}", encodeURIComponent(String(targetId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          accept: "application/json"
-        };
-        return this.client.call("get", uri, apiHeaders, apiPayload);
-      }
-      updateTarget(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            targetId: rest[0],
-            identifier: rest[1],
-            providerId: rest[2],
-            name: rest[3]
-          };
-        }
-        const userId = params.userId;
-        const targetId = params.targetId;
-        const identifier = params.identifier;
-        const providerId = params.providerId;
-        const name = params.name;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof targetId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "targetId"'
-          );
-        }
-        const apiPath = "/users/{userId}/targets/{targetId}".replace("{userId}", encodeURIComponent(String(userId))).replace("{targetId}", encodeURIComponent(String(targetId)));
-        const apiPayload = {};
-        if (typeof identifier !== "undefined") {
-          apiPayload["identifier"] = identifier;
-        }
-        if (typeof providerId !== "undefined") {
-          apiPayload["providerId"] = providerId;
-        }
-        if (typeof name !== "undefined") {
-          apiPayload["name"] = name;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      deleteTarget(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            targetId: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const targetId = params.targetId;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof targetId === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "targetId"'
-          );
-        }
-        const apiPath = "/users/{userId}/targets/{targetId}".replace("{userId}", encodeURIComponent(String(userId))).replace("{targetId}", encodeURIComponent(String(targetId)));
-        const apiPayload = {};
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json"
-        };
-        return this.client.call("delete", uri, apiHeaders, apiPayload);
-      }
-      createToken(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            length: rest[0],
-            expire: rest[1]
-          };
-        }
-        const userId = params.userId;
-        const length = params.length;
-        const expire = params.expire;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        const apiPath = "/users/{userId}/tokens".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof length !== "undefined") {
-          apiPayload["length"] = length;
-        }
-        if (typeof expire !== "undefined") {
-          apiPayload["expire"] = expire;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("post", uri, apiHeaders, apiPayload);
-      }
-      updateEmailVerification(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            emailVerification: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const emailVerification = params.emailVerification;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof emailVerification === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "emailVerification"'
-          );
-        }
-        const apiPath = "/users/{userId}/verification".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof emailVerification !== "undefined") {
-          apiPayload["emailVerification"] = emailVerification;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-      updatePhoneVerification(paramsOrFirst, ...rest) {
-        let params;
-        if (paramsOrFirst && typeof paramsOrFirst === "object" && !Array.isArray(paramsOrFirst)) {
-          params = paramsOrFirst || {};
-        } else {
-          params = {
-            userId: paramsOrFirst,
-            phoneVerification: rest[0]
-          };
-        }
-        const userId = params.userId;
-        const phoneVerification = params.phoneVerification;
-        if (typeof userId === "undefined") {
-          throw new AppwriteException('Missing required parameter: "userId"');
-        }
-        if (typeof phoneVerification === "undefined") {
-          throw new AppwriteException(
-            'Missing required parameter: "phoneVerification"'
-          );
-        }
-        const apiPath = "/users/{userId}/verification/phone".replace(
-          "{userId}",
-          encodeURIComponent(String(userId))
-        );
-        const apiPayload = {};
-        if (typeof phoneVerification !== "undefined") {
-          apiPayload["phoneVerification"] = phoneVerification;
-        }
-        const uri = new URL(this.client.config.endpoint + apiPath);
-        const apiHeaders = {
-          "X-Appwrite-Project": this.client.config.project,
-          "content-type": "application/json",
-          accept: "application/json"
-        };
-        return this.client.call("patch", uri, apiHeaders, apiPayload);
-      }
-    };
   }
 });
 
@@ -34926,118 +29935,27 @@ var init_permission = __esm({
   "node_modules/node-appwrite/dist/permission.mjs"() {
     Permission = class {
     };
-    Permission.read = (role2) => {
-      return `read("${role2}")`;
+    Permission.read = (role) => {
+      return `read("${role}")`;
     };
-    Permission.write = (role2) => {
-      return `write("${role2}")`;
+    Permission.write = (role) => {
+      return `write("${role}")`;
     };
-    Permission.create = (role2) => {
-      return `create("${role2}")`;
+    Permission.create = (role) => {
+      return `create("${role}")`;
     };
-    Permission.update = (role2) => {
-      return `update("${role2}")`;
+    Permission.update = (role) => {
+      return `update("${role}")`;
     };
-    Permission.delete = (role2) => {
-      return `delete("${role2}")`;
+    Permission.delete = (role) => {
+      return `delete("${role}")`;
     };
   }
 });
 
 // node_modules/node-appwrite/dist/role.mjs
-var Role;
 var init_role = __esm({
   "node_modules/node-appwrite/dist/role.mjs"() {
-    Role = class {
-      /**
-       * Grants access to anyone.
-       *
-       * This includes authenticated and unauthenticated users.
-       *
-       * @returns {string}
-       */
-      static any() {
-        return "any";
-      }
-      /**
-       * Grants access to a specific user by user ID.
-       *
-       * You can optionally pass verified or unverified for
-       * `status` to target specific types of users.
-       *
-       * @param {string} id
-       * @param {string} status
-       * @returns {string}
-       */
-      static user(id, status = "") {
-        if (status === "") {
-          return `user:${id}`;
-        }
-        return `user:${id}/${status}`;
-      }
-      /**
-       * Grants access to any authenticated or anonymous user.
-       *
-       * You can optionally pass verified or unverified for
-       * `status` to target specific types of users.
-       *
-       * @param {string} status
-       * @returns {string}
-       */
-      static users(status = "") {
-        if (status === "") {
-          return "users";
-        }
-        return `users/${status}`;
-      }
-      /**
-       * Grants access to any guest user without a session.
-       *
-       * Authenticated users don't have access to this role.
-       *
-       * @returns {string}
-       */
-      static guests() {
-        return "guests";
-      }
-      /**
-       * Grants access to a team by team ID.
-       *
-       * You can optionally pass a role for `role` to target
-       * team members with the specified role.
-       *
-       * @param {string} id
-       * @param {string} role
-       * @returns {string}
-       */
-      static team(id, role2 = "") {
-        if (role2 === "") {
-          return `team:${id}`;
-        }
-        return `team:${id}/${role2}`;
-      }
-      /**
-       * Grants access to a specific member of a team.
-       *
-       * When the member is removed from the team, they will
-       * no longer have access.
-       *
-       * @param {string} id
-       * @returns {string}
-       */
-      static member(id) {
-        return `member:${id}`;
-      }
-      /**
-       * Grants access to a user with the specified label.
-       *
-       * @param {string} name
-       * @returns  {string}
-       */
-      static label(name) {
-        return `label:${name}`;
-      }
-    };
   }
 });
 
@@ -35716,16 +30634,6 @@ var init_dist = __esm({
 });
 
 // src/db/client.ts
-var client_exports = {};
-__export(client_exports, {
-  clientForJwt: () => clientForJwt,
-  getAdminClient: () => getAdminClient,
-  getDatabaseId: () => getDatabaseId,
-  getStorage: () => getStorage,
-  getTablesDB: () => getTablesDB,
-  getUsers: () => getUsers,
-  resetClients: () => resetClients
-});
 function getAdminClient() {
   if (!adminClient) {
     const { endpoint, projectId, apiKey } = getConfig().appwrite;
@@ -35733,14 +30641,10 @@ function getAdminClient() {
   }
   return adminClient;
 }
-function clientForJwt(jwt) {
-  const { endpoint, projectId } = getConfig().appwrite;
-  return new Client().setEndpoint(endpoint).setProject(projectId).setJWT(jwt);
-}
 function resetClients() {
   adminClient = tables = storage = users = null;
 }
-var adminClient, tables, storage, users, getTablesDB, getStorage, getUsers, getDatabaseId;
+var adminClient, tables, storage, users, getTablesDB, getDatabaseId;
 var init_client2 = __esm({
   "src/db/client.ts"() {
     "use strict";
@@ -35751,39 +30655,39 @@ var init_client2 = __esm({
     storage = null;
     users = null;
     getTablesDB = () => tables ??= new TablesDB(getAdminClient());
-    getStorage = () => storage ??= new Storage(getAdminClient());
-    getUsers = () => users ??= new Users(getAdminClient());
     getDatabaseId = () => getConfig().appwrite.databaseId;
   }
 });
 
-// src/services/admin-check.ts
-async function isAdminUser(userId) {
-  const teamId = getConfig().appwrite.adminTeamId;
-  if (!teamId) return false;
-  const hit = cache.get(userId);
-  if (hit && hit.expiresAt > Date.now()) return hit.value;
-  let value = false;
-  try {
-    const res = await new Teams(getAdminClient()).listMemberships({ teamId, queries: [Query.equal("userId", userId), Query.limit(1)] });
-    value = res.memberships.some((m) => m.userId === userId && m.confirm);
-  } catch {
-    value = false;
-  }
-  cache.set(userId, { value, expiresAt: Date.now() + TTL_MS });
-  return value;
-}
-var TTL_MS, cache;
-var init_admin_check = __esm({
-  "src/services/admin-check.ts"() {
-    "use strict";
-    init_dist();
-    init_config();
-    init_client2();
-    TTL_MS = 6e4;
-    cache = /* @__PURE__ */ new Map();
-  }
+// src/entry-reminders.ts
+var entry_reminders_exports = {};
+__export(entry_reminders_exports, {
+  default: () => entry_reminders_default
 });
+module.exports = __toCommonJS(entry_reminders_exports);
+init_config();
+init_client2();
+
+// src/log.ts
+var LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
+var threshold = LEVELS.info;
+function setLogLevel(level) {
+  threshold = LEVELS[level];
+}
+function log(level, message, meta) {
+  if (LEVELS[level] < threshold) return;
+  const text = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), level, message, ...meta });
+  if (level === "error") console.error(text);
+  else if (level === "warn") console.warn(text);
+  else console.log(text);
+}
+
+// src/services/reminders.ts
+init_dist();
+
+// src/db/repo.ts
+init_dist();
+init_client2();
 
 // src/db/rows.ts
 function isRowNotFound(err) {
@@ -35793,509 +30697,77 @@ function isRowNotFound(err) {
 function isConflict(err) {
   return err?.code === 409;
 }
-function pairKey(a, b) {
-  return [a, b].sort().join("_");
-}
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
-var init_rows = __esm({
-  "src/db/rows.ts"() {
-    "use strict";
-  }
-});
 
 // src/db/repo.ts
-async function getRow(tableId, rowId2) {
+async function getRow(tableId, rowId) {
   try {
-    return await getTablesDB().getRow({ databaseId: getDatabaseId(), tableId, rowId: rowId2 });
+    return await getTablesDB().getRow({ databaseId: getDatabaseId(), tableId, rowId });
   } catch (err) {
     if (isRowNotFound(err)) return null;
     throw err;
   }
 }
-async function createRow(tableId, data, rowId2 = ID.unique(), permissions) {
+async function createRow(tableId, data, rowId = ID.unique(), permissions) {
   const ts = nowIso();
   const payload = { createdAt: ts, updatedAt: ts, ...data };
-  return getTablesDB().createRow({ databaseId: getDatabaseId(), tableId, rowId: rowId2, data: payload, permissions });
-}
-async function updateRow(tableId, rowId2, data) {
-  const payload = { ...data, updatedAt: nowIso() };
-  return getTablesDB().updateRow({ databaseId: getDatabaseId(), tableId, rowId: rowId2, data: payload });
-}
-async function deleteRow(tableId, rowId2) {
-  try {
-    await getTablesDB().deleteRow({ databaseId: getDatabaseId(), tableId, rowId: rowId2 });
-  } catch (err) {
-    if (!isRowNotFound(err)) throw err;
-  }
+  return getTablesDB().createRow({ databaseId: getDatabaseId(), tableId, rowId, data: payload, permissions });
 }
 async function listRows(tableId, queries) {
   const res = await getTablesDB().listRows({ databaseId: getDatabaseId(), tableId, queries });
   return res.rows;
 }
-async function findOne(tableId, queries) {
-  const rows = await listRows(tableId, [...queries, Query.limit(1)]);
-  return rows[0] ?? null;
-}
-async function incrementColumn(tableId, rowId2, column, value = 1) {
-  return getTablesDB().incrementRowColumn({ databaseId: getDatabaseId(), tableId, rowId: rowId2, column, value });
-}
-var init_repo = __esm({
-  "src/db/repo.ts"() {
-    "use strict";
-    init_dist();
-    init_client2();
-    init_rows();
-  }
-});
 
 // src/db/schema.ts
-var TABLES;
-var init_schema = __esm({
-  "src/db/schema.ts"() {
-    "use strict";
-    TABLES = {
-      profiles: "profiles",
-      roleMemberships: "role_memberships",
-      studentProfiles: "student_profiles",
-      teacherProfiles: "teacher_profiles",
-      learningRequests: "learning_requests",
-      learningRelations: "learning_relations",
-      learningGoals: "learning_goals",
-      learningTasks: "learning_tasks",
-      evidenceItems: "evidence_items",
-      feedbackEntries: "feedback_entries",
-      proofRecords: "proof_records",
-      conversations: "conversations",
-      conversationMembers: "conversation_members",
-      messages: "messages",
-      connectionRequests: "connection_requests",
-      contacts: "contacts",
-      blocks: "blocks",
-      reports: "reports",
-      idempotencyKeys: "idempotency_keys",
-      domainEvents: "domain_events",
-      auditEvents: "audit_events",
-      uploadIntents: "upload_intents",
-      notifications: "notifications",
-      qaQuestions: "qa_questions",
-      qaAnswers: "qa_answers",
-      evidenceRevisions: "evidence_revisions"
-    };
-  }
-});
+var TABLES = {
+  profiles: "profiles",
+  roleMemberships: "role_memberships",
+  studentProfiles: "student_profiles",
+  teacherProfiles: "teacher_profiles",
+  learningRequests: "learning_requests",
+  learningRelations: "learning_relations",
+  learningGoals: "learning_goals",
+  learningTasks: "learning_tasks",
+  evidenceItems: "evidence_items",
+  feedbackEntries: "feedback_entries",
+  proofRecords: "proof_records",
+  conversations: "conversations",
+  conversationMembers: "conversation_members",
+  messages: "messages",
+  connectionRequests: "connection_requests",
+  contacts: "contacts",
+  blocks: "blocks",
+  reports: "reports",
+  idempotencyKeys: "idempotency_keys",
+  domainEvents: "domain_events",
+  auditEvents: "audit_events",
+  uploadIntents: "upload_intents",
+  notifications: "notifications",
+  qaQuestions: "qa_questions",
+  qaAnswers: "qa_answers",
+  evidenceRevisions: "evidence_revisions"
+};
 
-// src/services/roles.ts
-async function listMemberships(userId) {
-  return listRows(TABLES.roleMemberships, [Query.equal("userId", userId), Query.limit(10)]);
-}
-async function getRolesOf(userId) {
-  return (await listMemberships(userId)).map((m) => m.role).filter(isRole);
-}
-async function grantRole(userId, role2, activate) {
-  const existing = await listMemberships(userId);
-  const has = existing.find((m) => m.role === role2);
-  if (!has) {
-    try {
-      await createRow(TABLES.roleMemberships, { userId, role: role2, active: activate || existing.length === 0, onboarded: false }, `${userId}_${role2}`);
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-    }
-  }
-  if (activate) await setActiveRole(userId, role2);
-  return listMemberships(userId);
-}
-async function setActiveRole(userId, role2) {
-  const all = await listMemberships(userId);
-  await Promise.all(all.map((m) => m.active !== (m.role === role2) ? updateRow(TABLES.roleMemberships, m.$id, { active: m.role === role2 }) : null));
-}
-async function markOnboarded(userId, role2) {
-  const m = await findOne(TABLES.roleMemberships, [Query.equal("userId", userId), Query.equal("role", role2)]);
-  if (m && !m.onboarded) await updateRow(TABLES.roleMemberships, m.$id, { onboarded: true });
-}
-var ROLES, isRole;
-var init_roles = __esm({
-  "src/services/roles.ts"() {
-    "use strict";
-    init_repo();
-    init_rows();
-    init_schema();
-    ROLES = ["student", "teacher"];
-    isRole = (v) => ROLES.includes(v);
-  }
-});
-
-// src/mappers/notifications.ts
-function toNotification(r, actor) {
-  return {
-    id: r.$id,
-    type: r.type,
-    title: r.title,
-    body: r.body ?? "",
-    href: r.href ?? null,
-    refType: r.refType ?? null,
-    refId: r.refId ?? null,
-    actor,
-    readAt: r.readAt ?? null,
-    createdAt: r.createdAt
-  };
-}
-function toReportItem(r, reporter, target, content = { excerpt: null, href: null }) {
-  const targetType = r.targetType === "qa_question" || r.targetType === "qa_answer" ? r.targetType : "user";
-  return {
-    id: r.$id,
-    reporter,
-    target,
-    targetType,
-    targetId: r.targetId ?? null,
-    contentExcerpt: content.excerpt,
-    contentHref: content.href,
-    reason: r.reason,
-    details: r.details ?? "",
-    status: r.status === "resolved" ? "resolved" : "open",
-    resolution: r.resolution ?? null,
-    resolvedBy: r.resolvedBy ?? null,
-    resolvedAt: r.resolvedAt ?? null,
-    createdAt: r.createdAt
-  };
-}
-var init_notifications = __esm({
-  "src/mappers/notifications.ts"() {
-    "use strict";
-  }
-});
-
-// src/services/events.ts
-async function emitEvent(e) {
-  try {
-    await createRow(TABLES.domainEvents, {
-      eventType: e.eventType,
-      aggregateType: e.aggregateType,
-      aggregateId: e.aggregateId,
-      actorId: e.actorId,
-      payloadVersion: 1,
-      payloadJson: JSON.stringify(e.payload ?? {}),
-      requestId: e.requestId ?? null,
-      occurredAt: (/* @__PURE__ */ new Date()).toISOString(),
-      status: "pending"
-    });
-  } catch (err) {
-    log("warn", "domain_event_write_failed", { eventType: e.eventType, message: err instanceof Error ? err.message : String(err) });
-  }
-}
-async function audit(a) {
-  try {
-    await createRow(TABLES.auditEvents, { ...a, reason: a.reason ?? null, requestId: a.requestId ?? null });
-  } catch (err) {
-    log("warn", "audit_write_failed", { action: a.action });
-  }
-}
-var init_events = __esm({
-  "src/services/events.ts"() {
-    "use strict";
-    init_repo();
-    init_schema();
-    init_log();
-  }
-});
-
-// src/mappers/profile.ts
-function toMe(user, p, memberships, isAdmin = false) {
-  const roles = memberships.map((m) => asRole(m.role)).filter((r) => r !== null);
-  const active = memberships.find((m) => m.active);
-  return {
-    userId: user.$id,
-    email: user.email,
-    emailVerified: user.emailVerification,
-    handle: p.handle,
-    displayName: p.displayName,
-    avatarFileId: p.avatarFileId,
-    locale: p.locale ?? "en",
-    timeZone: p.timeZone ?? "UTC",
-    availableRoles: roles,
-    activeRole: active ? asRole(active.role) : roles[0] ?? null,
-    ageBand: p.ageBand ?? null,
-    privacyAcceptedAt: p.privacyAcceptedAt,
-    onboarding: {
-      student: memberships.some((m) => m.role === "student" && m.onboarded),
-      teacher: memberships.some((m) => m.role === "teacher" && m.onboarded)
-    },
-    isAdmin,
-    createdAt: p.createdAt
-  };
-}
-function toPersonRef(p) {
-  return { userId: p.$id, displayName: p.displayName, handle: p.handle, avatarFileId: p.avatarFileId };
-}
-function toStudentProfile(p, s) {
-  return {
-    ...toPersonRef(p),
-    headline: s?.headline ?? "",
-    goalSummary: s?.goalSummary ?? "",
-    interests: s?.interests ?? [],
-    visibility: s?.visibility ?? "relations",
-    updatedAt: s?.updatedAt ?? p.updatedAt
-  };
-}
-function toTeacherProfile(p, t, emailVerified, signals) {
-  return {
-    ...toPersonRef(p),
-    headline: t.headline ?? "",
-    bio: t.bio ?? "",
-    subjects: t.subjects ?? [],
-    approach: t.approach ?? "",
-    selfDeclared: true,
-    emailVerified,
-    acceptingRequests: t.acceptingRequests,
-    visibility: t.visibility ?? "public",
-    signals,
-    updatedAt: t.updatedAt
-  };
-}
-var ROLES2, asRole;
-var init_profile = __esm({
-  "src/mappers/profile.ts"() {
-    "use strict";
-    ROLES2 = ["student", "teacher"];
-    asRole = (r) => ROLES2.includes(r) ? r : null;
-  }
-});
-
-// src/services/oauth-avatar.ts
-async function pictureUrlFor(identity) {
-  const token = identity.providerAccessToken;
-  if (!token) return null;
-  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  if (identity.provider === "google") {
-    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { Authorization: `Bearer ${token}` },
-      signal
-    });
-    if (!res.ok) return null;
-    const body2 = await res.json();
-    return body2.picture ?? null;
-  }
-  if (identity.provider === "notion") {
-    const res = await fetch("https://api.notion.com/v1/users/me", {
-      headers: { Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28" },
-      signal
-    });
-    if (!res.ok) return null;
-    const body2 = await res.json();
-    return body2.avatar_url ?? body2.bot?.owner?.user?.avatar_url ?? null;
-  }
-  return null;
-}
-async function download(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!res.ok) return null;
-  const mime = (res.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-  if (!ALLOWED.test(mime)) return null;
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (!buf.length || buf.length > MAX_BYTES) return null;
-  return { bytes: buf, mime };
-}
-async function syncOAuthAvatar(user, profile) {
-  if (profile.avatarFileId) return profile.avatarFileId;
-  try {
-    const res = await getUsers().listIdentities({ queries: [Query.equal("userId", user.$id)] });
-    const identity = res.identities.find((i) => i.provider === "google" || i.provider === "notion");
-    if (!identity) return null;
-    const url = await pictureUrlFor(identity);
-    if (!url) return null;
-    const image = await download(url);
-    if (!image) return null;
-    const bucketId = getConfig().appwrite.avatarBucketId;
-    const fileId = ID.unique();
-    await getStorage().createFile({
-      bucketId,
-      fileId,
-      file: InputFile.fromBuffer(image.bytes, `avatar-${user.$id}.${EXT[image.mime] ?? "jpg"}`),
-      permissions: [Permission.read(Role.any()), Permission.delete(Role.user(user.$id))]
-    });
-    const fresh = await getRow(TABLES.profiles, user.$id);
-    if (fresh?.avatarFileId) {
-      await getStorage().deleteFile({ bucketId, fileId }).catch(() => void 0);
-      return fresh.avatarFileId;
-    }
-    await updateRow(TABLES.profiles, user.$id, { avatarFileId: fileId });
-    return fileId;
-  } catch {
-    return null;
-  }
-}
-var MAX_BYTES, ALLOWED, FETCH_TIMEOUT_MS, EXT;
-var init_oauth_avatar = __esm({
-  "src/services/oauth-avatar.ts"() {
-    "use strict";
-    init_dist();
-    init_inputFile();
-    init_config();
-    init_repo();
-    init_client2();
-    init_schema();
-    MAX_BYTES = 2 * 1024 * 1024;
-    ALLOWED = /^image\/(jpeg|png|webp|gif)$/;
-    FETCH_TIMEOUT_MS = 5e3;
-    EXT = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif"
-    };
-  }
-});
+// src/services/notifications.ts
+init_dist();
 
 // src/services/profiles.ts
-async function getOrCreateProfile(user) {
-  const row = await getRow(TABLES.profiles, user.$id);
-  if (row) return row;
-  try {
-    return await createRow(TABLES.profiles, {
-      email: user.email,
-      handle: null,
-      displayName: user.name || user.email.split("@")[0] || "learner",
-      avatarFileId: null,
-      locale: "en",
-      timeZone: "UTC",
-      ageBand: null,
-      privacyAcceptedAt: null,
-      status: "active"
-    }, user.$id);
-  } catch (err) {
-    if (!isConflict(err)) throw err;
-    return await getRow(TABLES.profiles, user.$id);
-  }
-}
-async function getMe(user) {
-  const [profile, memberships, admin] = await Promise.all([getOrCreateProfile(user), listMemberships(user.$id), isAdminUser(user.$id)]);
-  const avatarFileId = await syncOAuthAvatar(user, profile);
-  return toMe(user, avatarFileId ? { ...profile, avatarFileId } : profile, memberships, admin);
-}
-async function updateMe2(user, patch) {
-  const data = {};
-  if (patch.handle !== void 0) {
-    const handle = patch.handle.toLowerCase();
-    const taken = await findOne(TABLES.profiles, [Query.equal("handle", handle)]);
-    if (taken && taken.$id !== user.$id) throw conflict("handle_taken", "That handle is already in use.");
-    data.handle = handle;
-  }
-  if (patch.displayName !== void 0) data.displayName = patch.displayName;
-  if (patch.locale !== void 0) data.locale = patch.locale;
-  if (patch.timeZone !== void 0) data.timeZone = patch.timeZone;
-  await getOrCreateProfile(user);
-  const [profile, memberships] = await Promise.all([updateRow(TABLES.profiles, user.$id, data), listMemberships(user.$id)]);
-  return toMe(user, profile, memberships);
-}
-async function applyAgeGate(user, ageBand) {
-  const min = getConfig().minAgeBand;
-  if (AGE_ORDER.indexOf(ageBand) < AGE_ORDER.indexOf(min)) {
-    throw validation("Node Learn is not available for your age group yet.", [{ path: "ageBand", message: "below_minimum" }]);
-  }
-  await getOrCreateProfile(user);
-  const [profile, memberships] = await Promise.all([
-    updateRow(TABLES.profiles, user.$id, { ageBand, privacyAcceptedAt: (/* @__PURE__ */ new Date()).toISOString() }),
-    listMemberships(user.$id)
-  ]);
-  return toMe(user, profile, memberships);
-}
-async function personRefs(userIds) {
-  const ids = [...new Set(userIds)].filter(Boolean);
-  const out = /* @__PURE__ */ new Map();
-  if (!ids.length) return out;
-  const rows = await listRows(TABLES.profiles, [Query.equal("$id", ids), Query.limit(ids.length)]);
-  for (const r of rows) out.set(r.$id, { userId: r.$id, displayName: r.displayName, handle: r.handle, avatarFileId: r.avatarFileId });
-  for (const id of ids) if (!out.has(id)) out.set(id, { userId: id, displayName: "Former member", handle: null, avatarFileId: null });
-  return out;
-}
-async function getStudentProfile(userId) {
-  const [row, profile] = await Promise.all([findOne(TABLES.studentProfiles, [Query.equal("userId", userId)]), getRow(TABLES.profiles, userId)]);
-  if (!profile) throw notFound("user_not_found", "This person could not be found.");
-  return toStudentProfile(profile, row);
-}
-async function upsertStudentProfile(user, patch) {
-  const profile = await getOrCreateProfile(user);
-  const existing = await findOne(TABLES.studentProfiles, [Query.equal("userId", user.$id)]);
-  const row = existing ? await updateRow(TABLES.studentProfiles, existing.$id, patch) : await createRow(TABLES.studentProfiles, { userId: user.$id, headline: "", goalSummary: "", interests: [], visibility: "relations", ...patch }, user.$id);
-  await markOnboarded(user.$id, "student");
-  return toStudentProfile(profile, row);
-}
-async function teacherSignals(userId) {
-  const relations = await listRows(TABLES.learningRelations, [Query.equal("teacherId", userId), Query.equal("status", "active"), Query.limit(1)]);
-  const reviewed = await listRows(TABLES.feedbackEntries, [Query.equal("authorId", userId), Query.limit(1)]);
-  const profile = await getRow(TABLES.profiles, userId);
-  return { activeRelations: relations.length, evidenceReviewed: reviewed.length, memberSince: profile?.createdAt ?? (/* @__PURE__ */ new Date()).toISOString() };
-}
-async function getTeacherProfile(userId, user) {
-  const [row, profile] = await Promise.all([findOne(TABLES.teacherProfiles, [Query.equal("userId", userId)]), getRow(TABLES.profiles, userId)]);
-  if (!profile || !row) throw notFound("user_not_found", "This teacher could not be found.");
-  const target = user?.$id === userId ? user : null;
-  const emailVerified = target ? target.emailVerification : await isEmailVerified(userId);
-  return toTeacherProfile(profile, row, emailVerified, await teacherSignals(userId));
-}
-async function isEmailVerified(userId) {
-  const { getUsers: getUsers2 } = await Promise.resolve().then(() => (init_client2(), client_exports));
-  try {
-    return (await getUsers2().get({ userId })).emailVerification;
-  } catch {
-    return false;
-  }
-}
-async function upsertTeacherProfile(user, patch) {
-  const profile = await getOrCreateProfile(user);
-  const existing = await findOne(TABLES.teacherProfiles, [Query.equal("userId", user.$id)]);
-  const merged = { headline: existing?.headline ?? "", bio: existing?.bio ?? "", subjects: existing?.subjects ?? [], approach: existing?.approach ?? "", ...patch };
-  const searchText = [profile.displayName, profile.handle, merged.headline, ...merged.subjects ?? []].filter(Boolean).join(" ").toLowerCase().slice(0, 1e3);
-  const row = existing ? await updateRow(TABLES.teacherProfiles, existing.$id, { ...patch, searchText }) : await createRow(TABLES.teacherProfiles, { userId: user.$id, acceptingRequests: true, visibility: "public", ...merged, searchText }, user.$id);
-  await markOnboarded(user.$id, "teacher");
-  return toTeacherProfile(profile, row, user.emailVerification, await teacherSignals(user.$id));
-}
-async function searchTeachers(params) {
-  const queries = [Query.equal("visibility", "public"), Query.limit(params.limit + 1)];
-  if (params.accepting !== false) queries.push(Query.equal("acceptingRequests", true));
-  if (params.q) queries.push(Query.search("searchText", params.q.toLowerCase()));
-  if (params.subject) queries.push(Query.contains("subjects", [params.subject.toLowerCase()]));
-  queries.push(params.sort === "newest" ? Query.orderDesc("createdAt") : Query.orderDesc("updatedAt"));
-  if (params.cursor) queries.push(Query.cursorAfter(params.cursor));
-  const fetched = await listRows(TABLES.teacherProfiles, queries);
-  const hasMore = fetched.length > params.limit;
-  const rows = hasMore ? fetched.slice(0, params.limit) : fetched;
-  const nextCursor = hasMore && rows.length ? rows[rows.length - 1].$id : null;
-  const ids = rows.map((r) => r.userId);
-  const profiles = /* @__PURE__ */ new Map();
-  const reviewed = /* @__PURE__ */ new Map();
-  if (ids.length) {
-    for (const p of await listRows(TABLES.profiles, [Query.equal("$id", ids), Query.limit(ids.length)])) profiles.set(p.$id, p);
-    const fb = await listRows(TABLES.feedbackEntries, [Query.equal("authorId", ids), Query.select(["authorId"]), Query.limit(500)]);
-    for (const f of fb) reviewed.set(f.authorId, (reviewed.get(f.authorId) ?? 0) + 1);
-  }
-  if (params.sort === "most_reviewed") rows.sort((a, b) => (reviewed.get(b.userId) ?? 0) - (reviewed.get(a.userId) ?? 0));
-  else if (params.sort !== "newest") rows.sort((a, b) => Number(b.acceptingRequests) - Number(a.acceptingRequests) || (reviewed.get(b.userId) ?? 0) - (reviewed.get(a.userId) ?? 0));
-  return { rows, profiles, reviewed, nextCursor };
-}
-async function lookupByHandle(handle) {
-  const profile = await findOne(TABLES.profiles, [Query.equal("handle", handle.toLowerCase())]);
-  if (!profile) return null;
-  return { profile, memberships: await listMemberships(profile.$id) };
-}
-var AGE_ORDER;
-var init_profiles = __esm({
-  "src/services/profiles.ts"() {
-    "use strict";
-    init_dist();
-    init_config();
-    init_admin_check();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-    init_profile();
-    init_oauth_avatar();
-    init_roles();
-    AGE_ORDER = ["under_16", "16_17", "18_plus"];
-  }
-});
+init_dist();
+init_config();
+
+// src/services/admin-check.ts
+init_dist();
+init_config();
+init_client2();
+
+// src/services/oauth-avatar.ts
+init_dist();
+init_inputFile();
+init_config();
+init_client2();
+var MAX_BYTES = 2 * 1024 * 1024;
 
 // src/services/notifications.ts
 async function notify(input) {
@@ -36318,4854 +30790,59 @@ async function notify(input) {
     log("warn", "notification_write_failed", { type: input.type, message: err instanceof Error ? err.message : String(err) });
   }
 }
-async function listNotifications(userId, p) {
-  const q = [Query.equal("userId", userId), Query.orderDesc("createdAt"), Query.limit(p.limit + 1)];
-  if (p.unreadOnly) q.push(Query.isNull("readAt"));
-  if (p.cursor) q.push(Query.cursorAfter(p.cursor));
-  const rows = await listRows(TABLES.notifications, q);
-  const hasMore = rows.length > p.limit;
-  const page = hasMore ? rows.slice(0, p.limit) : rows;
-  const refs = await personRefs(page.map((r) => r.actorId).filter((x) => !!x));
-  const last = page[page.length - 1];
-  return { items: page.map((r) => toNotification(r, r.actorId ? refs.get(r.actorId) ?? null : null)), nextCursor: hasMore && last ? last.$id : null };
-}
-async function countUnread(userId) {
-  const rows = await listRows(TABLES.notifications, [Query.equal("userId", userId), Query.isNull("readAt"), Query.select(["$id"]), Query.limit(100)]);
-  return rows.length;
-}
-async function markRead2(userId, input) {
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  let updated = 0;
-  if (input.all) {
-    for (let i = 0; i < 20; i++) {
-      const rows = await listRows(TABLES.notifications, [Query.equal("userId", userId), Query.isNull("readAt"), Query.select(["$id"]), Query.limit(100)]);
-      if (!rows.length) break;
-      await Promise.all(rows.map((r) => updateRow(TABLES.notifications, r.$id, { readAt: now })));
-      updated += rows.length;
-      if (rows.length < 100) break;
-    }
-  } else {
-    for (const id of input.ids ?? []) {
-      const row = await getRow(TABLES.notifications, id);
-      if (!row || row.userId !== userId || row.readAt) continue;
-      await updateRow(TABLES.notifications, id, { readAt: now });
-      updated++;
-    }
-  }
-  return { updated, unread: await countUnread(userId) };
-}
-var init_notifications2 = __esm({
-  "src/services/notifications.ts"() {
-    "use strict";
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_log();
-    init_notifications();
-    init_profiles();
-  }
-});
 
-// src/mappers/learning.ts
-function toProof(p) {
-  let milestones = [];
-  try {
-    milestones = JSON.parse(p.milestonesJson ?? "[]");
-  } catch {
-    milestones = [];
-  }
-  return {
-    relationId: p.relationId,
-    currentFocus: p.currentFocus,
-    milestones,
-    counts: { tasksDone: p.tasksDone, evidenceSubmitted: p.evidenceSubmitted, feedbackReceived: p.feedbackReceived, revisions: p.revisions },
-    recentChange: p.recentChange,
-    nextStep: p.nextStep,
-    computedAt: p.computedAt
-  };
-}
-var toLearningRequest, NO_ACTION, toRelation, toGoal, toTask, toFeedback, toRevision, toEvidence;
-var init_learning = __esm({
-  "src/mappers/learning.ts"() {
-    "use strict";
-    toLearningRequest = (r, counterpart) => ({
-      id: r.$id,
-      kind: r.kind,
-      studentId: r.studentId,
-      teacherId: r.teacherId,
-      initiatorId: r.initiatorId,
-      goalTitle: r.goalTitle,
-      message: r.message ?? "",
-      status: r.status,
-      relationId: r.relationId,
-      createdAt: r.createdAt,
-      respondedAt: r.respondedAt,
-      counterpart
-    });
-    NO_ACTION = { kind: "none", count: 0, dueAt: null };
-    toRelation = (r, student, teacher, nextAction = NO_ACTION) => ({
-      id: r.$id,
-      studentId: r.studentId,
-      teacherId: r.teacherId,
-      sourceRequestId: r.sourceRequestId,
-      status: r.status,
-      conversationId: r.conversationId,
-      currentGoalId: r.currentGoalId,
-      startedAt: r.startedAt,
-      endedAt: r.endedAt,
-      version: r.version,
-      pausedBy: r.pausedBy ?? null,
-      pausedAt: r.pausedAt ?? null,
-      endedBy: r.endedBy ?? null,
-      endReason: r.endReason ?? null,
-      student,
-      teacher,
-      summary: { openTasks: r.openTasks, evidenceCount: r.evidenceCount, lastActivityAt: r.lastActivityAt },
-      nextAction
-    });
-    toGoal = (g) => ({
-      id: g.$id,
-      relationId: g.relationId,
-      title: g.title,
-      description: g.description ?? "",
-      status: g.status,
-      createdBy: g.createdBy,
-      completionRequestedAt: g.completionRequestedAt ?? null,
-      createdAt: g.createdAt,
-      updatedAt: g.updatedAt
-    });
-    toTask = (t) => ({
-      id: t.$id,
-      relationId: t.relationId,
-      goalId: t.goalId,
-      title: t.title,
-      instructions: t.instructions ?? "",
-      status: t.status,
-      assignedBy: t.assignedBy,
-      dueAt: t.dueAt,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt
-    });
-    toFeedback = (f) => ({ id: f.$id, evidenceId: f.evidenceId, authorId: f.authorId, body: f.body ?? "", nextStep: f.nextStep ?? "", outcome: f.outcome === "needs_revision" ? "needs_revision" : "approved", createdAt: f.createdAt });
-    toRevision = (r) => ({ version: r.version, title: r.title, body: r.body ?? "", attachmentFileIds: r.attachmentFileIds ?? [], createdAt: r.createdAt });
-    toEvidence = (e, feedback, attachments = []) => ({
-      id: e.$id,
-      relationId: e.relationId,
-      taskId: e.taskId,
-      goalId: e.goalId,
-      authorId: e.authorId,
-      title: e.title,
-      body: e.body ?? "",
-      attachmentFileIds: e.attachmentFileIds ?? [],
-      attachments,
-      status: e.status,
-      version: e.version,
-      submittedAt: e.submittedAt,
-      reviewedAt: e.reviewedAt,
-      feedback: feedback.map(toFeedback)
-    });
-  }
-});
-
-// src/mappers/messaging.ts
-function toMessage(r) {
-  let payload;
-  try {
-    payload = JSON.parse(r.payloadJson ?? "");
-  } catch {
-    payload = { type: "system", text: "Unavailable message" };
-  }
-  return {
-    id: r.$id,
-    conversationId: r.conversationId,
-    sequence: r.sequence,
-    senderId: r.senderId,
-    type: r.type,
-    payloadVersion: 1,
-    payload: r.removedAt ? { type: "system", text: "This message was removed." } : payload,
-    clientMessageId: r.clientMessageId,
-    createdAt: r.createdAt,
-    removedAt: r.removedAt
-  };
-}
-function toConversation(c, m, last, counterpart) {
-  return {
-    id: c.$id,
-    relationId: c.relationId,
-    memberIds: c.memberIds,
-    lastMessage: last ? toMessage(last) : null,
-    lastSequence: c.lastSequence,
-    myLastReadSequence: m.lastReadSequence,
-    unreadCount: Math.max(0, c.lastSequence - m.lastReadSequence),
-    counterpart,
-    updatedAt: c.lastMessageAt ?? c.updatedAt
-  };
-}
-var init_messaging2 = __esm({
-  "src/mappers/messaging.ts"() {
-    "use strict";
-  }
-});
-
-// src/services/connections.ts
-var connections_exports = {};
-__export(connections_exports, {
-  accept: () => accept,
-  areContacts: () => areContacts,
-  cancelPendingBetween: () => cancelPendingBetween,
-  createRequest: () => createRequest,
-  listContacts: () => listContacts,
-  listRequests: () => listRequests,
-  lookup: () => lookup2,
-  respond: () => respond
-});
-async function lookup2(handle, viewerId) {
-  const found = await lookupByHandle(handle);
-  if (!found || !found.profile.handle || found.profile.$id === viewerId) return null;
-  if (await isBlockedEitherWay(viewerId, found.profile.$id)) return null;
-  return { userId: found.profile.$id, displayName: found.profile.displayName, handle: found.profile.handle, avatarFileId: found.profile.avatarFileId, roles: found.memberships.map((m) => m.role) };
-}
-async function areContacts(a, b) {
-  return !!await findOne(TABLES.contacts, [Query.equal("userId", a), Query.equal("contactUserId", b)]);
-}
-async function createRequest(from, input, source, requestId2) {
-  if (input.toUserId === from.$id) throw conflict("invalid_state", "You cannot connect with yourself.");
-  if (!await getRow(TABLES.profiles, input.toUserId)) throw notFound("user_not_found", "This person could not be found.");
-  await assertNotBlocked(from.$id, input.toUserId);
-  if (await areContacts(from.$id, input.toUserId)) throw conflict("duplicate_request", "You are already connected.");
-  const key = pairKey(from.$id, input.toUserId);
-  const open = await findOne(TABLES.connectionRequests, [Query.equal("pairKey", key), Query.equal("status", "pending")]);
-  if (open) {
-    if (open.toUserId === from.$id) return accept(open.$id, from, requestId2);
-    throw conflict("duplicate_request", "You already sent a request to this person.");
-  }
-  const row = await createRow(TABLES.connectionRequests, { fromUserId: from.$id, toUserId: input.toUserId, message: input.message, status: "pending", source, pairKey: key, respondedAt: null });
-  await emitEvent({ eventType: "connection.requested", aggregateType: "connection_request", aggregateId: row.$id, actorId: from.$id, payload: {}, requestId: requestId2 });
-  await notify({ userId: input.toUserId, type: "connection.received", title: "New connection request", body: input.message, href: "/connections", refType: "connection_request", refId: row.$id, actorId: from.$id, dedupeKey: `connection.received:${row.$id}` });
-  return toRequest(row, (await personRefs([input.toUserId])).get(input.toUserId));
-}
-async function listRequests(userId, direction, limit2, cursor2) {
-  const q = [Query.equal(direction === "incoming" ? "toUserId" : "fromUserId", userId), Query.equal("status", "pending"), Query.orderDesc("createdAt"), Query.limit(limit2 + 1)];
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const rows = await listRows(TABLES.connectionRequests, q);
-  const hasMore = rows.length > limit2;
-  const page = hasMore ? rows.slice(0, limit2) : rows;
-  const refs = await personRefs(page.map((r) => r.fromUserId === userId ? r.toUserId : r.fromUserId));
-  const last = page[page.length - 1];
-  return { items: page.map((r) => toRequest(r, refs.get(r.fromUserId === userId ? r.toUserId : r.fromUserId))), nextCursor: hasMore && last ? last.$id : null };
-}
-async function addContactPair(a, b, conversationId) {
-  for (const [u, c] of [[a, b], [b, a]]) {
-    try {
-      await createRow(TABLES.contacts, { userId: u, contactUserId: c, conversationId, connectedAt: (/* @__PURE__ */ new Date()).toISOString() });
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-    }
-  }
-}
-async function accept(id, actor, requestId2) {
-  const row = await getRow(TABLES.connectionRequests, id);
-  if (!row) throw notFound("not_found", "This request could not be found.");
-  if (row.toUserId !== actor.$id) throw forbidden();
-  if (row.status === "accepted") return toRequest(row, (await personRefs([row.fromUserId])).get(row.fromUserId));
-  if (row.status !== "pending") throw conflict("invalid_state", "This request is no longer open.");
-  await assertNotBlocked(row.fromUserId, row.toUserId);
-  const conv = await getOrCreateConversation(row.fromUserId, row.toUserId, null);
-  await addContactPair(row.fromUserId, row.toUserId, conv.$id);
-  const updated = await updateRow(TABLES.connectionRequests, id, { status: "accepted", respondedAt: (/* @__PURE__ */ new Date()).toISOString() });
-  await emitEvent({ eventType: "connection.accepted", aggregateType: "connection_request", aggregateId: id, actorId: actor.$id, payload: {}, requestId: requestId2 });
-  await notify({ userId: row.fromUserId, type: "connection.accepted", title: "Connection accepted", body: "", href: "/connections", refType: "connection_request", refId: id, actorId: actor.$id, dedupeKey: `connection.accepted:${id}` });
-  return toRequest(updated, (await personRefs([row.fromUserId])).get(row.fromUserId));
-}
-async function respond(id, actor, action) {
-  const row = await getRow(TABLES.connectionRequests, id);
-  if (!row) throw notFound("not_found", "This request could not be found.");
-  if (action === "decline" && row.toUserId !== actor.$id) throw forbidden();
-  if (action === "cancel" && row.fromUserId !== actor.$id) throw forbidden();
-  if (row.status !== "pending") throw conflict("invalid_state", "This request is no longer open.");
-  const updated = await updateRow(TABLES.connectionRequests, id, { status: action === "decline" ? "declined" : "cancelled", respondedAt: (/* @__PURE__ */ new Date()).toISOString() });
-  const other = row.fromUserId === actor.$id ? row.toUserId : row.fromUserId;
-  return toRequest(updated, (await personRefs([other])).get(other));
-}
-async function cancelPendingBetween(a, b) {
-  const rows = await listRows(TABLES.connectionRequests, [Query.equal("pairKey", pairKey(a, b)), Query.equal("status", "pending"), Query.limit(5)]);
-  await Promise.all(rows.map((r) => updateRow(TABLES.connectionRequests, r.$id, { status: "cancelled", respondedAt: (/* @__PURE__ */ new Date()).toISOString() })));
-}
-async function listContacts(userId, limit2, cursor2) {
-  const q = [Query.equal("userId", userId), Query.orderDesc("connectedAt"), Query.limit(limit2 + 1)];
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const rows = await listRows(TABLES.contacts, q);
-  const hasMore = rows.length > limit2;
-  const page = hasMore ? rows.slice(0, limit2) : rows;
-  const refs = await personRefs(page.map((r) => r.contactUserId));
-  const last = page[page.length - 1];
-  return {
-    items: page.map((r) => ({ ...refs.get(r.contactUserId), connectedAt: r.connectedAt, conversationId: r.conversationId })),
-    nextCursor: hasMore && last ? last.$id : null
-  };
-}
-var toRequest;
-var init_connections = __esm({
-  "src/services/connections.ts"() {
-    "use strict";
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-    init_events();
-    init_notifications2();
-    init_messaging3();
-    init_profiles();
-    init_safety();
-    toRequest = (r, counterpart) => ({
-      id: r.$id,
-      fromUserId: r.fromUserId,
-      toUserId: r.toUserId,
-      message: r.message ?? "",
-      status: r.status,
-      source: r.source,
-      createdAt: r.createdAt,
-      respondedAt: r.respondedAt,
-      counterpart
-    });
-  }
-});
-
-// src/services/safety.ts
-async function isBlockedEitherWay(a, b) {
-  const rows = await listRows(TABLES.blocks, [Query.or([
-    Query.and([Query.equal("blockerId", a), Query.equal("blockedId", b)]),
-    Query.and([Query.equal("blockerId", b), Query.equal("blockedId", a)])
-  ]), Query.limit(1)]);
-  return rows.length > 0;
-}
-async function assertNotBlocked(a, b) {
-  if (await isBlockedEitherWay(a, b)) throw conflict("blocked", "You cannot interact with this person.");
-}
-async function block(blockerId, blockedId) {
-  try {
-    await createRow(TABLES.blocks, { blockerId, blockedId }, `${blockerId}_${blockedId}`.slice(0, 36));
-  } catch (err) {
-    if (!isConflict(err)) throw err;
-  }
-  const { cancelPendingBetween: cancelPendingBetween2 } = await Promise.resolve().then(() => (init_connections(), connections_exports));
-  await cancelPendingBetween2(blockerId, blockedId);
-}
-async function unblock(blockerId, blockedId) {
-  const row = await findOne(TABLES.blocks, [Query.equal("blockerId", blockerId), Query.equal("blockedId", blockedId)]);
-  if (row) await deleteRow(TABLES.blocks, row.$id);
-}
-async function report(reporterId, input) {
-  await createRow(TABLES.reports, { reporterId, targetUserId: input.targetUserId, reason: input.reason, details: input.details ?? "", status: "open" });
-}
-var init_safety = __esm({
-  "src/services/safety.ts"() {
-    "use strict";
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-  }
-});
-
-// src/services/messaging.ts
-async function getOrCreateConversation(a, b, relationId) {
-  const key = pairKey(a, b);
-  const existing = await findOne(TABLES.conversations, [Query.equal("pairKey", key)]);
-  if (existing) {
-    if (relationId && existing.relationId !== relationId) return updateRow(TABLES.conversations, existing.$id, { relationId });
-    return existing;
-  }
-  let conv;
-  try {
-    conv = await createRow(TABLES.conversations, { relationId, memberIds: [a, b], pairKey: key, lastSequence: 0, lastMessageAt: null }, void 0, memberReadPermissions([a, b]));
-  } catch (err) {
-    if (!isConflict(err)) throw err;
-    return await findOne(TABLES.conversations, [Query.equal("pairKey", key)]);
-  }
-  for (const userId of [a, b]) {
-    try {
-      await createRow(TABLES.conversationMembers, { conversationId: conv.$id, userId, lastReadSequence: 0 }, `${conv.$id}_${userId}`.slice(0, 36));
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-    }
-  }
-  return conv;
-}
-async function requireMember(conversationId, userId) {
-  const conv = await getRow(TABLES.conversations, conversationId);
-  if (!conv) throw notFound("not_found", "This conversation could not be found.");
-  if (!conv.memberIds.includes(userId)) throw forbidden();
-  const member = await findOne(TABLES.conversationMembers, [Query.equal("conversationId", conversationId), Query.equal("userId", userId)]);
-  if (!member) throw conflict("not_member", "You are not part of this conversation.");
-  return { conv, member };
-}
-async function listConversations(userId, limit2, cursor2) {
-  const q = [Query.equal("userId", userId), Query.orderDesc("updatedAt"), Query.limit(limit2 + 1)];
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const members = await listRows(TABLES.conversationMembers, q);
-  const hasMore = members.length > limit2;
-  const page = hasMore ? members.slice(0, limit2) : members;
-  if (!page.length) return { items: [], nextCursor: null };
-  const convs = await listRows(TABLES.conversations, [Query.equal("$id", page.map((m) => m.conversationId)), Query.limit(page.length)]);
-  const convById = new Map(convs.map((c) => [c.$id, c]));
-  const others = convs.flatMap((c) => c.memberIds.filter((id) => id !== userId));
-  const refs = await personRefs(others);
-  const items = [];
-  for (const m of page) {
-    const c = convById.get(m.conversationId);
-    if (!c) continue;
-    const last = c.lastSequence > 0 ? await findOne(TABLES.messages, [Query.equal("conversationId", c.$id), Query.equal("sequence", c.lastSequence)]) : null;
-    const other = c.memberIds.find((id) => id !== userId);
-    items.push(toConversation(c, m, last, other ? refs.get(other) ?? null : null));
-  }
-  items.sort((a, b) => b.updatedAt > a.updatedAt ? 1 : -1);
-  const lastPage = page[page.length - 1];
-  return { items, nextCursor: hasMore && lastPage ? lastPage.$id : null };
-}
-async function getConversation(conversationId, userId) {
-  const { conv, member } = await requireMember(conversationId, userId);
-  const last = conv.lastSequence > 0 ? await findOne(TABLES.messages, [Query.equal("conversationId", conv.$id), Query.equal("sequence", conv.lastSequence)]) : null;
-  const other = conv.memberIds.find((id) => id !== userId);
-  const refs = other ? await personRefs([other]) : /* @__PURE__ */ new Map();
-  return toConversation(conv, member, last, other ? refs.get(other) ?? null : null);
-}
-async function listMessages(conversationId, userId, p) {
-  await requireMember(conversationId, userId);
-  const q = [Query.equal("conversationId", conversationId), Query.limit(p.limit + 1)];
-  if (p.afterSequence !== void 0) q.push(Query.greaterThan("sequence", p.afterSequence), Query.orderAsc("sequence"));
-  else {
-    if (p.beforeSequence !== void 0) q.push(Query.lessThan("sequence", p.beforeSequence));
-    q.push(Query.orderDesc("sequence"));
-  }
-  const rows = await listRows(TABLES.messages, q);
-  const hasMore = rows.length > p.limit;
-  const page = hasMore ? rows.slice(0, p.limit) : rows;
-  const items = page.map(toMessage);
-  if (p.afterSequence === void 0) items.reverse();
-  const edge = p.afterSequence !== void 0 ? items[items.length - 1] : items[0];
-  return { items, nextCursor: hasMore && edge ? String(edge.sequence) : null };
-}
-async function appendMessage(input) {
-  const dedupeKey = input.clientMessageId ? `${input.conversationId}:${input.senderId}:${input.clientMessageId}`.slice(0, 120) : null;
-  if (dedupeKey) {
-    const dup = await findOne(TABLES.messages, [Query.equal("dedupeKey", dedupeKey)]);
-    if (dup) return toMessage(dup);
-  }
-  const conv = await incrementColumn(TABLES.conversations, input.conversationId, "lastSequence", 1);
-  const sequence = conv.lastSequence;
-  let row;
-  try {
-    row = await createRow(TABLES.messages, {
-      conversationId: input.conversationId,
-      sequence,
-      senderId: input.senderId,
-      type: input.type,
-      payloadVersion: 1,
-      payloadJson: JSON.stringify(input.payload),
-      clientMessageId: input.clientMessageId ?? null,
-      dedupeKey,
-      removedAt: null
-    }, void 0, memberReadPermissions(conv.memberIds));
-  } catch (err) {
-    if (isConflict(err) && dedupeKey) {
-      const dup = await findOne(TABLES.messages, [Query.equal("dedupeKey", dedupeKey)]);
-      if (dup) return toMessage(dup);
-    }
-    throw err;
-  }
-  const now = row.createdAt;
-  await updateRow(TABLES.conversations, input.conversationId, { lastMessageAt: now });
-  const members = await listRows(TABLES.conversationMembers, [Query.equal("conversationId", input.conversationId), Query.limit(10)]);
-  await Promise.all(members.map((m) => updateRow(TABLES.conversationMembers, m.$id, m.userId === input.senderId ? { lastReadSequence: Math.max(m.lastReadSequence, sequence) } : {})));
-  await emitEvent({ eventType: "message.sent", aggregateType: "conversation", aggregateId: input.conversationId, actorId: input.senderId, payload: { sequence, type: input.type }, requestId: input.requestId });
-  return toMessage(row);
-}
-async function sendText(conversationId, senderId, text, clientMessageId, requestId2) {
-  const { conv } = await requireMember(conversationId, senderId);
-  const other = conv.memberIds.find((id) => id !== senderId);
-  if (other) await assertNotBlocked(senderId, other);
-  return appendMessage({ conversationId, senderId, type: "text", payload: { type: "text", text }, clientMessageId, requestId: requestId2 });
-}
-async function markRead3(conversationId, userId, sequence) {
-  const { conv, member } = await requireMember(conversationId, userId);
-  const next = Math.min(Math.max(member.lastReadSequence, sequence), conv.lastSequence);
-  if (next !== member.lastReadSequence) await updateRow(TABLES.conversationMembers, member.$id, { lastReadSequence: next });
-  return getConversation(conversationId, userId);
-}
-var memberReadPermissions;
-var init_messaging3 = __esm({
-  "src/services/messaging.ts"() {
-    "use strict";
-    init_dist();
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-    init_messaging2();
-    init_events();
-    init_profiles();
-    init_safety();
-    memberReadPermissions = (memberIds) => memberIds.map((id) => Permission.read(Role.user(id)));
-  }
-});
-
-// src/services/proof.ts
-async function listEvidence(relationId, limit2, cursor2) {
-  const q = [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(limit2 + 1)];
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const rows = await listRows(TABLES.evidenceItems, q);
-  const hasMore = rows.length > limit2;
-  const page = hasMore ? rows.slice(0, limit2) : rows;
-  const fb = page.length ? await listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", page.map((e) => e.$id)), Query.orderAsc("createdAt"), Query.limit(200)]) : [];
-  const last = page[page.length - 1];
-  const items = await Promise.all(page.map(async (e) => toEvidence(e, fb.filter((f) => f.evidenceId === e.$id), await resolveAttachments(e.attachmentFileIds ?? []))));
-  return { items, nextCursor: hasMore && last ? last.$id : null };
-}
-async function getEvidence(relationId, evidenceId) {
-  const row = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!row || row.relationId !== relationId) throw notFound("not_found", "This evidence could not be found.");
-  const [fb, revisions] = await Promise.all([
-    listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", evidenceId), Query.orderAsc("createdAt"), Query.limit(100)]),
-    row.version > 1 ? listRows(TABLES.evidenceRevisions, [Query.equal("evidenceId", evidenceId), Query.orderDesc("version"), Query.limit(20)]) : Promise.resolve([])
-  ]);
-  return { ...toEvidence(row, fb, await resolveAttachments(row.attachmentFileIds ?? [])), revisions: revisions.map(toRevision) };
-}
-async function submitEvidence(rel, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const attachmentFileIds = await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds ?? []);
-  let taskId = input.taskId ?? null;
-  if (taskId) {
-    const task = await getRow(TABLES.learningTasks, taskId);
-    if (!task || task.relationId !== rel.$id) throw notFound("not_found", "This task could not be found.");
-    if (task.status === "open" || task.status === "reviewed") await updateRow(TABLES.learningTasks, taskId, { status: "submitted" });
-  }
-  const row = await createRow(TABLES.evidenceItems, {
-    relationId: rel.$id,
-    taskId,
-    goalId: input.goalId ?? rel.currentGoalId,
-    authorId,
-    title: input.title,
-    body: input.body,
-    attachmentFileIds,
-    status: "submitted",
-    version: 1,
-    submittedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    reviewedAt: null
-  });
-  await updateRow(TABLES.learningRelations, rel.$id, { evidenceCount: rel.evidenceCount + 1, lastActivityAt: row.submittedAt });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId: row.$id, title: row.title, taskId }, requestId: requestId2 });
-  await emitEvent({ eventType: "evidence.submitted", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId: row.$id }, requestId: requestId2 });
-  await notify({ userId: authorId === rel.studentId ? rel.teacherId : rel.studentId, type: "evidence.submitted", title: "New evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${row.$id}`, refType: "evidence_item", refId: row.$id, actorId: authorId, dedupeKey: `evidence.submitted:${row.$id}` });
-  await recomputeProof(rel.$id);
-  return toEvidence(row, [], await resolveAttachments(attachmentFileIds));
-}
-async function addFeedback(rel, evidenceId, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const ev = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
-  if (ev.status === "reviewed") throw conflict("invalid_state", "This evidence has already been reviewed.", { reason: "evidence_reviewed" });
-  if (ev.status === "needs_revision") throw conflict("invalid_state", "Waiting for the learner to revise this evidence.", { reason: "evidence_awaiting_revision" });
-  const outcome = input.outcome ?? "approved";
-  const fb = await createRow(TABLES.feedbackEntries, { evidenceId, relationId: rel.$id, authorId, body: input.body, nextStep: input.nextStep ?? "", outcome });
-  await updateRow(TABLES.evidenceItems, evidenceId, { status: outcome === "approved" ? "reviewed" : "needs_revision", reviewedAt: fb.createdAt });
-  let openDelta = 0;
-  if (ev.taskId && outcome === "approved") {
-    const task = await getRow(TABLES.learningTasks, ev.taskId);
-    if (task && task.status !== "done" && task.status !== "dropped") {
-      const next = input.markTaskDone ? "done" : "reviewed";
-      await updateRow(TABLES.learningTasks, ev.taskId, { status: next });
-      if (next === "done") openDelta = -1;
-    }
-  }
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: fb.createdAt, openTasks: Math.max(0, rel.openTasks + openDelta) });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "feedback_added", payload: { type: "feedback_added", feedbackId: fb.$id, evidenceId, excerpt: input.body.slice(0, 140) }, requestId: requestId2 });
-  await emitEvent({ eventType: outcome === "approved" ? "feedback.added" : "evidence.revision_requested", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { feedbackId: fb.$id, evidenceId, outcome }, requestId: requestId2 });
-  await notify(outcome === "approved" ? { userId: ev.authorId, type: "feedback.added", title: "You received feedback", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `feedback.added:${fb.$id}` } : { userId: ev.authorId, type: "evidence.revision_requested", title: "Your teacher asked for a revision", body: input.body.slice(0, 140), href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "feedback_entry", refId: fb.$id, actorId: authorId, dedupeKey: `evidence.revision_requested:${fb.$id}` });
-  await recomputeProof(rel.$id);
-  return toFeedback(fb);
-}
-async function reviseEvidence2(rel, evidenceId, authorId, input, requestId2) {
-  assertRelationWritable(rel);
-  const ev = await getRow(TABLES.evidenceItems, evidenceId);
-  if (!ev || ev.relationId !== rel.$id) throw notFound("not_found", "This evidence could not be found.");
-  if (ev.authorId !== authorId) throw forbidden("Only the learner who submitted this evidence can revise it.");
-  if (ev.status !== "needs_revision") throw conflict("invalid_state", "This evidence is not waiting for a revision.", { reason: "evidence_not_revisable" });
-  const attachmentFileIds = input.attachmentFileIds !== void 0 ? await assertEvidenceAttachments(authorId, rel.$id, input.attachmentFileIds.filter((id) => !(ev.attachmentFileIds ?? []).includes(id))).then((fresh) => [...input.attachmentFileIds.filter((id) => (ev.attachmentFileIds ?? []).includes(id)), ...fresh]) : ev.attachmentFileIds ?? [];
-  try {
-    await createRow(TABLES.evidenceRevisions, {
-      evidenceId,
-      relationId: rel.$id,
-      authorId,
-      version: ev.version,
-      title: ev.title,
-      body: ev.body ?? "",
-      attachmentFileIds: ev.attachmentFileIds ?? []
-    }, revisionRowId(evidenceId, ev.version));
-  } catch (err) {
-    if (!isConflict(err)) throw err;
-  }
-  const row = await updateRow(TABLES.evidenceItems, evidenceId, {
-    title: input.title ?? ev.title,
-    body: input.body ?? ev.body ?? "",
-    attachmentFileIds,
-    status: "revised",
-    version: ev.version + 1,
-    reviewedAt: null
-  });
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: now });
-  await appendMessage({ conversationId: rel.conversationId, senderId: authorId, type: "evidence_submitted", payload: { type: "evidence_submitted", evidenceId, title: row.title, taskId: row.taskId }, requestId: requestId2 });
-  await emitEvent({ eventType: "evidence.revised", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: authorId, payload: { evidenceId, version: row.version }, requestId: requestId2 });
-  await notify({ userId: rel.teacherId, type: "evidence.revised", title: "Revised evidence to review", body: row.title, href: `/relations/${rel.$id}/evidence/${evidenceId}`, refType: "evidence_item", refId: evidenceId, actorId: authorId, dedupeKey: `evidence.revised:${evidenceId}:${row.version}` });
-  await recomputeProof(rel.$id);
-  return getEvidence(rel.$id, evidenceId);
-}
-async function recomputeProof(relationId) {
-  const [rel, goals, tasks, evidence, feedback] = await Promise.all([
-    getRow(TABLES.learningRelations, relationId),
-    listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.limit(100)]),
-    listRows(TABLES.learningTasks, [Query.equal("relationId", relationId), Query.limit(200)]),
-    listRows(TABLES.evidenceItems, [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(200)]),
-    listRows(TABLES.feedbackEntries, [Query.equal("relationId", relationId), Query.orderDesc("createdAt"), Query.limit(200)])
-  ]);
-  if (!rel) throw notFound("not_found", "This learning relation could not be found.");
-  const current = goals.find((g) => g.$id === rel.currentGoalId) ?? goals.find((g) => g.status === "active") ?? null;
-  const milestones = goals.filter((g) => g.status === "achieved").slice(0, 5).map((g) => ({ id: g.$id, title: g.title, reachedAt: g.updatedAt, evidenceId: evidence.find((e) => e.goalId === g.$id)?.$id ?? null }));
-  const latestFb = feedback[0];
-  const latestEv = evidence[0];
-  const nextOpen = tasks.filter((t) => t.status === "open").sort((a, b) => (a.dueAt ?? "9") < (b.dueAt ?? "9") ? -1 : 1)[0];
-  const data = {
-    relationId,
-    currentFocus: current?.title ?? null,
-    milestonesJson: JSON.stringify(milestones),
-    tasksDone: tasks.filter((t) => t.status === "done").length,
-    evidenceSubmitted: evidence.length,
-    feedbackReceived: feedback.length,
-    revisions: evidence.reduce((n, e) => n + Math.max(0, (e.version ?? 1) - 1), 0),
-    recentChange: latestFb ? `Feedback on "${evidence.find((e) => e.$id === latestFb.evidenceId)?.title ?? "evidence"}"` : latestEv ? `Submitted "${latestEv.title}"` : null,
-    nextStep: latestFb?.nextStep || nextOpen?.title || null,
-    computedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  let row;
-  const existing = await getRow(TABLES.proofRecords, relationId);
-  if (existing) row = await updateRow(TABLES.proofRecords, relationId, data);
-  else {
-    try {
-      row = await createRow(TABLES.proofRecords, data, relationId);
-    } catch (err) {
-      if (!isConflict(err)) throw err;
-      row = await updateRow(TABLES.proofRecords, relationId, data);
-    }
-  }
-  return toProof(row);
-}
-var import_node_crypto2, revisionRowId;
-var init_proof = __esm({
-  "src/services/proof.ts"() {
-    "use strict";
-    import_node_crypto2 = require("node:crypto");
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-    init_learning();
-    init_events();
-    init_notifications2();
-    init_messaging3();
-    init_uploads();
-    init_learning2();
-    revisionRowId = (evidenceId, version) => (0, import_node_crypto2.createHash)("sha256").update(`evidence-rev:${evidenceId}:${version}`).digest("hex").slice(0, 32);
-  }
-});
-
-// src/services/learning.ts
-var learning_exports = {};
-__export(learning_exports, {
-  assertRelationWritable: () => assertRelationWritable,
-  createGoal: () => createGoal2,
-  createTask: () => createTask2,
-  declineGoalCompletion: () => declineGoalCompletion2,
-  deriveNextAction: () => deriveNextAction,
-  getRelation: () => getRelation,
-  getWorkspace: () => getWorkspace,
-  listRelations: () => listRelations,
-  nextActionsFor: () => nextActionsFor,
-  requestGoalCompletion: () => requestGoalCompletion,
-  requireRelationMember: () => requireRelationMember,
-  seedGoalId: () => seedGoalId,
-  updateGoal: () => updateGoal2,
-  updateRelationStatus: () => updateRelationStatus,
-  updateTask: () => updateTask2
-});
-async function requireRelationMember(relationId, userId) {
-  const rel = await getRow(TABLES.learningRelations, relationId);
-  if (!rel) throw notFound("not_found", "This learning relation could not be found.");
-  if (rel.studentId !== userId && rel.teacherId !== userId) throw forbidden();
-  return rel;
-}
-function assertRelationWritable(rel) {
-  if (rel.status !== "active") throw conflict("invalid_state", rel.status === "paused" ? "This learning relation is paused. Resume it first." : "This learning relation has ended.", { reason: "relation_not_active", status: rel.status });
-}
-function deriveNextAction(w) {
-  if (w.status !== "active") return NO_ACTION;
-  if (w.awaitingReview > 0) return { kind: "teacher_review", count: w.awaitingReview, dueAt: null };
-  if (w.awaitingRevision > 0) return { kind: "student_revise", count: w.awaitingRevision, dueAt: null };
-  if (w.openTaskDueDates.length > 0) {
-    const due = w.openTaskDueDates.filter((d) => !!d).sort()[0] ?? null;
-    return { kind: "student_submit", count: w.openTaskDueDates.length, dueAt: due };
-  }
-  if (w.goalCompletionRequests > 0) return { kind: "teacher_confirm_goal", count: w.goalCompletionRequests, dueAt: null };
-  return { kind: "teacher_assign", count: 0, dueAt: null };
-}
-async function nextActionsFor(rels) {
-  const out = new Map(rels.map((r) => [r.$id, NO_ACTION]));
-  const ids = rels.filter((r) => r.status === "active").map((r) => r.$id);
-  if (!ids.length) return out;
-  const [evidence, tasks, goals] = await Promise.all([
-    listRows(TABLES.evidenceItems, [Query.equal("relationId", ids), Query.equal("status", ["submitted", "revised", "needs_revision"]), Query.limit(500)]),
-    listRows(TABLES.learningTasks, [Query.equal("relationId", ids), Query.equal("status", "open"), Query.limit(500)]),
-    listRows(TABLES.learningGoals, [Query.equal("relationId", ids), Query.equal("status", "active"), Query.limit(500)])
-  ]);
-  for (const id of ids) {
-    const ev = evidence.filter((e) => e.relationId === id);
-    out.set(id, deriveNextAction({
-      status: "active",
-      awaitingReview: ev.filter((e) => e.status === "submitted" || e.status === "revised").length,
-      awaitingRevision: ev.filter((e) => e.status === "needs_revision").length,
-      openTaskDueDates: tasks.filter((t) => t.relationId === id).map((t) => t.dueAt),
-      goalCompletionRequests: goals.filter((g) => g.relationId === id && g.completionRequestedAt).length
-    }));
+// src/services/reminders.ts
+var HOUR = 36e5;
+var DUE_SOON_WINDOW_MS = 24 * HOUR;
+var OVERDUE_LOOKBACK_MS = 7 * 24 * HOUR;
+function selectDueTasks(now, tasks) {
+  const t = now.getTime();
+  const out = [];
+  for (const task of tasks) {
+    if (task.status !== "open" || !task.dueAt) continue;
+    const due = Date.parse(task.dueAt);
+    if (Number.isNaN(due)) continue;
+    if (due <= t && due > t - OVERDUE_LOOKBACK_MS) out.push({ taskId: task.$id, relationId: task.relationId, title: task.title, dueAt: task.dueAt, kind: "overdue" });
+    else if (due > t && due <= t + DUE_SOON_WINDOW_MS) out.push({ taskId: task.$id, relationId: task.relationId, title: task.title, dueAt: task.dueAt, kind: "due_soon" });
   }
   return out;
 }
-async function listRelations(userId, role2, status, limit2, cursor2) {
-  const q = [Query.equal(role2 === "student" ? "studentId" : "teacherId", userId), Query.orderDesc("lastActivityAt"), Query.limit(limit2 + 1)];
-  if (status) q.push(Query.equal("status", status));
-  if (cursor2) q.push(Query.cursorAfter(cursor2));
-  const rows = await listRows(TABLES.learningRelations, q);
-  const hasMore = rows.length > limit2;
-  const page = hasMore ? rows.slice(0, limit2) : rows;
-  const [refs, next] = await Promise.all([personRefs(page.flatMap((r) => [r.studentId, r.teacherId])), nextActionsFor(page)]);
-  const last = page[page.length - 1];
-  return { items: page.map((r) => toRelation(r, refs.get(r.studentId), refs.get(r.teacherId), next.get(r.$id))), nextCursor: hasMore && last ? last.$id : null };
-}
-async function getRelation(relationId, userId) {
-  const rel = await requireRelationMember(relationId, userId);
-  const [refs, next] = await Promise.all([personRefs([rel.studentId, rel.teacherId]), nextActionsFor([rel])]);
-  return toRelation(rel, refs.get(rel.studentId), refs.get(rel.teacherId), next.get(rel.$id));
-}
-async function getWorkspace(relationId, userId) {
-  const rel = await requireRelationMember(relationId, userId);
-  const [refs, goals, tasks, evidence, proof, next] = await Promise.all([
-    personRefs([rel.studentId, rel.teacherId]),
-    listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.orderDesc("createdAt"), Query.limit(50)]),
-    listRows(TABLES.learningTasks, [Query.equal("relationId", relationId), Query.orderDesc("createdAt"), Query.limit(100)]),
-    listRows(TABLES.evidenceItems, [Query.equal("relationId", relationId), Query.orderDesc("submittedAt"), Query.limit(5)]),
-    getRow(TABLES.proofRecords, relationId),
-    nextActionsFor([rel])
-  ]);
-  const feedback = evidence.length ? await listRows(TABLES.feedbackEntries, [Query.equal("evidenceId", evidence.map((e) => e.$id)), Query.orderAsc("createdAt"), Query.limit(100)]) : [];
-  return {
-    relation: toRelation(rel, refs.get(rel.studentId), refs.get(rel.teacherId), next.get(rel.$id)),
-    goals: goals.map(toGoal),
-    tasks: tasks.map(toTask),
-    recentEvidence: evidence.map((e) => toEvidence(e, feedback.filter((f) => f.evidenceId === e.$id))),
-    proof: proof ? toProof(proof) : null
-  };
-}
-async function updateRelationStatus(relationId, userId, input, requestId2) {
-  const rel = await requireRelationMember(relationId, userId);
-  const from = rel.status;
-  const to = input.status;
-  if (from === "ended") throw conflict("invalid_state", "This learning relation has ended.");
-  if (!TRANSITIONS[from]?.includes(to)) throw conflict("invalid_state", `This learning relation is already ${from}.`, { from, to });
-  const reason = input.reason?.trim() ?? "";
-  if (to === "ended" && !reason) throw validation("Tell the other person why you are ending this learning relation.", [{ path: "reason", message: "Required" }]);
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const patch = { status: to, version: rel.version + 1, lastActivityAt: now };
-  if (to === "paused") Object.assign(patch, { pausedBy: userId, pausedAt: now });
-  if (to === "active") Object.assign(patch, { pausedBy: null, pausedAt: null });
-  if (to === "ended") Object.assign(patch, { endedAt: now, endedBy: userId, endReason: reason.slice(0, 500) });
-  await updateRow(TABLES.learningRelations, relationId, patch);
-  const text = to === "ended" ? `Learning relation ended. Reason: ${reason}` : to === "paused" ? "Learning relation paused." : "Learning relation resumed.";
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text }, requestId: requestId2 });
-  const other = userId === rel.teacherId ? rel.studentId : rel.teacherId;
-  const kind = to === "active" ? "resumed" : to;
-  const titles = { paused: "A learning relation was paused", resumed: "A learning relation was resumed", ended: "A learning relation was ended" };
-  await notify({
-    userId: other,
-    type: `relation.${kind}`,
-    title: titles[kind],
-    body: to === "ended" ? reason.slice(0, 300) : "",
-    href: `/relations/${relationId}`,
-    refType: "learning_relation",
-    refId: relationId,
-    actorId: userId,
-    dedupeKey: `relation.${kind}:${relationId}:${rel.version + 1}`
-  });
-  await emitEvent({ eventType: `relation.${to === "active" ? "resumed" : to}`, aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { from, reason: to === "ended" ? reason : void 0 }, requestId: requestId2 });
-  return getRelation(relationId, userId);
-}
-async function touch(rel, patch = {}) {
-  await updateRow(TABLES.learningRelations, rel.$id, { lastActivityAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
-}
-async function createGoal2(rel, actorId, input, requestId2, rowId2) {
-  assertRelationWritable(rel);
-  let row;
-  try {
-    row = await createRow(TABLES.learningGoals, { relationId: rel.$id, title: input.title, description: input.description ?? "", status: "active", createdBy: actorId }, rowId2);
-  } catch (err) {
-    if (!rowId2 || !isConflict(err)) throw err;
-    const existing = await getRow(TABLES.learningGoals, rowId2);
-    if (!existing) throw err;
-    return toGoal(existing);
-  }
-  await touch(rel, rel.currentGoalId ? {} : { currentGoalId: row.$id });
-  await appendMessage({ conversationId: rel.conversationId, senderId: actorId, type: "goal_created", payload: { type: "goal_created", goalId: row.$id, title: row.title }, requestId: requestId2 });
-  await emitEvent({ eventType: "goal.created", aggregateType: "learning_relation", aggregateId: rel.$id, actorId, payload: { goalId: row.$id }, requestId: requestId2 });
-  if (!rowId2) {
-    const other = actorId === rel.teacherId ? rel.studentId : rel.teacherId;
-    await notify({ userId: other, type: "goal.created", title: actorId === rel.studentId ? "Your learner proposed a new goal" : "New learning goal", body: row.title, href: `/relations/${rel.$id}`, refType: "learning_goal", refId: row.$id, actorId, dedupeKey: `goal.created:${row.$id}` });
-  }
-  await recomputeProof(rel.$id);
-  return toGoal(row);
-}
-async function nextFocus(relationId, excludeGoalId) {
-  const active = await listRows(TABLES.learningGoals, [Query.equal("relationId", relationId), Query.equal("status", "active"), Query.orderAsc("createdAt"), Query.limit(20)]);
-  return active.find((g) => g.$id !== excludeGoalId)?.$id ?? null;
-}
-async function loadGoal(relationId, goalId) {
-  const goal = await getRow(TABLES.learningGoals, goalId);
-  if (!goal || goal.relationId !== relationId) throw notFound("not_found", "This goal could not be found.");
-  return goal;
-}
-async function updateGoal2(relationId, goalId, userId, patch, requestId2) {
-  const rel = await requireRelationMember(relationId, userId);
-  assertRelationWritable(rel);
-  const goal = await loadGoal(relationId, goalId);
-  const statusChange = patch.status && patch.status !== goal.status ? patch.status : null;
-  if (statusChange && userId !== rel.teacherId) throw forbidden("Only the teacher can change a goal's status.");
-  const row = await updateRow(TABLES.learningGoals, goalId, statusChange ? { ...patch, completionRequestedAt: null } : patch);
-  let focus = {};
-  if (statusChange && statusChange !== "active" && rel.currentGoalId === goalId) focus = { currentGoalId: await nextFocus(relationId, goalId) };
-  if (statusChange === "active" && !rel.currentGoalId) focus = { currentGoalId: goalId };
-  await touch(rel, focus);
-  if (statusChange === "achieved") {
-    await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "milestone_reached", payload: { type: "milestone_reached", milestoneId: goalId, title: row.title }, requestId: requestId2 });
-    await emitEvent({ eventType: "goal.achieved", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { goalId }, requestId: requestId2 });
-    await notify({ userId: rel.studentId, type: "goal.achieved", title: "Goal achieved", body: row.title, href: `/relations/${relationId}`, refType: "learning_goal", refId: goalId, actorId: userId, dedupeKey: `goal.achieved:${goalId}` });
-  }
-  await recomputeProof(relationId);
-  return toGoal(row);
-}
-async function requestGoalCompletion(relationId, goalId, userId, requestId2) {
-  const rel = await requireRelationMember(relationId, userId);
-  if (userId !== rel.studentId) throw forbidden("Only the learner asks for a goal to be confirmed.");
-  assertRelationWritable(rel);
-  const goal = await loadGoal(relationId, goalId);
-  if (goal.status !== "active") throw conflict("invalid_state", "This goal is no longer active.");
-  if (goal.completionRequestedAt) return toGoal(goal);
-  const row = await updateRow(TABLES.learningGoals, goalId, { completionRequestedAt: (/* @__PURE__ */ new Date()).toISOString() });
-  await touch(rel);
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text: `Asked to confirm goal "${row.title}" as achieved.` }, requestId: requestId2 });
-  await emitEvent({ eventType: "goal.completion_requested", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { goalId }, requestId: requestId2 });
-  await notify({ userId: rel.teacherId, type: "goal.completion_requested", title: "Confirm a completed goal", body: row.title, href: `/relations/${relationId}`, refType: "learning_goal", refId: goalId, actorId: userId, dedupeKey: `goal.completion_requested:${goalId}:${row.completionRequestedAt}` });
-  return toGoal(row);
-}
-async function declineGoalCompletion2(relationId, goalId, userId, note, requestId2) {
-  const rel = await requireRelationMember(relationId, userId);
-  if (userId !== rel.teacherId) throw forbidden("Only the teacher confirms goals.");
-  assertRelationWritable(rel);
-  const goal = await loadGoal(relationId, goalId);
-  if (!goal.completionRequestedAt) throw conflict("invalid_state", "Nobody asked to confirm this goal.");
-  const row = await updateRow(TABLES.learningGoals, goalId, { completionRequestedAt: null });
-  await touch(rel);
-  const text = `Goal "${row.title}" is not complete yet.${note ? ` ${note}` : ""}`;
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "system", payload: { type: "system", text }, requestId: requestId2 });
-  await emitEvent({ eventType: "goal.completion_declined", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { goalId }, requestId: requestId2 });
-  await notify({ userId: rel.studentId, type: "goal.completion_declined", title: "Goal not confirmed yet", body: note || row.title, href: `/relations/${relationId}`, refType: "learning_goal", refId: goalId, actorId: userId, dedupeKey: `goal.completion_declined:${goalId}:${goal.completionRequestedAt}` });
-  return toGoal(row);
-}
-async function createTask2(relationId, userId, input, requestId2) {
-  const rel = await requireRelationMember(relationId, userId);
-  if (rel.teacherId !== userId) throw forbidden("Only the teacher assigns tasks.");
-  assertRelationWritable(rel);
-  const row = await createRow(TABLES.learningTasks, { relationId, goalId: input.goalId ?? rel.currentGoalId, title: input.title, instructions: input.instructions ?? "", status: "open", assignedBy: userId, dueAt: input.dueAt ?? null });
-  await touch(rel, { openTasks: rel.openTasks + 1 });
-  await appendMessage({ conversationId: rel.conversationId, senderId: userId, type: "task_assigned", payload: { type: "task_assigned", taskId: row.$id, title: row.title, dueAt: row.dueAt }, requestId: requestId2 });
-  await emitEvent({ eventType: "task.assigned", aggregateType: "learning_relation", aggregateId: relationId, actorId: userId, payload: { taskId: row.$id }, requestId: requestId2 });
-  await notify({ userId: userId === rel.teacherId ? rel.studentId : rel.teacherId, type: "task.assigned", title: "New task", body: row.title, href: `/relations/${relationId}`, refType: "learning_task", refId: row.$id, actorId: userId, dedupeKey: `task.assigned:${row.$id}` });
-  return toTask(row);
-}
-async function updateTask2(relationId, taskId, userId, patch) {
-  const rel = await requireRelationMember(relationId, userId);
-  if (rel.teacherId !== userId) throw forbidden("Only the teacher can edit tasks.");
-  assertRelationWritable(rel);
-  const task = await getRow(TABLES.learningTasks, taskId);
-  if (!task || task.relationId !== relationId) throw notFound("not_found", "This task could not be found.");
-  const row = await updateRow(TABLES.learningTasks, taskId, patch);
-  const wasOpen = task.status === "open" || task.status === "submitted" || task.status === "reviewed";
-  const isOpen = row.status === "open" || row.status === "submitted" || row.status === "reviewed";
-  await touch(rel, wasOpen !== isOpen ? { openTasks: Math.max(0, rel.openTasks + (isOpen ? 1 : -1)) } : {});
-  await recomputeProof(relationId);
-  return toTask(row);
-}
-var import_node_crypto3, seedGoalId, TRANSITIONS;
-var init_learning2 = __esm({
-  "src/services/learning.ts"() {
-    "use strict";
-    import_node_crypto3 = require("node:crypto");
-    init_dist();
-    init_repo();
-    init_rows();
-    init_schema();
-    init_errors2();
-    init_learning();
-    init_events();
-    init_notifications2();
-    init_messaging3();
-    init_profiles();
-    init_proof();
-    seedGoalId = (relationId) => (0, import_node_crypto3.createHash)("sha256").update(`seed-goal:${relationId}`).digest("hex").slice(0, 32);
-    TRANSITIONS = { active: ["paused", "ended"], paused: ["active", "ended"], ended: [] };
-  }
-});
-
-// src/services/uploads.ts
-async function createIntent(userId, input) {
-  const lim = LIMITS[input.purpose];
-  if (input.sizeBytes > lim.maxBytes) throw validation("This file is too large.", [{ path: "sizeBytes", message: `max ${lim.maxBytes}` }]);
-  if (!lim.mime.test(input.mimeType)) throw validation("This file type is not supported.", [{ path: "mimeType", message: "unsupported" }]);
-  if (input.purpose === "evidence") {
-    if (!input.relationId) throw validation("Evidence uploads need a learning relation.", [{ path: "relationId", message: "required" }]);
-    await requireRelationMember(input.relationId, userId);
-  }
-  const cfg = getConfig().appwrite;
-  const bucketId = input.purpose === "avatar" ? cfg.avatarBucketId : input.purpose === "qa" ? cfg.qaBucketId : cfg.evidenceBucketId;
-  const fileId = ID.unique();
-  const expiresAt = new Date(Date.now() + 15 * 6e4).toISOString();
-  await createRow(TABLES.uploadIntents, { userId, purpose: input.purpose, bucketId, fileId, relationId: input.relationId ?? null, fileName: input.fileName.slice(0, 255), mimeType: input.mimeType, sizeBytes: input.sizeBytes, status: "pending", expiresAt }, fileId);
-  return { bucketId, fileId, expiresAt };
-}
-async function completeIntent(userId, fileId) {
-  const intent = await getRow(TABLES.uploadIntents, fileId);
-  if (!intent) throw notFound("not_found", "Upload not found.");
-  if (intent.userId !== userId) throw forbidden();
-  if (intent.status === "complete" || intent.status === INTENT_ATTACHED) return { fileId, bucketId: intent.bucketId };
-  if (new Date(intent.expiresAt).getTime() < Date.now()) throw conflict("invalid_state", "This upload has expired. Start again.");
-  const storage2 = getStorage();
-  const file = await storage2.getFile({ bucketId: intent.bucketId, fileId }).catch(() => null);
-  if (!file) throw conflict("invalid_state", "The file has not been uploaded yet.");
-  if (file.sizeOriginal > intent.sizeBytes * 1.05 + 1024) {
-    await storage2.deleteFile({ bucketId: intent.bucketId, fileId });
-    throw validation("Uploaded file does not match the declared size.");
-  }
-  const readers = [Permission.read(Role.user(userId))];
-  if (intent.purpose === "avatar") readers.push(Permission.read(Role.any()));
-  if (intent.purpose === "qa") readers.push(Permission.read(Role.users()));
-  if (intent.relationId) {
-    const rel = await requireRelationMember(intent.relationId, userId);
-    const other = rel.studentId === userId ? rel.teacherId : rel.studentId;
-    readers.push(Permission.read(Role.user(other)));
-  }
-  await storage2.updateFile({ bucketId: intent.bucketId, fileId, permissions: [...readers, Permission.delete(Role.user(userId))] });
-  await updateRow(TABLES.uploadIntents, fileId, { status: "complete" });
-  if (intent.purpose === "avatar") {
-    const profile = await getRow(TABLES.profiles, userId);
-    await updateRow(TABLES.profiles, userId, { avatarFileId: fileId });
-    if (profile?.avatarFileId && profile.avatarFileId !== fileId) {
-      await storage2.deleteFile({ bucketId: getConfig().appwrite.avatarBucketId, fileId: profile.avatarFileId }).catch(() => void 0);
-    }
-  }
-  return { fileId, bucketId: intent.bucketId };
-}
-async function assertEvidenceAttachments(userId, relationId, fileIds) {
-  const ids = Array.from(new Set(fileIds)).slice(0, 5);
-  if (!ids.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
-  for (const id of ids) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row || row.userId !== userId || row.purpose !== "evidence" || row.relationId !== relationId || row.status !== "complete") {
-      throw validation("One of the attachments is not a completed upload for this relation.", [{ path: "attachmentFileIds", message: id }]);
-    }
-  }
-  return ids;
-}
-async function assertQaAttachments(userId, fileIds, max = 5) {
-  const ids = Array.from(new Set(fileIds ?? []));
-  if (ids.length > max) throw validation(`You can attach up to ${max} files.`, [{ path: "attachmentFileIds", message: `max ${max}` }]);
-  if (!ids.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", ids), Query.limit(ids.length)]);
-  for (const id of ids) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row || row.userId !== userId || row.purpose !== "qa" || row.status !== "complete" && row.status !== INTENT_ATTACHED) {
-      throw validation("One of the attachments is not a finished upload of yours.", [{ path: "attachmentFileIds", message: id }]);
-    }
-  }
-  return ids;
-}
-async function markAttached(fileIds) {
-  await Promise.all(fileIds.map((id) => updateRow(TABLES.uploadIntents, id, { status: INTENT_ATTACHED }).catch(() => void 0)));
-}
-async function deleteUploads(fileIds) {
-  if (!fileIds.length) return;
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
-  const storage2 = getStorage();
-  await Promise.all(rows.map(async (r) => {
-    await storage2.deleteFile({ bucketId: r.bucketId, fileId: r.fileId }).catch(() => void 0);
-    await deleteRow(TABLES.uploadIntents, r.$id).catch(() => void 0);
-  }));
-}
-async function resolveAttachments(fileIds) {
-  if (!fileIds.length) return [];
-  const rows = await listRows(TABLES.uploadIntents, [Query.equal("$id", fileIds), Query.limit(fileIds.length)]);
-  const cfg = getConfig().appwrite;
-  const tokens = new Tokens(getAdminClient());
-  const now = Date.now();
-  const out = [];
-  for (const id of fileIds) {
-    const row = rows.find((r) => r.$id === id);
-    if (!row) continue;
-    let tok = tokenCache.get(id);
-    if (!tok || tok.expiresAt - 6e4 < now) {
-      const expiresAt = now + TOKEN_TTL_MS;
-      try {
-        const t = await tokens.createFileToken({ bucketId: row.bucketId, fileId: id, expire: new Date(expiresAt).toISOString() });
-        tok = { secret: t.secret, expiresAt };
-        tokenCache.set(id, tok);
-      } catch {
+async function runTaskReminders(now = /* @__PURE__ */ new Date(), batchSize = 200) {
+  const stats = { tasksScanned: 0, dueSoon: 0, overdue: 0, skippedInactive: 0 };
+  const from = new Date(now.getTime() - OVERDUE_LOOKBACK_MS).toISOString();
+  const to = new Date(now.getTime() + DUE_SOON_WINDOW_MS).toISOString();
+  const rels = /* @__PURE__ */ new Map();
+  let cursor;
+  for (let page = 0; page < 20; page++) {
+    const q = [Query.equal("status", "open"), Query.greaterThan("dueAt", from), Query.lessThanEqual("dueAt", to), Query.orderAsc("$id"), Query.limit(batchSize)];
+    if (cursor) q.push(Query.cursorAfter(cursor));
+    const tasks = await listRows(TABLES.learningTasks, q);
+    stats.tasksScanned += tasks.length;
+    for (const r of selectDueTasks(now, tasks)) {
+      if (!rels.has(r.relationId)) rels.set(r.relationId, await getRow(TABLES.learningRelations, r.relationId));
+      const rel = rels.get(r.relationId);
+      if (!rel || rel.status !== "active") {
+        stats.skippedInactive++;
         continue;
       }
-    }
-    const url = `${cfg.endpoint}/storage/buckets/${row.bucketId}/files/${id}/view?project=${cfg.projectId}&token=${tok.secret}`;
-    out.push({ fileId: id, fileName: row.fileName ?? "attachment", mimeType: row.mimeType, sizeBytes: row.sizeBytes, url, expiresAt: new Date(tok.expiresAt).toISOString() });
-  }
-  return out;
-}
-var DOCS, LIMITS, INTENT_ATTACHED, TOKEN_TTL_MS, tokenCache;
-var init_uploads = __esm({
-  "src/services/uploads.ts"() {
-    "use strict";
-    init_dist();
-    init_config();
-    init_repo();
-    init_schema();
-    init_client2();
-    init_errors2();
-    init_learning2();
-    DOCS = /^(image\/(jpeg|png|webp)|application\/(pdf|zip)|text\/(plain|markdown))$/;
-    LIMITS = {
-      avatar: { maxBytes: 2 * 1024 * 1024, mime: /^image\/(jpeg|png|webp)$/ },
-      evidence: { maxBytes: 25 * 1024 * 1024, mime: DOCS },
-      qa: { maxBytes: 25 * 1024 * 1024, mime: DOCS }
-    };
-    INTENT_ATTACHED = "attached";
-    TOKEN_TTL_MS = 30 * 6e4;
-    tokenCache = /* @__PURE__ */ new Map();
-  }
-});
-
-// src/entry-appwrite.ts
-var entry_appwrite_exports = {};
-__export(entry_appwrite_exports, {
-  default: () => entry_appwrite_default
-});
-module.exports = __toCommonJS(entry_appwrite_exports);
-
-// node_modules/hono/dist/compose.js
-var compose = (middleware, onError, onNotFound) => {
-  return (context, next) => {
-    let index = -1;
-    return dispatch(0);
-    async function dispatch(i) {
-      if (i <= index) {
-        throw new Error("next() called multiple times");
-      }
-      index = i;
-      let res;
-      let isError = false;
-      let handler;
-      if (middleware[i]) {
-        handler = middleware[i][0][0];
-        context.req.routeIndex = i;
+      const href = `/relations/${rel.$id}`;
+      if (r.kind === "due_soon") {
+        await notify({ userId: rel.studentId, type: "task.due_soon", title: "Task due within 24 hours", body: r.title, href, refType: "learning_task", refId: r.taskId, dedupeKey: `task.due_soon:${r.taskId}:${r.dueAt}` });
+        stats.dueSoon++;
       } else {
-        handler = i === middleware.length && next || void 0;
-      }
-      if (handler) {
-        try {
-          res = await handler(context, () => dispatch(i + 1));
-        } catch (err) {
-          if (err instanceof Error && onError) {
-            context.error = err;
-            res = await onError(err, context);
-            isError = true;
-          } else {
-            throw err;
-          }
-        }
-      } else {
-        if (context.finalized === false && onNotFound) {
-          res = await onNotFound(context);
-        }
-      }
-      if (res && (context.finalized === false || isError)) {
-        context.res = res;
-      }
-      return context;
-    }
-  };
-};
-
-// node_modules/hono/dist/http-exception.js
-var HTTPException = class extends Error {
-  res;
-  status;
-  /**
-   * Creates an instance of `HTTPException`.
-   * @param status - HTTP status code for the exception. Defaults to 500.
-   * @param options - Additional options for the exception.
-   */
-  constructor(status = 500, options) {
-    super(options?.message, { cause: options?.cause });
-    this.res = options?.res;
-    this.status = status;
-  }
-  /**
-   * Returns the response object associated with the exception.
-   * If a response object is not provided, a new response is created with the error message and status code.
-   * @returns The response object.
-   */
-  getResponse() {
-    if (this.res) {
-      const newResponse = new Response(this.res.body, {
-        status: this.status,
-        headers: this.res.headers
-      });
-      return newResponse;
-    }
-    return new Response(this.message, {
-      status: this.status
-    });
-  }
-};
-
-// node_modules/hono/dist/request/constants.js
-var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
-
-// node_modules/hono/dist/utils/buffer.js
-var bufferToFormData = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      // Normalize the media type (case-insensitive) while keeping parameters like the boundary
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
-};
-
-// node_modules/hono/dist/utils/body.js
-var MAX_NESTING_DEPTH = 32;
-var MAX_NESTED_OBJECTS = 1e4;
-var isRawRequest = (request) => "headers" in request;
-var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
-  const { all = false, dot = false } = options;
-  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
-  const contentType = headers.get("Content-Type");
-  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
-  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
-    return parseFormData(request, { all, dot });
-  }
-  return {};
-};
-async function parseFormData(request, options) {
-  if (!isRawRequest(request) && request.bodyCache.formData) {
-    return convertFormDataToBodyData(
-      await request.bodyCache.formData,
-      options
-    );
-  }
-  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
-  const arrayBuffer = await request.arrayBuffer();
-  const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
-  if (!isRawRequest(request)) {
-    request.bodyCache.formData = formDataPromise;
-  }
-  const formData = await formDataPromise;
-  if (formData) {
-    return convertFormDataToBodyData(formData, options);
-  }
-  return {};
-}
-function convertFormDataToBodyData(formData, options) {
-  const form = /* @__PURE__ */ Object.create(null);
-  const nestingState = { count: 0 };
-  formData.forEach((value, key) => {
-    const shouldParseAllValues = options.all || key.endsWith("[]");
-    if (!shouldParseAllValues) {
-      form[key] = value;
-    } else {
-      handleParsingAllValues(form, key, value);
-    }
-  });
-  if (options.dot) {
-    Object.entries(form).forEach(([key, value]) => {
-      const shouldParseDotValues = key.includes(".");
-      if (shouldParseDotValues) {
-        handleParsingNestedValues(form, key, value, nestingState);
-        delete form[key];
-      }
-    });
-  }
-  return form;
-}
-var handleParsingAllValues = (form, key, value) => {
-  if (form[key] !== void 0) {
-    if (Array.isArray(form[key])) {
-      ;
-      form[key].push(value);
-    } else {
-      form[key] = [form[key], value];
-    }
-  } else {
-    if (!key.endsWith("[]")) {
-      form[key] = value;
-    } else {
-      form[key] = [value];
-    }
-  }
-};
-var handleParsingNestedValues = (form, key, value, state) => {
-  if (/(?:^|\.)__proto__\./.test(key)) {
-    return;
-  }
-  let nestedForm = form;
-  const keys = key.split(".", MAX_NESTING_DEPTH + 2);
-  if (keys.length > MAX_NESTING_DEPTH + 1) {
-    throwNestingLimitExceeded();
-  }
-  keys.forEach((key2, index) => {
-    if (index === keys.length - 1) {
-      nestedForm[key2] = value;
-    } else {
-      if (!nestedForm[key2] || typeof nestedForm[key2] !== "object" || Array.isArray(nestedForm[key2]) || nestedForm[key2] instanceof File) {
-        if (state.count++ >= MAX_NESTED_OBJECTS) {
-          throwNestingLimitExceeded();
-        }
-        nestedForm[key2] = /* @__PURE__ */ Object.create(null);
-      }
-      nestedForm = nestedForm[key2];
-    }
-  });
-};
-var throwNestingLimitExceeded = () => {
-  throw new Error("Nesting limit exceeded");
-};
-
-// node_modules/hono/dist/utils/url.js
-var splitPath = (path) => {
-  const paths = path.split("/");
-  if (paths[0] === "") {
-    paths.shift();
-  }
-  return paths;
-};
-var splitRoutingPath = (routePath) => {
-  const { groups, path } = extractGroupsFromPath(routePath);
-  const paths = splitPath(path);
-  return replaceGroupMarks(paths, groups);
-};
-var extractGroupsFromPath = (path) => {
-  const groups = [];
-  path = path.replace(/\{[^}]+\}/g, (match2, index) => {
-    const mark = `@${index}`;
-    groups.push([mark, match2]);
-    return mark;
-  });
-  return { groups, path };
-};
-var replaceGroupMarks = (paths, groups) => {
-  for (let i = groups.length - 1; i >= 0; i--) {
-    const [mark] = groups[i];
-    for (let j = paths.length - 1; j >= 0; j--) {
-      if (paths[j].includes(mark)) {
-        paths[j] = paths[j].replace(mark, groups[i][1]);
-        break;
+        await notify({ userId: rel.studentId, type: "task.overdue", title: "Task is overdue", body: r.title, href, refType: "learning_task", refId: r.taskId, dedupeKey: `task.overdue:${r.taskId}:${r.dueAt}` });
+        await notify({ userId: rel.teacherId, type: "task.overdue", title: "A learner's task is overdue", body: r.title, href, refType: "learning_task", refId: r.taskId, dedupeKey: `task.overdue:teacher:${r.taskId}:${r.dueAt}` });
+        stats.overdue++;
       }
     }
+    if (tasks.length < batchSize) break;
+    cursor = tasks[tasks.length - 1].$id;
   }
-  return paths;
-};
-var patternCache = {};
-var getPattern = (label, next) => {
-  if (label === "*") {
-    return "*";
-  }
-  const match2 = label.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
-  if (match2) {
-    const cacheKey = `${label}#${next}`;
-    if (!patternCache[cacheKey]) {
-      if (match2[2]) {
-        patternCache[cacheKey] = next && next[0] !== ":" && next[0] !== "*" ? [cacheKey, match2[1], new RegExp(`^${match2[2]}(?=/${next})`)] : [label, match2[1], new RegExp(`^${match2[2]}$`)];
-      } else {
-        patternCache[cacheKey] = [label, match2[1], true];
-      }
-    }
-    return patternCache[cacheKey];
-  }
-  return null;
-};
-var tryDecode = (str, decoder) => {
-  try {
-    return decoder(str);
-  } catch {
-    return str.replace(/(?:%[0-9A-Fa-f]{2})+/g, (match2) => {
-      try {
-        return decoder(match2);
-      } catch {
-        return match2;
-      }
-    });
-  }
-};
-var tryDecodeURI = (str) => tryDecode(str, decodeURI);
-var getPath = (request) => {
-  const url = request.url;
-  const start = url.indexOf("/", url.indexOf(":") + 4);
-  let i = start;
-  for (; i < url.length; i++) {
-    const charCode = url.charCodeAt(i);
-    if (charCode === 37) {
-      const queryIndex = url.indexOf("?", i);
-      const hashIndex = url.indexOf("#", i);
-      const end = queryIndex === -1 ? hashIndex === -1 ? void 0 : hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
-      const path = url.slice(start, end);
-      return tryDecodeURI(path.includes("%25") ? path.replace(/%25/g, "%2525") : path);
-    } else if (charCode === 63 || charCode === 35) {
-      break;
-    }
-  }
-  return url.slice(start, i);
-};
-var getPathNoStrict = (request) => {
-  const result = getPath(request);
-  return result.length > 1 && result.at(-1) === "/" ? result.slice(0, -1) : result;
-};
-var mergePath = (base, sub, ...rest) => {
-  if (rest.length) {
-    sub = mergePath(sub, ...rest);
-  }
-  return `${base?.[0] === "/" ? "" : "/"}${base}${sub === "/" ? "" : `${base?.at(-1) === "/" ? "" : "/"}${sub?.[0] === "/" ? sub.slice(1) : sub}`}`;
-};
-var checkOptionalParameter = (path) => {
-  if (path.charCodeAt(path.length - 1) !== 63 || !path.includes(":")) {
-    return null;
-  }
-  const segments = path.split("/");
-  const results = [];
-  let basePath = "";
-  segments.forEach((segment) => {
-    if (segment !== "" && !/\:/.test(segment)) {
-      basePath += "/" + segment;
-    } else if (/\:/.test(segment)) {
-      if (segment.charCodeAt(segment.length - 1) === 63) {
-        if (results.length === 0 && basePath === "") {
-          results.push("/");
-        } else {
-          results.push(basePath);
-        }
-        const optionalSegment = segment.slice(0, -1);
-        basePath += "/" + optionalSegment;
-        results.push(basePath);
-      } else {
-        basePath += "/" + segment;
-      }
-    }
-  });
-  return results.filter((v, i, a) => a.indexOf(v) === i);
-};
-var tryDecodeURIComponent = (str) => str.indexOf("%") !== -1 ? tryDecode(str, decodeURIComponent_) : str;
-var _decodeURI = (value) => {
-  if (value.indexOf("+") !== -1) {
-    value = value.replace(/\+/g, " ");
-  }
-  return tryDecodeURIComponent(value);
-};
-var _getQueryParam = (url, key, multiple) => {
-  const hashIndex = url.indexOf("#", 8);
-  if (hashIndex !== -1) {
-    url = url.slice(0, hashIndex);
-  }
-  let encoded;
-  if (!multiple && key && key.indexOf("%") === -1 && key.indexOf("+") === -1) {
-    let keyIndex2 = url.indexOf("?", 8);
-    if (keyIndex2 === -1) {
-      return void 0;
-    }
-    if (!url.startsWith(key, keyIndex2 + 1)) {
-      keyIndex2 = url.indexOf(`&${key}`, keyIndex2 + 1);
-    }
-    while (keyIndex2 !== -1) {
-      const trailingKeyCode = url.charCodeAt(keyIndex2 + key.length + 1);
-      if (trailingKeyCode === 61) {
-        const valueIndex = keyIndex2 + key.length + 2;
-        const endIndex = url.indexOf("&", valueIndex);
-        return _decodeURI(url.slice(valueIndex, endIndex === -1 ? void 0 : endIndex));
-      } else if (trailingKeyCode == 38 || isNaN(trailingKeyCode)) {
-        return "";
-      }
-      keyIndex2 = url.indexOf(`&${key}`, keyIndex2 + 1);
-    }
-    encoded = /[%+]/.test(url);
-    if (!encoded) {
-      return void 0;
-    }
-  }
-  const results = /* @__PURE__ */ Object.create(null);
-  encoded ??= /[%+]/.test(url);
-  let keyIndex = url.indexOf("?", 8);
-  while (keyIndex !== -1) {
-    const nextKeyIndex = url.indexOf("&", keyIndex + 1);
-    let valueIndex = url.indexOf("=", keyIndex);
-    if (valueIndex > nextKeyIndex && nextKeyIndex !== -1) {
-      valueIndex = -1;
-    }
-    let name = url.slice(
-      keyIndex + 1,
-      valueIndex === -1 ? nextKeyIndex === -1 ? void 0 : nextKeyIndex : valueIndex
-    );
-    if (encoded) {
-      name = _decodeURI(name);
-    }
-    keyIndex = nextKeyIndex;
-    if (name === "") {
-      continue;
-    }
-    let value;
-    if (valueIndex === -1) {
-      value = "";
-    } else {
-      value = url.slice(valueIndex + 1, nextKeyIndex === -1 ? void 0 : nextKeyIndex);
-      if (encoded) {
-        value = _decodeURI(value);
-      }
-    }
-    if (multiple) {
-      if (!(results[name] && Array.isArray(results[name]))) {
-        results[name] = [];
-      }
-      ;
-      results[name].push(value);
-    } else {
-      results[name] ??= value;
-    }
-  }
-  return key ? results[key] : results;
-};
-var getQueryParam = _getQueryParam;
-var getQueryParams = (url, key) => {
-  return _getQueryParam(url, key, true);
-};
-var decodeURIComponent_ = decodeURIComponent;
-
-// node_modules/hono/dist/request.js
-var HonoRequest = class {
-  /**
-   * `.raw` can get the raw Request object.
-   *
-   * @see {@link https://hono.dev/docs/api/request#raw}
-   *
-   * @example
-   * ```ts
-   * // For Cloudflare Workers
-   * app.post('/', async (c) => {
-   *   const metadata = c.req.raw.cf?.hostMetadata?
-   *   ...
-   * })
-   * ```
-   */
-  raw;
-  #validatedData;
-  // Short name of validatedData
-  #matchResult;
-  routeIndex = 0;
-  /**
-   * `.path` can get the pathname of the request.
-   *
-   * @see {@link https://hono.dev/docs/api/request#path}
-   *
-   * @example
-   * ```ts
-   * app.get('/about/me', (c) => {
-   *   const pathname = c.req.path // `/about/me`
-   * })
-   * ```
-   */
-  path;
-  bodyCache = {};
-  constructor(request, path = "/", matchResult = [[]]) {
-    this.raw = request;
-    this.path = path;
-    this.#matchResult = matchResult;
-  }
-  param(key) {
-    return key ? this.#getDecodedParam(key) : this.#getAllDecodedParams();
-  }
-  #getDecodedParam(key) {
-    const paramKey = this.#matchResult[0][this.routeIndex]?.[1][key];
-    const param = this.#getParamValue(paramKey);
-    return param && tryDecodeURIComponent(param);
-  }
-  #getAllDecodedParams() {
-    const decoded = {};
-    const keys = Object.keys(this.#matchResult[0][this.routeIndex]?.[1] ?? {});
-    for (const key of keys) {
-      const value = this.#getParamValue(this.#matchResult[0][this.routeIndex][1][key]);
-      if (value !== void 0) {
-        decoded[key] = tryDecodeURIComponent(value);
-      }
-    }
-    return decoded;
-  }
-  #getParamValue(paramKey) {
-    return this.#matchResult[1] ? this.#matchResult[1][paramKey] : paramKey;
-  }
-  query(key) {
-    return getQueryParam(this.url, key);
-  }
-  queries(key) {
-    return getQueryParams(this.url, key);
-  }
-  header(name) {
-    if (name) {
-      return this.raw.headers.get(name) ?? void 0;
-    }
-    const headerData = /* @__PURE__ */ Object.create(null);
-    this.raw.headers.forEach((value, key) => {
-      headerData[key] = value;
-    });
-    return headerData;
-  }
-  async parseBody(options) {
-    return parseBody(this, options);
-  }
-  #cachedBody = (key) => {
-    const { bodyCache, raw: raw2 } = this;
-    const cachedBody = bodyCache[key];
-    if (cachedBody) {
-      return cachedBody;
-    }
-    for (const anyCachedKey in bodyCache) {
-      return bodyCache[anyCachedKey].then((body2) => {
-        if (anyCachedKey === "json") {
-          body2 = JSON.stringify(body2);
-        }
-        const contentType = anyCachedKey === "formData" ? void 0 : raw2.headers.get("content-type");
-        return new Response(body2, {
-          headers: contentType ? { "Content-Type": contentType } : void 0
-        })[key]();
-      });
-    }
-    return bodyCache[key] = raw2[key]();
-  };
-  /**
-   * `.json()` can parse Request body of type `application/json`
-   *
-   * @see {@link https://hono.dev/docs/api/request#json}
-   *
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.json()
-   * })
-   * ```
-   */
-  json() {
-    return this.#cachedBody("text").then((text) => JSON.parse(text));
-  }
-  /**
-   * `.text()` can parse Request body of type `text/plain`
-   *
-   * @see {@link https://hono.dev/docs/api/request#text}
-   *
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.text()
-   * })
-   * ```
-   */
-  text() {
-    return this.#cachedBody("text");
-  }
-  /**
-   * `.arrayBuffer()` parse Request body as an `ArrayBuffer`
-   *
-   * @see {@link https://hono.dev/docs/api/request#arraybuffer}
-   *
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.arrayBuffer()
-   * })
-   * ```
-   */
-  arrayBuffer() {
-    return this.#cachedBody("arrayBuffer");
-  }
-  /**
-   * `.bytes()` parses the request body as a `Uint8Array`.
-   *
-   * @see {@link https://hono.dev/docs/api/request#bytes}
-   *
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.bytes()
-   * })
-   * ```
-   */
-  bytes() {
-    return this.#cachedBody("arrayBuffer").then((buffer) => new Uint8Array(buffer));
-  }
-  /**
-   * Parses the request body as a `Blob`.
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.blob();
-   * });
-   * ```
-   * @see https://hono.dev/docs/api/request#blob
-   */
-  blob() {
-    return this.#cachedBody("blob");
-  }
-  /**
-   * Parses the request body as `FormData`.
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.formData();
-   * });
-   * ```
-   * @see https://hono.dev/docs/api/request#formdata
-   */
-  formData() {
-    return this.#cachedBody("formData");
-  }
-  /**
-   * Adds validated data to the request.
-   *
-   * @param target - The target of the validation.
-   * @param data - The validated data to add.
-   */
-  addValidatedData(target, data) {
-    ;
-    (this.#validatedData ??= {})[target] = data;
-  }
-  valid(target) {
-    return this.#validatedData?.[target];
-  }
-  /**
-   * `.url()` can get the request url strings.
-   *
-   * @see {@link https://hono.dev/docs/api/request#url}
-   *
-   * @example
-   * ```ts
-   * app.get('/about/me', (c) => {
-   *   const url = c.req.url // `http://localhost:8787/about/me`
-   *   ...
-   * })
-   * ```
-   */
-  get url() {
-    return this.raw.url;
-  }
-  /**
-   * `.method()` can get the method name of the request.
-   *
-   * @see {@link https://hono.dev/docs/api/request#method}
-   *
-   * @example
-   * ```ts
-   * app.get('/about/me', (c) => {
-   *   const method = c.req.method // `GET`
-   * })
-   * ```
-   */
-  get method() {
-    return this.raw.method;
-  }
-  get [GET_MATCH_RESULT]() {
-    return this.#matchResult;
-  }
-  /**
-   * `.matchedRoutes()` can return a matched route in the handler
-   *
-   * @deprecated
-   *
-   * Use matchedRoutes helper defined in "hono/route" instead.
-   *
-   * @see {@link https://hono.dev/docs/api/request#matchedroutes}
-   *
-   * @example
-   * ```ts
-   * app.use('*', async function logger(c, next) {
-   *   await next()
-   *   c.req.matchedRoutes.forEach(({ handler, method, path }, i) => {
-   *     const name = handler.name || (handler.length < 2 ? '[handler]' : '[middleware]')
-   *     console.log(
-   *       method,
-   *       ' ',
-   *       path,
-   *       ' '.repeat(Math.max(10 - path.length, 0)),
-   *       name,
-   *       i === c.req.routeIndex ? '<- respond from here' : ''
-   *     )
-   *   })
-   * })
-   * ```
-   */
-  get matchedRoutes() {
-    return this.#matchResult[0].map(([[, route]]) => route);
-  }
-  /**
-   * `routePath()` can retrieve the path registered within the handler
-   *
-   * @deprecated
-   *
-   * Use routePath helper defined in "hono/route" instead.
-   *
-   * @see {@link https://hono.dev/docs/api/request#routepath}
-   *
-   * @example
-   * ```ts
-   * app.get('/posts/:id', (c) => {
-   *   return c.json({ path: c.req.routePath })
-   * })
-   * ```
-   */
-  get routePath() {
-    return this.#matchResult[0].map(([[, route]]) => route)[this.routeIndex].path;
-  }
-};
-
-// node_modules/hono/dist/utils/html.js
-var HtmlEscapedCallbackPhase = {
-  Stringify: 1,
-  BeforeStream: 2,
-  Stream: 3
-};
-var raw = (value, callbacks) => {
-  const escapedString = new String(value);
-  escapedString.isEscaped = true;
-  escapedString.callbacks = callbacks;
-  return escapedString;
-};
-var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => {
-  if (typeof str === "object" && !(str instanceof String)) {
-    if (!(str instanceof Promise)) {
-      str = str.toString();
-    }
-    if (str instanceof Promise) {
-      str = await str;
-    }
-  }
-  const callbacks = str.callbacks;
-  if (!callbacks?.length) {
-    return Promise.resolve(str);
-  }
-  if (buffer) {
-    buffer[0] += str;
-  } else {
-    buffer = [str];
-  }
-  const resStr = Promise.all(callbacks.map((c) => c({ phase, buffer, context }))).then(
-    (res) => Promise.all(
-      res.filter(Boolean).map((str2) => resolveCallback(str2, phase, false, context, buffer))
-    ).then(() => buffer[0])
-  );
-  if (preserveCallbacks) {
-    return raw(await resStr, callbacks);
-  } else {
-    return resStr;
-  }
-};
-
-// node_modules/hono/dist/context.js
-var TEXT_PLAIN = "text/plain; charset=UTF-8";
-var setDefaultContentType = (contentType, headers) => {
-  return {
-    "Content-Type": contentType,
-    ...headers
-  };
-};
-var createResponseInstance = (body2, init) => new Response(body2, init);
-var Context = class {
-  #rawRequest;
-  #req;
-  /**
-   * `.env` can get bindings (environment variables, secrets, KV namespaces, D1 database, R2 bucket etc.) in Cloudflare Workers.
-   *
-   * @see {@link https://hono.dev/docs/api/context#env}
-   *
-   * @example
-   * ```ts
-   * // Environment object for Cloudflare Workers
-   * app.get('*', async c => {
-   *   const counter = c.env.COUNTER
-   * })
-   * ```
-   */
-  env = {};
-  #var;
-  finalized = false;
-  /**
-   * `.error` can get the error object from the middleware if the Handler throws an error.
-   *
-   * @see {@link https://hono.dev/docs/api/context#error}
-   *
-   * @example
-   * ```ts
-   * app.use('*', async (c, next) => {
-   *   await next()
-   *   if (c.error) {
-   *     // do something...
-   *   }
-   * })
-   * ```
-   */
-  error;
-  #status;
-  #executionCtx;
-  #res;
-  #layout;
-  #renderer;
-  #notFoundHandler;
-  #preparedHeaders;
-  #matchResult;
-  #path;
-  /**
-   * Creates an instance of the Context class.
-   *
-   * @param req - The Request object.
-   * @param options - Optional configuration options for the context.
-   */
-  constructor(req, options) {
-    this.#rawRequest = req;
-    if (options) {
-      this.#executionCtx = options.executionCtx;
-      this.env = options.env;
-      this.#notFoundHandler = options.notFoundHandler;
-      this.#path = options.path;
-      this.#matchResult = options.matchResult;
-    }
-  }
-  /**
-   * `.req` is the instance of {@link HonoRequest}.
-   */
-  get req() {
-    this.#req ??= new HonoRequest(this.#rawRequest, this.#path, this.#matchResult);
-    return this.#req;
-  }
-  /**
-   * @see {@link https://hono.dev/docs/api/context#event}
-   * The FetchEvent associated with the current request.
-   *
-   * @throws Will throw an error if the context does not have a FetchEvent.
-   */
-  get event() {
-    if (this.#executionCtx && "respondWith" in this.#executionCtx) {
-      return this.#executionCtx;
-    } else {
-      throw Error("This context has no FetchEvent");
-    }
-  }
-  /**
-   * @see {@link https://hono.dev/docs/api/context#executionctx}
-   * The ExecutionContext associated with the current request.
-   *
-   * @throws Will throw an error if the context does not have an ExecutionContext.
-   */
-  get executionCtx() {
-    if (this.#executionCtx) {
-      return this.#executionCtx;
-    } else {
-      throw Error("This context has no ExecutionContext");
-    }
-  }
-  /**
-   * @see {@link https://hono.dev/docs/api/context#res}
-   * The Response object for the current request.
-   */
-  get res() {
-    return this.#res ||= createResponseInstance(null, {
-      headers: this.#preparedHeaders ??= new Headers()
-    });
-  }
-  /**
-   * Sets the Response object for the current request.
-   *
-   * @param _res - The Response object to set.
-   */
-  set res(_res) {
-    if (this.#res && _res) {
-      _res = createResponseInstance(_res.body, _res);
-      for (const [k, v] of this.#res.headers.entries()) {
-        if (k === "content-type") {
-          continue;
-        }
-        if (k === "set-cookie") {
-          const cookies = this.#res.headers.getSetCookie();
-          _res.headers.delete("set-cookie");
-          for (const cookie of cookies) {
-            _res.headers.append("set-cookie", cookie);
-          }
-        } else {
-          _res.headers.set(k, v);
-        }
-      }
-    }
-    this.#res = _res;
-    this.finalized = true;
-  }
-  /**
-   * `.render()` can create a response within a layout.
-   *
-   * @see {@link https://hono.dev/docs/api/context#render-setrenderer}
-   *
-   * @example
-   * ```ts
-   * app.get('/', (c) => {
-   *   return c.render('Hello!')
-   * })
-   * ```
-   */
-  render = (...args) => {
-    this.#renderer ??= (content) => this.html(content);
-    return this.#renderer(...args);
-  };
-  /**
-   * Sets the layout for the response.
-   *
-   * @param layout - The layout to set.
-   * @returns The layout function.
-   */
-  setLayout = (layout) => this.#layout = layout;
-  /**
-   * Gets the current layout for the response.
-   *
-   * @returns The current layout function.
-   */
-  getLayout = () => this.#layout;
-  /**
-   * `.setRenderer()` can set the layout in the custom middleware.
-   *
-   * @see {@link https://hono.dev/docs/api/context#render-setrenderer}
-   *
-   * @example
-   * ```tsx
-   * app.use('*', async (c, next) => {
-   *   c.setRenderer((content) => {
-   *     return c.html(
-   *       <html>
-   *         <body>
-   *           <p>{content}</p>
-   *         </body>
-   *       </html>
-   *     )
-   *   })
-   *   await next()
-   * })
-   * ```
-   */
-  setRenderer = (renderer) => {
-    this.#renderer = renderer;
-  };
-  /**
-   * `.header()` can set headers.
-   *
-   * @see {@link https://hono.dev/docs/api/context#header}
-   *
-   * @example
-   * ```ts
-   * app.get('/welcome', (c) => {
-   *   // Set headers
-   *   c.header('X-Message', 'Hello!')
-   *   c.header('Content-Type', 'text/plain')
-   *
-   *   // Append multiple headers using the append option (e.g. Vary)
-   *   c.header('Vary', 'Accept-Encoding', { append: true })
-   *   c.header('Vary', 'User-Agent', { append: true })
-   *
-   *   return c.body('Thank you for coming')
-   * })
-   * ```
-   */
-  header = (name, value, options) => {
-    if (this.finalized) {
-      this.#res = createResponseInstance(this.#res.body, this.#res);
-    }
-    const headers = this.#res ? this.#res.headers : this.#preparedHeaders ??= new Headers();
-    if (value === void 0) {
-      headers.delete(name);
-    } else if (options?.append) {
-      headers.append(name, value);
-    } else {
-      headers.set(name, value);
-    }
-  };
-  status = (status) => {
-    this.#status = status;
-  };
-  /**
-   * `.set()` can set the value specified by the key.
-   *
-   * @see {@link https://hono.dev/docs/api/context#set-get}
-   *
-   * @example
-   * ```ts
-   * app.use('*', async (c, next) => {
-   *   c.set('message', 'Hono is hot!!')
-   *   await next()
-   * })
-   * ```
-   */
-  set = (key, value) => {
-    this.#var ??= /* @__PURE__ */ new Map();
-    this.#var.set(key, value);
-  };
-  /**
-   * `.get()` can use the value specified by the key.
-   *
-   * @see {@link https://hono.dev/docs/api/context#set-get}
-   *
-   * @example
-   * ```ts
-   * app.get('/', (c) => {
-   *   const message = c.get('message')
-   *   return c.text(`The message is "${message}"`)
-   * })
-   * ```
-   */
-  get = (key) => {
-    return this.#var ? this.#var.get(key) : void 0;
-  };
-  /**
-   * `.var` can access the value of a variable.
-   *
-   * @see {@link https://hono.dev/docs/api/context#var}
-   *
-   * @example
-   * ```ts
-   * const result = c.var.client.oneMethod()
-   * ```
-   */
-  // c.var.propName is a read-only
-  get var() {
-    if (!this.#var) {
-      return {};
-    }
-    return Object.fromEntries(this.#var);
-  }
-  #newResponse(data, arg, headers) {
-    let responseHeaders = this.#res ? new Headers(this.#res.headers) : this.#preparedHeaders;
-    if (typeof arg === "object" && arg.headers) {
-      responseHeaders ??= new Headers();
-      for (const [key, value] of new Headers(arg.headers)) {
-        if (key === "set-cookie") {
-          responseHeaders.append(key, value);
-        } else {
-          responseHeaders.set(key, value);
-        }
-      }
-    }
-    if (headers) {
-      if (!responseHeaders) {
-        let count = 0;
-        for (const k in headers) {
-          if (++count > 1 || typeof headers[k] !== "string") {
-            responseHeaders = new Headers();
-            break;
-          }
-        }
-      }
-      if (responseHeaders) {
-        for (const k in headers) {
-          const v = headers[k];
-          if (typeof v === "string") {
-            responseHeaders.set(k, v);
-          } else {
-            responseHeaders.delete(k);
-            for (const v2 of v) {
-              responseHeaders.append(k, v2);
-            }
-          }
-        }
-      }
-    }
-    const status = typeof arg === "number" ? arg : arg?.status ?? this.#status;
-    return createResponseInstance(data, {
-      status,
-      headers: responseHeaders ?? headers
-    });
-  }
-  newResponse = (...args) => this.#newResponse(...args);
-  /**
-   * `.body()` can return the HTTP response.
-   * You can set headers with `.header()` and set HTTP status code with `.status`.
-   * This can also be set in `.text()`, `.json()` and so on.
-   *
-   * @see {@link https://hono.dev/docs/api/context#body}
-   *
-   * @example
-   * ```ts
-   * app.get('/welcome', (c) => {
-   *   // Set headers
-   *   c.header('X-Message', 'Hello!')
-   *   c.header('Content-Type', 'text/plain')
-   *   // Set HTTP status code
-   *   c.status(201)
-   *
-   *   // Return the response body
-   *   return c.body('Thank you for coming')
-   * })
-   * ```
-   */
-  body = (data, arg, headers) => this.#newResponse(data, arg, headers);
-  /**
-   * `.text()` can render text as `Content-Type:text/plain`.
-   *
-   * @see {@link https://hono.dev/docs/api/context#text}
-   *
-   * @example
-   * ```ts
-   * app.get('/say', (c) => {
-   *   return c.text('Hello!')
-   * })
-   * ```
-   */
-  text = (text, arg, headers) => {
-    return !this.#preparedHeaders && !this.#status && !arg && !headers && !this.finalized ? new Response(text) : this.#newResponse(
-      text,
-      arg,
-      setDefaultContentType(TEXT_PLAIN, headers)
-    );
-  };
-  /**
-   * `.json()` can render JSON as `Content-Type:application/json`.
-   *
-   * @see {@link https://hono.dev/docs/api/context#json}
-   *
-   * @example
-   * ```ts
-   * app.get('/api', (c) => {
-   *   return c.json({ message: 'Hello!' })
-   * })
-   * ```
-   */
-  json = (object, arg, headers) => {
-    return this.#newResponse(
-      JSON.stringify(object),
-      arg,
-      setDefaultContentType("application/json", headers)
-    );
-  };
-  html = (html, arg, headers) => {
-    const res = (html2) => this.#newResponse(html2, arg, setDefaultContentType("text/html; charset=UTF-8", headers));
-    return typeof html === "object" ? resolveCallback(html, HtmlEscapedCallbackPhase.Stringify, false, {}).then(res) : res(html);
-  };
-  /**
-   * `.redirect()` can Redirect, default status code is 302.
-   *
-   * @see {@link https://hono.dev/docs/api/context#redirect}
-   *
-   * @example
-   * ```ts
-   * app.get('/redirect', (c) => {
-   *   return c.redirect('/')
-   * })
-   * app.get('/redirect-permanently', (c) => {
-   *   return c.redirect('/', 301)
-   * })
-   * ```
-   */
-  redirect = (location, status) => {
-    const locationString = String(location);
-    this.header(
-      "Location",
-      // Multibytes should be encoded
-      // eslint-disable-next-line no-control-regex
-      !/[^\x00-\xFF]/.test(locationString) ? locationString : encodeURI(locationString)
-    );
-    return this.newResponse(null, status ?? 302);
-  };
-  /**
-   * `.notFound()` can return the Not Found Response.
-   *
-   * @see {@link https://hono.dev/docs/api/context#notfound}
-   *
-   * @example
-   * ```ts
-   * app.get('/notfound', (c) => {
-   *   return c.notFound()
-   * })
-   * ```
-   */
-  notFound = () => {
-    this.#notFoundHandler ??= () => createResponseInstance();
-    return this.#notFoundHandler(this);
-  };
-};
-
-// node_modules/hono/dist/router.js
-var METHOD_NAME_ALL = "ALL";
-var METHOD_NAME_ALL_LOWERCASE = "all";
-var METHODS = ["get", "post", "put", "delete", "options", "patch", "query"];
-var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is already built.";
-var UnsupportedPathError = class extends Error {
-};
-
-// node_modules/hono/dist/utils/constants.js
-var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
-
-// node_modules/hono/dist/hono-base.js
-var notFoundHandler = (c) => {
-  return c.text("404 Not Found", 404);
-};
-var errorHandler = (err, c) => {
-  if ("getResponse" in err) {
-    const res = err.getResponse();
-    return c.newResponse(res.body, res);
-  }
-  console.error(err);
-  return c.text("Internal Server Error", 500);
-};
-var Hono = class _Hono {
-  get;
-  post;
-  put;
-  delete;
-  options;
-  patch;
-  query;
-  all;
-  on;
-  use;
-  /*
-    This class is like an abstract class and does not have a router.
-    To use it, inherit the class and implement router in the constructor.
-  */
-  router;
-  getPath;
-  // Cannot use `#` because it requires visibility at JavaScript runtime.
-  _basePath = "/";
-  #path = "/";
-  routes = [];
-  constructor(options = {}) {
-    const allMethods = [...METHODS, METHOD_NAME_ALL_LOWERCASE];
-    allMethods.forEach((method) => {
-      this[method] = (args1, ...args) => {
-        const methodName = method.toUpperCase();
-        if (typeof args1 === "string") {
-          this.#path = args1;
-        } else {
-          this.#addRoute(methodName, this.#path, args1);
-        }
-        args.forEach((handler) => {
-          this.#addRoute(methodName, this.#path, handler);
-        });
-        return this;
-      };
-    });
-    this.on = (method, path, ...handlers) => {
-      for (const p of [path].flat()) {
-        this.#path = p;
-        for (const m of [method].flat()) {
-          const methodName = m.toUpperCase();
-          for (const handler of handlers) {
-            this.#addRoute(methodName, this.#path, handler);
-          }
-        }
-      }
-      return this;
-    };
-    this.use = (arg1, ...handlers) => {
-      if (typeof arg1 === "string") {
-        this.#path = arg1;
-      } else {
-        this.#path = "*";
-        handlers.unshift(arg1);
-      }
-      handlers.forEach((handler) => {
-        this.#addRoute(METHOD_NAME_ALL, this.#path, handler);
-      });
-      return this;
-    };
-    const { strict, ...optionsWithoutStrict } = options;
-    Object.assign(this, optionsWithoutStrict);
-    this.getPath = strict ?? true ? options.getPath ?? getPath : getPathNoStrict;
-  }
-  #clone() {
-    const clone = new _Hono({
-      router: this.router,
-      getPath: this.getPath
-    });
-    clone.errorHandler = this.errorHandler;
-    clone.#notFoundHandler = this.#notFoundHandler;
-    clone.routes = this.routes;
-    return clone;
-  }
-  #notFoundHandler = notFoundHandler;
-  // Cannot use `#` because it requires visibility at JavaScript runtime.
-  errorHandler = errorHandler;
-  /**
-   * `.route()` allows grouping other Hono instance in routes.
-   *
-   * @see {@link https://hono.dev/docs/api/routing#grouping}
-   *
-   * @param {string} path - base Path
-   * @param {Hono} app - other Hono instance
-   * @returns {Hono} routed Hono instance
-   *
-   * @example
-   * ```ts
-   * const app = new Hono()
-   * const app2 = new Hono()
-   *
-   * app2.get("/user", (c) => c.text("user"))
-   * app.route("/api", app2) // GET /api/user
-   * ```
-   */
-  route(path, app2) {
-    const subApp = this.basePath(path);
-    app2.routes.map((r) => {
-      let handler;
-      if (app2.errorHandler === errorHandler) {
-        handler = r.handler;
-      } else {
-        handler = async (c, next) => (await compose([], app2.errorHandler)(c, () => r.handler(c, next))).res;
-        handler[COMPOSED_HANDLER] = r.handler;
-      }
-      subApp.#addRoute(r.method, r.path, handler, r.basePath);
-    });
-    return this;
-  }
-  /**
-   * `.basePath()` allows base paths to be specified.
-   *
-   * @see {@link https://hono.dev/docs/api/routing#base-path}
-   *
-   * @param {string} path - base Path
-   * @returns {Hono} changed Hono instance
-   *
-   * @example
-   * ```ts
-   * const api = new Hono().basePath('/api')
-   * ```
-   */
-  basePath(path) {
-    const subApp = this.#clone();
-    subApp._basePath = mergePath(this._basePath, path);
-    return subApp;
-  }
-  /**
-   * `.onError()` handles an error and returns a customized Response.
-   *
-   * @see {@link https://hono.dev/docs/api/hono#error-handling}
-   *
-   * @param {ErrorHandler} handler - request Handler for error
-   * @returns {Hono} changed Hono instance
-   *
-   * @example
-   * ```ts
-   * app.onError((err, c) => {
-   *   console.error(`${err}`)
-   *   return c.text('Custom Error Message', 500)
-   * })
-   * ```
-   */
-  onError = (handler) => {
-    this.errorHandler = handler;
-    return this;
-  };
-  /**
-   * `.notFound()` allows you to customize a Not Found Response.
-   *
-   * @see {@link https://hono.dev/docs/api/hono#not-found}
-   *
-   * @param {NotFoundHandler} handler - request handler for not-found
-   * @returns {Hono} changed Hono instance
-   *
-   * @example
-   * ```ts
-   * app.notFound((c) => {
-   *   return c.text('Custom 404 Message', 404)
-   * })
-   * ```
-   */
-  notFound = (handler) => {
-    this.#notFoundHandler = handler;
-    return this;
-  };
-  /**
-   * `.mount()` allows you to mount applications built with other frameworks into your Hono application.
-   *
-   * @see {@link https://hono.dev/docs/api/hono#mount}
-   *
-   * @param {string} path - base Path
-   * @param {Function} applicationHandler - other Request Handler
-   * @param {MountOptions} [options] - options of `.mount()`
-   * @returns {Hono} mounted Hono instance
-   *
-   * @example
-   * ```ts
-   * import { Router as IttyRouter } from 'itty-router'
-   * import { Hono } from 'hono'
-   * // Create itty-router application
-   * const ittyRouter = IttyRouter()
-   * // GET /itty-router/hello
-   * ittyRouter.get('/hello', () => new Response('Hello from itty-router'))
-   *
-   * const app = new Hono()
-   * app.mount('/itty-router', ittyRouter.handle)
-   * ```
-   *
-   * @example
-   * ```ts
-   * const app = new Hono()
-   * // Send the request to another application without modification.
-   * app.mount('/app', anotherApp, {
-   *   replaceRequest: (req) => req,
-   * })
-   * ```
-   */
-  mount(path, applicationHandler, options) {
-    let replaceRequest;
-    let optionHandler;
-    if (options) {
-      if (typeof options === "function") {
-        optionHandler = options;
-      } else {
-        optionHandler = options.optionHandler;
-        if (options.replaceRequest === false) {
-          replaceRequest = (request) => request;
-        } else {
-          replaceRequest = options.replaceRequest;
-        }
-      }
-    }
-    const getOptions = optionHandler ? (c) => {
-      const options2 = optionHandler(c);
-      return Array.isArray(options2) ? options2 : [options2];
-    } : (c) => {
-      let executionContext = void 0;
-      try {
-        executionContext = c.executionCtx;
-      } catch {
-      }
-      return [c.env, executionContext];
-    };
-    replaceRequest ||= (() => {
-      const mergedPath = mergePath(this._basePath, path);
-      const pathPrefixLength = mergedPath === "/" ? 0 : mergedPath.length;
-      return (request) => {
-        const url = new URL(request.url);
-        url.pathname = this.getPath(request).slice(pathPrefixLength) || "/";
-        return new Request(url, request);
-      };
-    })();
-    const handler = async (c, next) => {
-      const res = await applicationHandler(replaceRequest(c.req.raw), ...getOptions(c));
-      if (res) {
-        return res;
-      }
-      await next();
-    };
-    this.#addRoute(METHOD_NAME_ALL, mergePath(path, "*"), handler);
-    return this;
-  }
-  #addRoute(method, path, handler, baseRoutePath) {
-    path = mergePath(this._basePath, path);
-    const r = {
-      basePath: baseRoutePath !== void 0 ? mergePath(this._basePath, baseRoutePath) : this._basePath,
-      path,
-      method,
-      handler
-    };
-    this.router.add(method, path, [handler, r]);
-    this.routes.push(r);
-  }
-  #handleError(err, c) {
-    if (err instanceof Error) {
-      return this.errorHandler(err, c);
-    }
-    throw err;
-  }
-  #dispatch(request, executionCtx, env, method) {
-    if (method === "HEAD") {
-      return (async () => new Response(null, await this.#dispatch(request, executionCtx, env, "GET")))();
-    }
-    const path = this.getPath(request, { env });
-    const matchResult = this.router.match(method, path);
-    const c = new Context(request, {
-      path,
-      matchResult,
-      env,
-      executionCtx,
-      notFoundHandler: this.#notFoundHandler
-    });
-    if (matchResult[0].length === 1) {
-      let res;
-      try {
-        res = matchResult[0][0][0][0](c, async () => {
-          c.res = await this.#notFoundHandler(c);
-        });
-      } catch (err) {
-        return this.#handleError(err, c);
-      }
-      return res instanceof Promise ? res.then(
-        (resolved) => resolved || (c.finalized ? c.res : this.#notFoundHandler(c))
-      ).catch((err) => this.#handleError(err, c)) : res ?? this.#notFoundHandler(c);
-    }
-    const composed = compose(matchResult[0], this.errorHandler, this.#notFoundHandler);
-    return (async () => {
-      try {
-        const context = await composed(c);
-        if (!context.finalized) {
-          throw new Error(
-            "Context is not finalized. Did you forget to return a Response object or `await next()`?"
-          );
-        }
-        return context.res;
-      } catch (err) {
-        return this.#handleError(err, c);
-      }
-    })();
-  }
-  /**
-   * `.fetch()` will be entry point of your app.
-   *
-   * @see {@link https://hono.dev/docs/api/hono#fetch}
-   *
-   * @param {Request} request - request Object of request
-   * @param {Env} env - env Object
-   * @param {ExecutionContext} executionCtx - context of execution
-   * @returns {Response | Promise<Response>} response of request
-   *
-   */
-  fetch = (request, ...rest) => {
-    return this.#dispatch(request, rest[1], rest[0], request.method);
-  };
-  /**
-   * `.request()` is a useful method for testing.
-   * You can pass a URL or pathname to send a GET request.
-   * app will return a Response object.
-   * ```ts
-   * test('GET /hello is ok', async () => {
-   *   const res = await app.request('/hello')
-   *   expect(res.status).toBe(200)
-   * })
-   * ```
-   * @see https://hono.dev/docs/api/hono#request
-   */
-  request = (input, requestInit, Env, executionCtx) => {
-    if (input instanceof Request) {
-      return this.fetch(requestInit ? new Request(input, requestInit) : input, Env, executionCtx);
-    }
-    input = input.toString();
-    return this.fetch(
-      new Request(
-        /^https?:\/\//.test(input) ? input : `http://localhost${mergePath("/", input)}`,
-        requestInit
-      ),
-      Env,
-      executionCtx
-    );
-  };
-  /**
-   * `.fire()` automatically adds a global fetch event listener.
-   * This can be useful for environments that adhere to the Service Worker API, such as non-ES module Cloudflare Workers.
-   * @deprecated
-   * Use `fire` from `hono/service-worker` instead.
-   * ```ts
-   * import { Hono } from 'hono'
-   * import { fire } from 'hono/service-worker'
-   *
-   * const app = new Hono()
-   * // ...
-   * fire(app)
-   * ```
-   * @see https://hono.dev/docs/api/hono#fire
-   * @see https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
-   * @see https://developers.cloudflare.com/workers/reference/migrate-to-module-workers/
-   */
-  fire = () => {
-    addEventListener("fetch", (event) => {
-      event.respondWith(this.#dispatch(event.request, event, void 0, event.request.method));
-    });
-  };
-};
-
-// node_modules/hono/dist/router/utils.js
-var createNullObject = () => /* @__PURE__ */ Object.create(null);
-
-// node_modules/hono/dist/router/reg-exp-router/matcher.js
-var emptyParam = [];
-function match(method, path) {
-  const matchers = this.buildAllMatchers();
-  const match2 = (method2, path2) => {
-    const matcher = matchers[method2] || matchers[METHOD_NAME_ALL];
-    const staticMatch = matcher[2][path2];
-    if (staticMatch) {
-      return staticMatch;
-    }
-    const match3 = path2.match(matcher[0]);
-    if (!match3) {
-      return [[], emptyParam];
-    }
-    const index = match3.indexOf("", 1);
-    return [matcher[1][index], match3];
-  };
-  this.match = match2;
-  return match2(method, path);
+  log("info", "task_reminders_done", stats);
+  return stats;
 }
 
-// node_modules/hono/dist/router/reg-exp-router/node.js
-var LABEL_REG_EXP_STR = "[^/]+";
-var ONLY_WILDCARD_REG_EXP_STR = ".*";
-var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
-var PATH_ERROR = /* @__PURE__ */ Symbol();
-var regExpMetaChars = new Set(".\\+*[^]$()");
-function compareKey(a, b) {
-  if (a.length === 1) {
-    return b.length === 1 ? a < b ? -1 : 1 : -1;
-  }
-  if (b.length === 1) {
-    return 1;
-  }
-  if (a === ONLY_WILDCARD_REG_EXP_STR || a === TAIL_WILDCARD_REG_EXP_STR) {
-    return b === TAIL_WILDCARD_REG_EXP_STR ? -1 : 1;
-  } else if (b === ONLY_WILDCARD_REG_EXP_STR || b === TAIL_WILDCARD_REG_EXP_STR) {
-    return -1;
-  }
-  if (a === LABEL_REG_EXP_STR) {
-    return 1;
-  } else if (b === LABEL_REG_EXP_STR) {
-    return -1;
-  }
-  return a.length === b.length ? a < b ? -1 : 1 : b.length - a.length;
-}
-var Node = class _Node {
-  // handler index of a dynamic path, or -1 for a static path terminal
-  #index;
-  #varIndex;
-  #children = createNullObject();
-  insert(tokens, index, paramMap, context, isStatic) {
-    let node = this;
-    for (let i = 0, len = tokens.length; i < len; i++) {
-      const token = tokens[i];
-      const pattern = token.length === 1 ? token === "*" ? i === len - 1 ? ["", "", ONLY_WILDCARD_REG_EXP_STR] : ["", "", LABEL_REG_EXP_STR] : null : token === "/*" ? ["", "", TAIL_WILDCARD_REG_EXP_STR] : token.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
-      let nextNode;
-      if (pattern) {
-        const name = pattern[1];
-        let regexpStr = pattern[2] || LABEL_REG_EXP_STR;
-        if (name && pattern[2]) {
-          if (regexpStr === ".*") {
-            throw PATH_ERROR;
-          }
-          regexpStr = regexpStr.replace(/^\((?!\?:)(?=[^)]+\)$)/, "(?:");
-          if (/\((?!\?:)/.test(regexpStr)) {
-            throw PATH_ERROR;
-          }
-          if (regexpStr.length === 1 && regExpMetaChars.has(regexpStr)) {
-            throw PATH_ERROR;
-          }
-        }
-        nextNode = node.#children[regexpStr];
-        if (!nextNode) {
-          if (regexpStr !== ONLY_WILDCARD_REG_EXP_STR && regexpStr !== TAIL_WILDCARD_REG_EXP_STR) {
-            for (const k in node.#children) {
-              if (
-                // a single-char pattern coexists with single-char literals as a literal does
-                (regexpStr.length > 1 || k.length > 1) && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR
-              ) {
-                throw PATH_ERROR;
-              }
-            }
-          }
-          nextNode = node.#children[regexpStr] = new _Node();
-        }
-        if (name !== "") {
-          nextNode.#varIndex ??= context.varIndex++;
-          paramMap.push([name, nextNode.#varIndex]);
-        }
-      } else {
-        nextNode = node.#children[token];
-        if (!nextNode) {
-          for (const k in node.#children) {
-            if (k.length > 1 && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR) {
-              throw PATH_ERROR;
-            }
-          }
-          nextNode = node.#children[token] = new _Node();
-        }
-      }
-      node = nextNode;
-    }
-    if (node.#index !== void 0) {
-      throw PATH_ERROR;
-    }
-    node.#index = isStatic ? -1 : index;
-  }
-  buildRegExpStr() {
-    const childKeys = Object.keys(this.#children).sort(compareKey);
-    const strList = childKeys.map((k) => {
-      const c = this.#children[k];
-      const childStr = c.buildRegExpStr();
-      return childStr === "" ? "" : (typeof c.#varIndex === "number" ? `(${k})@${c.#varIndex}` : regExpMetaChars.has(k) ? `\\${k}` : k) + childStr;
-    }).filter(Boolean);
-    if (typeof this.#index === "number" && this.#index !== -1) {
-      strList.unshift(`#${this.#index}`);
-    }
-    if (strList.length === 0) {
-      return "";
-    }
-    if (strList.length === 1) {
-      return strList[0];
-    }
-    return "(?:" + strList.join("|") + ")";
-  }
-};
-
-// node_modules/hono/dist/router/reg-exp-router/trie.js
-var Trie = class {
-  #context = { varIndex: 0 };
-  #root = new Node();
-  #index = 0;
-  // dynamic path -> [handler index, param assoc]; static paths are not registered
-  paths = createNullObject();
-  insert(path, isStatic) {
-    if (isStatic) {
-      this.#root.insert(path.split(""), 0, [], this.#context, true);
-      return;
-    }
-    const paramAssoc = [];
-    const groups = [];
-    let markedPath = path;
-    for (let i = 0; ; ) {
-      let replaced = false;
-      markedPath = markedPath.replace(/\{[^}]+\}/g, (m) => {
-        const mark = `@\\${i}`;
-        groups[i] = [mark, m];
-        i++;
-        replaced = true;
-        return mark;
-      });
-      if (!replaced) {
-        break;
-      }
-    }
-    const tokens = markedPath.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
-    for (let i = groups.length - 1; i >= 0; i--) {
-      const [mark] = groups[i];
-      for (let j = tokens.length - 1; j >= 0; j--) {
-        if (tokens[j].indexOf(mark) !== -1) {
-          tokens[j] = tokens[j].replace(mark, groups[i][1]);
-          break;
-        }
-      }
-    }
-    this.#root.insert(tokens, this.#index, paramAssoc, this.#context, false);
-    this.paths[path] = [this.#index++, paramAssoc];
-  }
-  buildRegExp() {
-    let regexp = this.#root.buildRegExpStr();
-    if (regexp === "") {
-      return [/^$/, [], []];
-    }
-    let captureIndex = 0;
-    const indexReplacementMap = [];
-    const paramReplacementMap = [];
-    regexp = regexp.replace(/#(\d+)|@(\d+)|\.\*\$/g, (_, handlerIndex, paramIndex) => {
-      if (handlerIndex !== void 0) {
-        indexReplacementMap[++captureIndex] = Number(handlerIndex);
-        return "$()";
-      }
-      if (paramIndex !== void 0) {
-        paramReplacementMap[Number(paramIndex)] = ++captureIndex;
-        return "";
-      }
-      return "";
-    });
-    return [new RegExp(`^${regexp}`), indexReplacementMap, paramReplacementMap];
-  }
-};
-
-// node_modules/hono/dist/router/reg-exp-router/router.js
-var wildcardRegExpCache = createNullObject();
-function buildWildcardRegExp(path) {
-  return wildcardRegExpCache[path] ??= new RegExp(
-    `^${path.replace(
-      /\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g,
-      (match2, metaChar) => metaChar ? `\\${metaChar}` : match2 === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match2 === "*" ? ONLY_WILDCARD_REG_EXP_STR : `/:${LABEL_REG_EXP_STR}`
-    )}$`
-  );
-}
-function findMiddleware(middleware, path) {
-  for (const k of Object.keys(middleware).sort((a, b) => b.length - a.length)) {
-    if (buildWildcardRegExp(k).test(path)) {
-      return [...middleware[k]];
-    }
-  }
-  return void 0;
-}
-var RegExpRouter = class {
-  name = "RegExpRouter";
-  #middleware;
-  #routes;
-  #tries;
-  constructor() {
-    this.#middleware = { [METHOD_NAME_ALL]: createNullObject() };
-    this.#routes = { [METHOD_NAME_ALL]: createNullObject() };
-    this.#tries = { [METHOD_NAME_ALL]: new Trie() };
-  }
-  #insertPath(method, path) {
-    try {
-      this.#tries[method].insert(path, !/\*|\/:/.test(path));
-    } catch (e) {
-      throw e === PATH_ERROR ? new UnsupportedPathError(path) : e;
-    }
-  }
-  add(method, path, handler) {
-    const middleware = this.#middleware;
-    const routes = this.#routes;
-    if (!middleware) {
-      throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
-    }
-    if (!middleware[method]) {
-      this.#tries[method] = new Trie();
-      for (const handlerMap of [middleware, routes]) {
-        handlerMap[method] = createNullObject();
-        for (const p in handlerMap[METHOD_NAME_ALL]) {
-          handlerMap[method][p] = [...handlerMap[METHOD_NAME_ALL][p]];
-          this.#insertPath(method, p);
-        }
-      }
-    }
-    if (path === "/*") {
-      path = "*";
-    }
-    const methods = method === METHOD_NAME_ALL ? Object.keys(middleware) : [method];
-    if (/\*$/.test(path)) {
-      const re = buildWildcardRegExp(path);
-      for (const m of methods) {
-        if (!middleware[m][path]) {
-          this.#insertPath(m, path);
-          middleware[m][path] = findMiddleware(middleware[m], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
-        }
-      }
-      for (const handlerMap of [middleware, routes]) {
-        for (const m of methods) {
-          for (const p in handlerMap[m]) {
-            re.test(p) && handlerMap[m][p].push([handler, path]);
-          }
-        }
-      }
-      return;
-    }
-    const paths = checkOptionalParameter(path) || [path];
-    for (const path2 of paths) {
-      for (const m of methods) {
-        if (!routes[m][path2]) {
-          this.#insertPath(m, path2);
-          routes[m][path2] = findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || [];
-        }
-        routes[m][path2].push([handler, path2]);
-      }
-    }
-  }
-  match = match;
-  buildAllMatchers() {
-    const matchers = createNullObject();
-    for (const method of Object.keys(this.#routes)) {
-      matchers[method] = this.#buildMatcher(method);
-    }
-    this.#middleware = this.#routes = this.#tries = void 0;
-    wildcardRegExpCache = createNullObject();
-    return matchers;
-  }
-  #buildMatcher(method) {
-    const middleware = this.#middleware[method];
-    const routes = this.#routes[method];
-    const trie = this.#tries[method];
-    const staticMap = createNullObject();
-    const handlerData = [];
-    const [regexp, indexReplacementMap, paramReplacementMap] = trie.buildRegExp();
-    for (const r of [middleware, routes]) {
-      for (const path in r) {
-        const handlers = r[path];
-        const pathData = trie.paths[path];
-        if (!pathData) {
-          staticMap[path] = [handlers.map(([h]) => [h, createNullObject()]), emptyParam];
-          continue;
-        }
-        handlerData[pathData[0]] = handlers.map(([h, handlerPath]) => [
-          h,
-          trie.paths[handlerPath][1].reduceRight((map, [key], i) => {
-            map[key] = paramReplacementMap[pathData[1][i][1]];
-            return map;
-          }, createNullObject())
-        ]);
-      }
-    }
-    return [regexp, indexReplacementMap.map((i) => handlerData[i]), staticMap];
-  }
-};
-
-// node_modules/hono/dist/router/smart-router/router.js
-var SmartRouter = class {
-  name = "SmartRouter";
-  #routers = [];
-  #routes = [];
-  constructor(init) {
-    this.#routers = init.routers;
-  }
-  add(method, path, handler) {
-    if (!this.#routes) {
-      throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
-    }
-    this.#routes.push([method, path, handler]);
-  }
-  match(method, path) {
-    if (!this.#routes) {
-      throw new Error("Fatal error");
-    }
-    const routers = this.#routers;
-    const routes = this.#routes;
-    const len = routers.length;
-    let i = 0;
-    let res;
-    for (; i < len; i++) {
-      const router = routers[i];
-      try {
-        for (let i2 = 0, len2 = routes.length; i2 < len2; i2++) {
-          router.add(...routes[i2]);
-        }
-        res = router.match(method, path);
-      } catch (e) {
-        if (e instanceof UnsupportedPathError) {
-          continue;
-        }
-        throw e;
-      }
-      this.match = router.match.bind(router);
-      this.#routers = [router];
-      this.#routes = void 0;
-      break;
-    }
-    if (i === len) {
-      throw new Error("Fatal error");
-    }
-    this.name = `SmartRouter + ${this.activeRouter.name}`;
-    return res;
-  }
-  get activeRouter() {
-    if (this.#routes || this.#routers.length !== 1) {
-      throw new Error("No active router has been determined yet.");
-    }
-    return this.#routers[0];
-  }
-};
-
-// node_modules/hono/dist/router/trie-router/node.js
-var emptyParams = createNullObject();
-var order = 0;
-var Node2 = class _Node2 {
-  #methods = [];
-  #children = createNullObject();
-  #patterns = [];
-  #pattern;
-  #params = emptyParams;
-  insert(method, path, handler) {
-    let curNode = this;
-    const parts = splitRoutingPath(path);
-    const possibleKeys = /* @__PURE__ */ new Set();
-    let i = 0;
-    for (const p of parts) {
-      const nextP = parts[++i];
-      const pattern = getPattern(p, nextP) || (nextP === void 0 && p && p.indexOf("*") === p.length - 1 ? p : null);
-      const isParam = Array.isArray(pattern);
-      const key = isParam ? pattern[0] : pattern || p;
-      const child = curNode.#children[key] ||= new _Node2();
-      if (pattern && !child.#pattern) {
-        child.#pattern = pattern;
-        curNode.#patterns.push(child);
-      }
-      curNode = child;
-      if (isParam) {
-        possibleKeys.add(pattern[1]);
-      }
-    }
-    curNode.#methods.push({
-      [method]: {
-        handler,
-        possibleKeys: [...possibleKeys],
-        score: ++order
-      }
-    });
-  }
-  #pushHandlerSets(handlerSets, node, method, nodeParams, params) {
-    for (let i = 0, len = node.#methods.length; i < len; i++) {
-      const m = node.#methods[i];
-      const handlerSet = m[method] || m[METHOD_NAME_ALL];
-      if (handlerSet) {
-        handlerSet.params = createNullObject();
-        handlerSets.push(handlerSet);
-        for (let i2 = 0, len2 = handlerSet.possibleKeys.length; i2 < len2; i2++) {
-          const key = handlerSet.possibleKeys[i2];
-          handlerSet.params[key] = params?.[key] && !i2 ? params[key] : nodeParams[key] ?? params?.[key];
-        }
-      }
-    }
-  }
-  search(method, path) {
-    const handlerSets = [];
-    this.#params = emptyParams;
-    const curNode = this;
-    let curNodes = [curNode];
-    const parts = splitPath(path);
-    const curNodesQueue = [];
-    const len = parts.length;
-    let partOffsets = null;
-    for (let i = 0; i < len; i++) {
-      const part = parts[i];
-      const isLast = i === len - 1;
-      const tempNodes = [];
-      for (let j = 0, len2 = curNodes.length; j < len2; j++) {
-        const node = curNodes[j];
-        const nextNode = node.#children[part];
-        if (nextNode) {
-          nextNode.#params = node.#params;
-          if (isLast) {
-            if (nextNode.#children["*"]) {
-              this.#pushHandlerSets(handlerSets, nextNode.#children["*"], method, node.#params);
-            }
-            this.#pushHandlerSets(handlerSets, nextNode, method, node.#params);
-          } else {
-            tempNodes.push(nextNode);
-          }
-        }
-        for (const child of node.#patterns) {
-          const pattern = child.#pattern;
-          const params = node.#params === emptyParams ? {} : { ...node.#params };
-          if (typeof pattern === "string") {
-            if (pattern === "*" || part.startsWith(pattern.slice(0, -1))) {
-              this.#pushHandlerSets(handlerSets, child, method, node.#params);
-              if (pattern === "*") {
-                child.#params = params;
-                tempNodes.push(child);
-              }
-            }
-            continue;
-          }
-          const [, name, matcher] = pattern;
-          if (!part && matcher === true) {
-            continue;
-          }
-          if (matcher !== true) {
-            if (!partOffsets) {
-              partOffsets = [];
-              let offset = path[0] === "/" ? 1 : 0;
-              for (let p = 0; p < len; p++) {
-                partOffsets[p] = offset;
-                offset += parts[p].length + 1;
-              }
-            }
-            const restPathString = path.slice(partOffsets[i]);
-            const m = matcher.exec(restPathString);
-            if (m) {
-              params[name] = m[0];
-              this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
-              if (m[0].length === restPathString.length && child.#children["*"]) {
-                this.#pushHandlerSets(
-                  handlerSets,
-                  child.#children["*"],
-                  method,
-                  node.#params,
-                  params
-                );
-              }
-              for (const _ in child.#children) {
-                child.#params = params;
-                const componentCount = m[0].match(/\//g)?.length ?? 0;
-                const targetCurNodes = curNodesQueue[componentCount] ||= [];
-                targetCurNodes.push(child);
-                break;
-              }
-              continue;
-            }
-          }
-          if (matcher === true || matcher.test(part)) {
-            params[name] = part;
-            if (isLast) {
-              this.#pushHandlerSets(handlerSets, child, method, params, node.#params);
-              if (child.#children["*"]) {
-                this.#pushHandlerSets(
-                  handlerSets,
-                  child.#children["*"],
-                  method,
-                  params,
-                  node.#params
-                );
-              }
-            } else {
-              child.#params = params;
-              tempNodes.push(child);
-            }
-          }
-        }
-      }
-      const shifted = curNodesQueue.shift();
-      curNodes = shifted ? tempNodes.concat(shifted) : tempNodes;
-    }
-    if (handlerSets[1]) {
-      handlerSets.sort((a, b) => {
-        return a.score - b.score;
-      });
-    }
-    return [handlerSets.map(({ handler, params }) => [handler, params])];
-  }
-};
-
-// node_modules/hono/dist/router/trie-router/router.js
-var TrieRouter = class {
-  name = "TrieRouter";
-  #node = new Node2();
-  add(method, path, handler) {
-    for (const result of checkOptionalParameter(path) || [path]) {
-      this.#node.insert(method, result, handler);
-    }
-  }
-  match(method, path) {
-    return this.#node.search(method, path);
-  }
-};
-
-// node_modules/hono/dist/hono.js
-var Hono2 = class extends Hono {
-  /**
-   * Creates an instance of the Hono class.
-   *
-   * @param options - Optional configuration options for the Hono instance.
-   */
-  constructor(options = {}) {
-    super(options);
-    this.router = options.router ?? new SmartRouter({
-      routers: [new RegExpRouter(), new TrieRouter()]
-    });
-  }
-};
-
-// node_modules/hono/dist/middleware/body-limit/index.js
-var ERROR_MESSAGE = "Payload Too Large";
-var bodyLimit = (options) => {
-  const onError = options.onError || (() => {
-    const res = new Response(ERROR_MESSAGE, {
-      status: 413
-    });
-    throw new HTTPException(413, { res });
-  });
-  const maxSize = options.maxSize;
-  return async function bodyLimit2(c, next) {
-    if (!c.req.raw.body) {
-      return next();
-    }
-    const hasTransferEncoding = c.req.raw.headers.has("transfer-encoding");
-    const hasContentLength = c.req.raw.headers.has("content-length");
-    if (hasContentLength && !hasTransferEncoding) {
-      const contentLength = parseInt(c.req.raw.headers.get("content-length") || "0", 10);
-      return contentLength > maxSize ? onError(c) : next();
-    }
-    let size = 0;
-    const chunks = [];
-    const rawReader = c.req.raw.body.getReader();
-    for (; ; ) {
-      const { done, value } = await rawReader.read();
-      if (done) {
-        break;
-      }
-      size += value.length;
-      if (size > maxSize) {
-        return onError(c);
-      }
-      chunks.push(value);
-    }
-    const requestInit = {
-      body: new ReadableStream({
-        start(controller) {
-          for (const chunk of chunks) {
-            controller.enqueue(chunk);
-          }
-          controller.close();
-        }
-      }),
-      duplex: "half"
-    };
-    c.req.raw = new Request(c.req.raw, requestInit);
-    return next();
-  };
-};
-
-// node_modules/hono/dist/middleware/secure-headers/secure-headers.js
-var HEADERS_MAP = {
-  crossOriginEmbedderPolicy: ["Cross-Origin-Embedder-Policy", "require-corp"],
-  crossOriginResourcePolicy: ["Cross-Origin-Resource-Policy", "same-origin"],
-  crossOriginOpenerPolicy: ["Cross-Origin-Opener-Policy", "same-origin"],
-  originAgentCluster: ["Origin-Agent-Cluster", "?1"],
-  referrerPolicy: ["Referrer-Policy", "no-referrer"],
-  strictTransportSecurity: ["Strict-Transport-Security", "max-age=15552000; includeSubDomains"],
-  xContentTypeOptions: ["X-Content-Type-Options", "nosniff"],
-  xDnsPrefetchControl: ["X-DNS-Prefetch-Control", "off"],
-  xDownloadOptions: ["X-Download-Options", "noopen"],
-  xFrameOptions: ["X-Frame-Options", "SAMEORIGIN"],
-  xPermittedCrossDomainPolicies: ["X-Permitted-Cross-Domain-Policies", "none"],
-  xXssProtection: ["X-XSS-Protection", "0"]
-};
-var DEFAULT_OPTIONS = {
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: true,
-  crossOriginOpenerPolicy: true,
-  originAgentCluster: true,
-  referrerPolicy: true,
-  strictTransportSecurity: true,
-  xContentTypeOptions: true,
-  xDnsPrefetchControl: true,
-  xDownloadOptions: true,
-  xFrameOptions: true,
-  xPermittedCrossDomainPolicies: true,
-  xXssProtection: true,
-  removePoweredBy: true,
-  permissionsPolicy: {}
-};
-var secureHeaders = (customOptions) => {
-  const options = { ...DEFAULT_OPTIONS, ...customOptions };
-  const headersToSet = getFilteredHeaders(options);
-  const callbacks = [];
-  if (options.contentSecurityPolicy) {
-    const [callback, value] = getCSPDirectives(
-      options.contentSecurityPolicy,
-      "Content-Security-Policy"
-    );
-    if (callback) {
-      callbacks.push(callback);
-    }
-    headersToSet.push(["Content-Security-Policy", value]);
-  }
-  if (options.contentSecurityPolicyReportOnly) {
-    const [callback, value] = getCSPDirectives(
-      options.contentSecurityPolicyReportOnly,
-      "Content-Security-Policy-Report-Only"
-    );
-    if (callback) {
-      callbacks.push(callback);
-    }
-    headersToSet.push(["Content-Security-Policy-Report-Only", value]);
-  }
-  if (options.permissionsPolicy && Object.keys(options.permissionsPolicy).length > 0) {
-    headersToSet.push([
-      "Permissions-Policy",
-      getPermissionsPolicyDirectives(options.permissionsPolicy)
-    ]);
-  }
-  if (options.reportingEndpoints) {
-    headersToSet.push(["Reporting-Endpoints", getReportingEndpoints(options.reportingEndpoints)]);
-  }
-  if (options.reportTo) {
-    headersToSet.push(["Report-To", getReportToOptions(options.reportTo)]);
-  }
-  return async function secureHeaders2(ctx, next) {
-    const headersToSetForReq = callbacks.length === 0 ? headersToSet : callbacks.reduce((acc, cb) => cb(ctx, acc), headersToSet);
-    await next();
-    setHeaders(ctx, headersToSetForReq);
-    if (options?.removePoweredBy) {
-      ctx.res.headers.delete("X-Powered-By");
-    }
-  };
-};
-function getFilteredHeaders(options) {
-  return Object.entries(HEADERS_MAP).filter(([key]) => options[key]).map(([key, defaultValue]) => {
-    const overrideValue = options[key];
-    return typeof overrideValue === "string" ? [defaultValue[0], overrideValue] : defaultValue;
-  });
-}
-function getCSPDirectives(contentSecurityPolicy, headerName) {
-  const callbacks = [];
-  const resultValues = [];
-  for (const [directive, value] of Object.entries(contentSecurityPolicy)) {
-    const valueArray = Array.isArray(value) ? value : [value];
-    valueArray.forEach((value2, i) => {
-      if (typeof value2 === "function") {
-        const index = i * 2 + 2 + resultValues.length;
-        callbacks.push((ctx, values) => {
-          values[index] = value2(ctx, directive);
-        });
-      }
-    });
-    resultValues.push(
-      directive.replace(
-        /[A-Z]+(?![a-z])|[A-Z]/g,
-        (match2, offset) => offset ? "-" + match2.toLowerCase() : match2.toLowerCase()
-      ),
-      ...valueArray.flatMap((value2) => [" ", value2]),
-      "; "
-    );
-  }
-  resultValues.pop();
-  return callbacks.length === 0 ? [void 0, resultValues.join("")] : [
-    (ctx, headersToSet) => headersToSet.map((values) => {
-      if (values[0] === headerName) {
-        const clone = values[1].slice();
-        callbacks.forEach((cb) => {
-          cb(ctx, clone);
-        });
-        return [values[0], clone.join("")];
-      } else {
-        return values;
-      }
-    }),
-    resultValues
-  ];
-}
-function getPermissionsPolicyDirectives(policy) {
-  return Object.entries(policy).map(([directive, value]) => {
-    const kebabDirective = camelToKebab(directive);
-    if (typeof value === "boolean") {
-      return `${kebabDirective}=${value ? "*" : "()"}`;
-    }
-    if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return `${kebabDirective}=()`;
-      }
-      if (value.length === 1 && value[0] === "*") {
-        return `${kebabDirective}=*`;
-      }
-      if (value.length === 1 && value[0] === "none") {
-        return `${kebabDirective}=()`;
-      }
-      const allowlist = value.map((item) => ["self", "src"].includes(item) ? item : `"${item}"`);
-      return `${kebabDirective}=(${allowlist.join(" ")})`;
-    }
-    return "";
-  }).filter(Boolean).join(", ");
-}
-function camelToKebab(str) {
-  return str.replace(/([a-z\d])([A-Z])/g, "$1-$2").toLowerCase();
-}
-function getReportingEndpoints(reportingEndpoints = []) {
-  return reportingEndpoints.map((endpoint) => `${endpoint.name}="${endpoint.url}"`).join(", ");
-}
-function getReportToOptions(reportTo = []) {
-  return reportTo.map((option) => JSON.stringify(option)).join(", ");
-}
-function setHeaders(ctx, headersToSet) {
-  headersToSet.forEach(([header, value]) => {
-    ctx.res.headers.set(header, value);
-  });
-}
-
-// src/app.ts
-init_config();
-init_errors2();
-init_log();
-
-// node_modules/hono/dist/helper/factory/index.js
-var createMiddleware = (middleware) => middleware;
-
-// src/middleware/access-log.ts
-init_log();
-var accessLog = createMiddleware(async (c, next) => {
-  const started = performance.now();
-  await next();
-  const status = c.res.status;
-  const level = status >= 500 ? "error" : status >= 400 && status !== 401 && status !== 404 ? "warn" : "info";
-  log(level, "http", {
-    requestId: c.get("requestId"),
-    method: c.req.method,
-    route: c.req.routePath,
-    status,
-    latencyMs: Math.round((performance.now() - started) * 10) / 10,
-    userId: c.get("user")?.$id ?? null
-  });
-});
-
-// src/middleware/auth.ts
-init_config();
-init_errors2();
-init_admin_check();
-
-// src/services/identity.ts
-var import_node_crypto = require("node:crypto");
-init_dist();
-init_client2();
-init_log();
-var TTL_MS2 = 6e4;
-var MAX = 500;
-var cache2 = /* @__PURE__ */ new Map();
-function evict(now) {
-  if (cache2.size < MAX) return;
-  for (const [k, v] of cache2) if (v.expiresAt <= now) cache2.delete(k);
-  while (cache2.size >= MAX) {
-    const oldest = cache2.keys().next();
-    if (oldest.done) break;
-    cache2.delete(oldest.value);
-  }
-}
-var isUnauthorized = (e) => e instanceof AppwriteException && (e.code === 401 || e.type === "user_jwt_invalid" || e.type === "user_invalid_credentials");
-async function resolveUserByJwt(jwt) {
-  const now = Date.now();
-  const key = (0, import_node_crypto.createHash)("sha256").update(jwt).digest("hex");
-  const hit = cache2.get(key);
-  if (hit && hit.expiresAt > now) return hit.user;
-  try {
-    const user = await new Account(clientForJwt(jwt)).get();
-    evict(now);
-    cache2.set(key, { user, expiresAt: now + TTL_MS2 });
-    return user;
-  } catch (err) {
-    if (isUnauthorized(err)) return null;
-    log("error", "jwt_verification_failed", { type: err instanceof AppwriteException ? err.type : void 0 });
-    throw err;
-  }
-}
-async function resolveUserById(userId) {
-  try {
-    return await getUsers().get({ userId });
-  } catch (err) {
-    if (err instanceof AppwriteException && err.code === 404) return null;
-    throw err;
-  }
-}
-function evictUser(userId) {
-  for (const [k, v] of cache2) if (v.user.$id === userId) cache2.delete(k);
-}
-
-// src/middleware/auth.ts
-init_roles();
-var BEARER = /^Bearer\s+(.+)$/i;
-async function authenticate(c) {
-  const config = getConfig();
-  const devHeader = c.req.header("x-dev-user-id");
-  if (config.devBypassUserId && devHeader === config.devBypassUserId) return resolveUserById(config.devBypassUserId);
-  const header = c.req.header("authorization");
-  const token = header ? BEARER.exec(header)?.[1]?.trim() : void 0;
-  if (!token) return null;
-  return resolveUserByJwt(token);
-}
-var requireAuth = createMiddleware(async (c, next) => {
-  const user = await authenticate(c);
-  if (!user) throw unauthorized();
-  c.set("user", user);
-  c.set("roles", await getRolesOf(user.$id));
-  await next();
-});
-var requireVerifiedEmail = createMiddleware(async (c, next) => {
-  const user = c.get("user");
-  if (!user) throw unauthorized();
-  if (!user.emailVerification) throw emailNotVerified();
-  await next();
-});
-function currentUser(c) {
-  const u = c.get("user");
-  if (!u) throw unauthorized();
-  return u;
-}
-var requireAdmin = createMiddleware(async (c, next) => {
-  const user = c.get("user");
-  if (!user) throw unauthorized();
-  if (!await isAdminUser(user.$id)) throw forbidden("Moderator access is required.");
-  await next();
-});
-
-// node_modules/hono/dist/middleware/cors/index.js
-var cors = (options) => {
-  const opts = {
-    origin: "*",
-    allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH", "QUERY"],
-    allowHeaders: [],
-    exposeHeaders: [],
-    ...options
-  };
-  const exposeHeadersStr = opts.exposeHeaders?.length ? opts.exposeHeaders.join(",") : void 0;
-  const allowHeadersStr = opts.allowHeaders?.length ? opts.allowHeaders.join(",") : void 0;
-  const findAllowOrigin = ((optsOrigin) => {
-    if (typeof optsOrigin === "string") {
-      if (optsOrigin === "*") {
-        return () => optsOrigin;
-      } else {
-        return (origin) => optsOrigin === origin ? origin : null;
-      }
-    } else if (typeof optsOrigin === "function") {
-      return optsOrigin;
-    } else {
-      return (origin) => optsOrigin.includes(origin) ? origin : null;
-    }
-  })(opts.origin);
-  const findAllowMethods = ((optsAllowMethods) => {
-    if (typeof optsAllowMethods === "function") {
-      return async (origin, c) => (await optsAllowMethods(origin, c)).join(",");
-    } else if (Array.isArray(optsAllowMethods)) {
-      const methodsStr = optsAllowMethods.join(",");
-      return () => methodsStr;
-    } else {
-      return () => "";
-    }
-  })(opts.allowMethods);
-  return async function cors2(c, next) {
-    function set(key, value) {
-      c.res.headers.set(key, value);
-    }
-    const allowOrigin = await findAllowOrigin(c.req.header("origin") || "", c);
-    if (allowOrigin) {
-      set("Access-Control-Allow-Origin", allowOrigin);
-    }
-    if (opts.credentials) {
-      set("Access-Control-Allow-Credentials", "true");
-    }
-    if (exposeHeadersStr) {
-      set("Access-Control-Expose-Headers", exposeHeadersStr);
-    }
-    if (c.req.method === "OPTIONS") {
-      if (opts.origin !== "*") {
-        c.res.headers.append("Vary", "Origin");
-      }
-      if (opts.maxAge != null) {
-        set("Access-Control-Max-Age", opts.maxAge.toString());
-      }
-      const allowMethods = await findAllowMethods(c.req.header("origin") || "", c);
-      if (allowMethods) {
-        set("Access-Control-Allow-Methods", allowMethods);
-      }
-      let headersStr = allowHeadersStr;
-      if (!headersStr) {
-        const requestHeaders = c.req.header("Access-Control-Request-Headers");
-        if (requestHeaders) {
-          headersStr = requestHeaders.split(",").map((h) => h.trim()).join(",");
-        }
-      }
-      if (headersStr) {
-        set("Access-Control-Allow-Headers", headersStr);
-        c.res.headers.append("Vary", "Access-Control-Request-Headers");
-      }
-      c.res.headers.delete("Content-Length");
-      c.res.headers.delete("Content-Type");
-      return new Response(null, {
-        headers: c.res.headers,
-        status: 204,
-        statusText: "No Content"
-      });
-    }
-    await next();
-    if (opts.origin !== "*") {
-      c.header("Vary", "Origin", { append: true });
-    }
-  };
-};
-
-// src/middleware/cors.ts
-function isPrivateNetworkOrigin(origin) {
-  let protocol, hostname;
-  try {
-    const u = new URL(origin);
-    protocol = u.protocol;
-    hostname = u.hostname;
-  } catch {
-    return false;
-  }
-  if (protocol !== "http:" && protocol !== "https:") return false;
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "::1") return true;
-  const parts = host.split(".");
-  if (parts.length !== 4) return false;
-  const o = parts.map((p) => /^\d{1,3}$/.test(p) ? Number(p) : -1);
-  const [a, b] = o;
-  if (a === void 0 || b === void 0 || o.some((x) => x < 0 || x > 255)) return false;
-  return a === 127 || a === 10 || a === 192 && b === 168 || a === 172 && b >= 16 && b <= 31 || a === 169 && b === 254;
-}
-function corsMiddleware(origins, options = {}) {
-  const allow = new Set(origins);
-  const allowPrivate = options.allowPrivateNetworkOrigins === true;
-  return cors({
-    origin: (origin) => allow.has(origin) || allowPrivate && isPrivateNetworkOrigin(origin) ? origin : "",
-    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id", "X-Dev-User-Id"],
-    exposeHeaders: ["X-Request-Id"],
-    maxAge: 86400,
-    credentials: false
-  });
-}
-
-// src/middleware/rate-limit.ts
-init_errors2();
-function rateLimit(opts) {
-  const capacity = opts.perMin;
-  const maxEntries = opts.maxEntries ?? 1e4;
-  const buckets = /* @__PURE__ */ new Map();
-  return createMiddleware(async (c, next) => {
-    const user = c.get("user");
-    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "unknown";
-    const key = `${opts.keyPrefix ?? ""}:${user?.$id ?? ip}`;
-    const now = Date.now();
-    if (buckets.size >= maxEntries) buckets.clear();
-    const bucket = buckets.get(key) ?? { tokens: capacity, updatedAt: now };
-    const elapsed = now - bucket.updatedAt;
-    if (elapsed >= 6e4) {
-      bucket.tokens = capacity;
-      bucket.updatedAt = now;
-    } else if (bucket.tokens <= 0) {
-      throw rateLimited((6e4 - elapsed) / 1e3);
-    }
-    bucket.tokens -= 1;
-    buckets.set(key, bucket);
-    await next();
-  });
-}
-
-// src/middleware/request-id.ts
-var requestId = createMiddleware(async (c, next) => {
-  const incoming = c.req.header("x-request-id");
-  const id = incoming && incoming.length <= 128 ? incoming : crypto.randomUUID();
-  c.set("requestId", id);
-  await next();
-  c.res.headers.set("X-Request-Id", id);
-});
-
-// src/routes/admin.ts
-init_errors2();
-
-// src/lib/body.ts
-init_errors2();
-async function readJsonBody(c, schema) {
-  let raw2;
-  try {
-    raw2 = await c.req.json();
-  } catch {
-    throw validation("The request body is not valid JSON.");
-  }
-  const parsed = schema.safeParse(raw2);
-  if (!parsed.success) {
-    throw validation(
-      "Some fields are not valid.",
-      parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message }))
-    );
-  }
-  return parsed.data;
-}
-function readQuery(c, schema) {
-  const parsed = schema.safeParse(c.req.query());
-  if (!parsed.success) {
-    throw validation(
-      "Some query parameters are not valid.",
-      parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message }))
-    );
-  }
-  return parsed.data;
-}
-function idempotencyKeyOf(c) {
-  const key = c.req.header("idempotency-key")?.trim();
-  return key && key.length <= 128 ? key : null;
-}
-
-// src/schemas/index.ts
-init_zod();
-
-// src/contracts/api.ts
-var QA_TOPICS = [
-  { slug: "programming", label: "Programming" },
-  { slug: "math", label: "Math" },
-  { slug: "physics", label: "Physics" },
-  { slug: "languages", label: "Languages" },
-  { slug: "writing", label: "Writing" },
-  { slug: "music", label: "Music" },
-  { slug: "art-design", label: "Art & design" },
-  { slug: "science", label: "Science" },
-  { slug: "history", label: "History" },
-  { slug: "exam-prep", label: "Exam prep" },
-  { slug: "public-speaking", label: "Public speaking" },
-  { slug: "learning-how-to-learn", label: "Learning how to learn" }
-];
-var QA_AUTO_CLOSE_DAYS = 14;
-var QA_MAX_ATTACHMENTS = 5;
-
-// src/schemas/index.ts
-var trimmed = (max, min = 1) => external_exports.string().trim().min(min).max(max);
-var cursor = external_exports.string().min(1).max(64).optional();
-var limit = external_exports.coerce.number().int().min(1).max(50).default(20);
-var role = external_exports.enum(["student", "teacher"]);
-var visibility = external_exports.enum(["public", "contacts", "relations", "private"]);
-var updateMe = external_exports.object({
-  handle: external_exports.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_.-]{2,31}$/, "Use 3\u201332 letters, numbers, dots, dashes or underscores.").optional(),
-  displayName: trimmed(80).optional(),
-  locale: external_exports.string().trim().min(2).max(16).optional(),
-  timeZone: external_exports.string().trim().min(1).max(64).optional()
-}).strict();
-var ageGate = external_exports.object({ ageBand: external_exports.enum(["under_16", "16_17", "18_plus"]), acceptPrivacy: external_exports.literal(true) }).strict();
-var selectRole = external_exports.object({ role, activate: external_exports.boolean().optional() }).strict();
-var updateStudentProfile = external_exports.object({
-  headline: external_exports.string().trim().max(120).optional(),
-  goalSummary: external_exports.string().trim().max(2e3).optional(),
-  interests: external_exports.array(trimmed(64)).max(10).optional(),
-  visibility: visibility.optional()
-}).strict();
-var updateTeacherProfile = external_exports.object({
-  headline: external_exports.string().trim().max(120).optional(),
-  bio: external_exports.string().trim().max(4e3).optional(),
-  subjects: external_exports.array(trimmed(64)).max(10).optional(),
-  approach: external_exports.string().trim().max(2e3).optional(),
-  acceptingRequests: external_exports.boolean().optional(),
-  visibility: visibility.optional()
-}).strict();
-var boolish = external_exports.preprocess((v) => v === "true" || v === "1" ? true : v === "false" || v === "0" ? false : v, external_exports.boolean());
-var teacherSearch = external_exports.object({ q: external_exports.string().trim().max(80).optional(), subject: external_exports.string().trim().max(64).optional(), accepting: boolish.optional(), sort: external_exports.enum(["relevance", "newest", "most_reviewed"]).optional(), cursor, limit });
-var createLearningRequest = external_exports.object({ teacherId: trimmed(36), goalTitle: trimmed(120), message: external_exports.string().trim().max(2e3).default("") }).strict();
-var createTeacherInvitation = external_exports.object({ studentId: trimmed(36), goalTitle: trimmed(120), message: external_exports.string().trim().max(2e3).default("") }).strict();
-var requestList = external_exports.object({ role, status: external_exports.enum(["pending", "accepted", "declined", "cancelled", "expired"]).optional(), cursor, limit });
-var relationList = external_exports.object({ role, status: external_exports.enum(["active", "paused", "ended"]).optional(), cursor, limit });
-var relationStatus = external_exports.object({ status: external_exports.enum(["active", "paused", "ended"]), reason: external_exports.string().trim().max(500).optional() }).strict();
-var createGoal = external_exports.object({ title: trimmed(120), description: external_exports.string().trim().max(2e3).optional() }).strict();
-var updateGoal = external_exports.object({ title: trimmed(120).optional(), description: external_exports.string().trim().max(2e3).optional(), status: external_exports.enum(["active", "achieved", "dropped"]).optional() }).strict();
-var createTask = external_exports.object({ title: trimmed(120), instructions: external_exports.string().trim().max(4e3).optional(), goalId: external_exports.string().max(36).nullable().optional(), dueAt: external_exports.string().datetime().nullable().optional() }).strict();
-var updateTask = external_exports.object({ title: trimmed(120).optional(), instructions: external_exports.string().trim().max(4e3).optional(), status: external_exports.enum(["open", "submitted", "reviewed", "done", "dropped"]).optional(), dueAt: external_exports.string().datetime().nullable().optional() }).strict();
-var createEvidence = external_exports.object({ title: trimmed(120), body: external_exports.string().trim().max(8e3), taskId: external_exports.string().max(36).nullable().optional(), goalId: external_exports.string().max(36).nullable().optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict();
-var createFeedback = external_exports.object({ body: trimmed(4e3), nextStep: external_exports.string().trim().max(300).optional(), markTaskDone: external_exports.boolean().optional(), outcome: external_exports.enum(["approved", "needs_revision"]).optional() }).strict();
-var reviseEvidence = external_exports.object({ title: trimmed(120).optional(), body: external_exports.string().trim().max(8e3).optional(), attachmentFileIds: external_exports.array(external_exports.string().max(36)).max(5).optional() }).strict().refine((v) => v.title !== void 0 || v.body !== void 0 || v.attachmentFileIds !== void 0, { message: "Change at least one field." });
-var declineGoalCompletion = external_exports.object({ note: external_exports.string().trim().max(300).optional() }).strict();
-var paged = external_exports.object({ cursor, limit });
-var sendMessage = external_exports.object({ clientMessageId: trimmed(64), text: trimmed(4e3) }).strict();
-var messageList = external_exports.object({ afterSequence: external_exports.coerce.number().int().min(0).optional(), beforeSequence: external_exports.coerce.number().int().min(1).optional(), limit });
-var markRead = external_exports.object({ sequence: external_exports.number().int().min(0) }).strict();
-var lookup = external_exports.object({ handle: trimmed(32) });
-var createConnectionRequest = external_exports.object({ toUserId: trimmed(36), message: external_exports.string().trim().max(500).default("") }).strict();
-var connectionList = external_exports.object({ direction: external_exports.enum(["incoming", "outgoing"]).default("incoming"), cursor, limit });
-var blockInput = external_exports.object({ userId: trimmed(36) }).strict();
-var reportInput = external_exports.object({ targetUserId: trimmed(36), reason: external_exports.enum(["harassment", "spam", "inappropriate", "other"]), details: external_exports.string().trim().max(2e3).optional() }).strict();
-var uploadIntent = external_exports.object({ purpose: external_exports.enum(["avatar", "evidence", "qa"]), fileName: trimmed(255), mimeType: trimmed(128), sizeBytes: external_exports.number().int().min(1), relationId: external_exports.string().max(36).optional() }).strict();
-var uploadComplete = external_exports.object({ fileId: trimmed(36) }).strict();
-var notificationList = external_exports.object({ cursor, limit, unreadOnly: external_exports.preprocess((v) => v === "true" || v === "1", external_exports.boolean()).optional() });
-var markNotificationsRead = external_exports.object({ ids: external_exports.array(trimmed(36)).max(100).optional(), all: external_exports.boolean().optional() }).strict().refine((v) => v.all || v.ids && v.ids.length > 0, { message: "Provide ids or all=true." });
-var reportList = external_exports.object({ status: external_exports.enum(["open", "resolved"]).optional(), cursor, limit });
-var resolveReport = external_exports.object({ action: external_exports.enum(["dismiss", "warn", "suspend", "remove_content"]), note: external_exports.string().trim().max(1e3).optional() }).strict();
-var qaTopicSlugs = QA_TOPICS.map((t) => t.slug);
-var qaTopic = external_exports.enum(qaTopicSlugs);
-var qaQuestionList = external_exports.object({ topic: qaTopic.optional(), status: external_exports.enum(["open", "answered", "closed"]).optional(), cursor, limit });
-var qaAttachmentIds = external_exports.array(external_exports.string().trim().min(1).max(36)).max(QA_MAX_ATTACHMENTS);
-var createQaQuestion = external_exports.object({ topic: qaTopic, title: trimmed(160, 8), body: trimmed(8e3, 20), attachmentFileIds: qaAttachmentIds.optional() }).strict();
-var updateQaQuestion = external_exports.object({ topic: qaTopic.optional(), title: trimmed(160, 8).optional(), body: trimmed(8e3, 20).optional(), attachmentFileIds: qaAttachmentIds.optional() }).strict().refine((v) => Object.keys(v).length > 0, { message: "Nothing to update." });
-var qaBody = external_exports.object({ body: trimmed(8e3, 2) }).strict();
-var qaAnswerBody = external_exports.object({ body: trimmed(8e3, 2), attachmentFileIds: qaAttachmentIds.optional() }).strict();
-var qaReport = external_exports.object({ reason: external_exports.enum(["harassment", "spam", "inappropriate", "other"]), details: external_exports.string().trim().max(2e3).optional() }).strict();
-
-// src/services/admin.ts
-init_dist();
-init_client2();
-init_repo();
-init_schema();
-init_errors2();
-init_notifications();
-init_events();
-init_notifications2();
-init_profiles();
-
-// src/services/qa.ts
-var import_node_crypto4 = require("node:crypto");
-init_repo();
-init_rows();
-init_schema();
-init_errors2();
-init_events();
-init_notifications2();
-init_uploads();
-
-// src/services/qa-policy.ts
-var QA_DAILY_QUESTION_LIMIT = 5;
-var QA_DAILY_ANSWER_LIMIT = 30;
-var DAY_MS = 24 * 60 * 60 * 1e3;
-var isLive = (q) => !q.removedAt;
-var isClosed = (q) => q.status === "closed";
-function canAnswer(q, v, alreadyAnswered) {
-  return isLive(q) && !isClosed(q) && v.roles.includes("teacher") && q.authorId !== v.userId && !v.blockedWithAuthor && !alreadyAnswered;
-}
-function canEditQuestion(q, v) {
-  return isLive(q) && q.authorId === v.userId && q.status === "open" && q.answerCount === 0;
-}
-function canCloseQuestion(q, v) {
-  return isLive(q) && q.authorId === v.userId && !isClosed(q);
-}
-function canAccept(q, a, v) {
-  return isLive(q) && q.authorId === v.userId && a.kind === "answer" && !a.removedAt;
-}
-function canClarify(q, a, v) {
-  return isLive(q) && !isClosed(q) && q.authorId === v.userId && a.kind === "answer" && !a.removedAt && !a.hasClarification && !v.blockedWithAuthor;
-}
-function canEditAnswer(q, a, v) {
-  return isLive(q) && !isClosed(q) && a.authorId === v.userId && !a.removedAt;
-}
-function statusAfterAnswer(current) {
-  return current === "closed" ? "closed" : "answered";
-}
-function closesAt(lastActivityAt, status) {
-  if (status === "closed") return null;
-  return new Date(new Date(lastActivityAt).getTime() + QA_AUTO_CLOSE_DAYS * DAY_MS).toISOString();
-}
-function sinceOneDay(now) {
-  return new Date(now.getTime() - DAY_MS).toISOString();
-}
-var norm = (s) => s.trim().toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
-function topicsForSubjects(subjects) {
-  const wanted = new Set(subjects.map(norm));
-  return QA_TOPICS.filter((t) => wanted.has(norm(t.label)) || wanted.has(norm(t.slug))).map((t) => t.slug);
-}
-var ANONYMOUS_STUDENT = { userId: "anonymous", displayName: "A student", handle: null, avatarFileId: null };
-function publicAuthor(ref, ageBand) {
-  return ageBand === "under_16" || ageBand === "16_17" ? ANONYMOUS_STUDENT : ref;
-}
-function excerpt(text, max = 200) {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}\u2026` : flat;
-}
-
-// src/services/qa.ts
-var hashId = (...parts) => (0, import_node_crypto4.createHash)("sha256").update(parts.join(":")).digest("hex").slice(0, 32);
-var answerRowId = (questionId, teacherId) => hashId("qa-answer", questionId, teacherId);
-var clarificationRowId = (answerId) => hashId("qa-clarify", answerId);
-var nowIso2 = () => (/* @__PURE__ */ new Date()).toISOString();
-async function blockedEitherWay(userId) {
-  const rows = await listRows(TABLES.blocks, [Query.or([Query.equal("blockerId", userId), Query.equal("blockedId", userId)]), Query.limit(500)]);
-  return new Set(rows.map((b) => b.blockerId === userId ? b.blockedId : b.blockerId));
-}
-async function authors(ids) {
-  const unique = [...new Set(ids)].filter(Boolean);
-  const out = /* @__PURE__ */ new Map();
-  if (!unique.length) return out;
-  const rows = await listRows(TABLES.profiles, [Query.equal("$id", unique), Query.limit(unique.length)]);
-  for (const r of rows) {
-    const ref = r.status === "deleted" ? { userId: r.$id, displayName: "Former member", handle: null, avatarFileId: null } : { userId: r.$id, displayName: r.displayName, handle: r.handle, avatarFileId: r.avatarFileId };
-    out.set(r.$id, publicAuthor(ref, r.ageBand));
-  }
-  for (const id of unique) if (!out.has(id)) out.set(id, { userId: id, displayName: "Former member", handle: null, avatarFileId: null });
-  return out;
-}
-async function loadQuestion(id) {
-  const row = await getRow(TABLES.qaQuestions, id);
-  if (!row || row.removedAt) throw notFound("not_found", "This question could not be found.");
-  return row;
-}
-async function loadAnswer(id) {
-  const row = await getRow(TABLES.qaAnswers, id);
-  if (!row || row.removedAt || row.kind !== "answer") throw notFound("not_found", "This answer could not be found.");
-  return row;
-}
-async function assertDailyLimit(table, authorId, max, extra = []) {
-  const rows = await listRows(table, [Query.equal("authorId", authorId), Query.greaterThan("createdAt", sinceOneDay(/* @__PURE__ */ new Date())), ...extra, Query.select(["$id"]), Query.limit(max)]);
-  if (rows.length >= max) throw new HttpError(429, "rate_limited", `You can post up to ${max} of these per day. Try again tomorrow.`, { headers: { "Retry-After": "3600" } });
-}
-function toQuestion(r, author, viewerId) {
-  const status = ["open", "answered", "closed"].includes(r.status) ? r.status : "open";
-  return {
-    id: r.$id,
-    topic: r.topic,
-    title: r.title,
-    body: r.body,
-    status,
-    answerCount: r.answerCount ?? 0,
-    acceptedAnswerId: r.acceptedAnswerId ?? null,
-    author,
-    isMine: r.authorId === viewerId,
-    lastActivityAt: r.lastActivityAt,
-    attachmentCount: r.attachmentFileIds?.length ?? 0,
-    closesAt: closesAt(r.lastActivityAt, status),
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt
-  };
-}
-async function toQuestions(rows, viewerId) {
-  const refs = await authors(rows.map((r) => r.authorId));
-  return rows.map((r) => toQuestion(r, refs.get(r.authorId), viewerId));
-}
-async function pageQuestions(queries, p, viewerId) {
-  const q = [Query.isNull("removedAt"), Query.orderDesc("lastActivityAt"), Query.limit(p.limit + 1), ...queries];
-  if (p.cursor) q.push(Query.cursorAfter(p.cursor));
-  const [rows, blocked] = await Promise.all([listRows(TABLES.qaQuestions, q), blockedEitherWay(viewerId)]);
-  const hasMore = rows.length > p.limit;
-  const page = hasMore ? rows.slice(0, p.limit) : rows;
-  const last = page[page.length - 1];
-  return { items: await toQuestions(page.filter((r) => !blocked.has(r.authorId)), viewerId), nextCursor: hasMore && last ? last.$id : null };
-}
-async function replaceAttachments(userId, current, next) {
-  const ids = await assertQaAttachments(userId, next, QA_MAX_ATTACHMENTS);
-  const dropped = (current ?? []).filter((id) => !ids.includes(id));
-  return { ids, commit: async () => {
-    await markAttached(ids);
-    await deleteUploads(dropped);
-  } };
-}
-async function listTopics() {
-  const rows = await listRows(TABLES.qaQuestions, [Query.equal("status", "open"), Query.isNull("removedAt"), Query.select(["topic"]), Query.limit(1e3)]);
-  const counts = /* @__PURE__ */ new Map();
-  for (const r of rows) counts.set(r.topic, (counts.get(r.topic) ?? 0) + 1);
-  return QA_TOPICS.map((t) => ({ slug: t.slug, label: t.label, openCount: counts.get(t.slug) ?? 0 }));
-}
-async function listQuestions(viewerId, p) {
-  const q = [];
-  if (p.topic) q.push(Query.equal("topic", p.topic));
-  if (p.status) q.push(Query.equal("status", p.status));
-  return pageQuestions(q, p, viewerId);
-}
-async function listMyQuestions(viewerId, p) {
-  return pageQuestions([Query.equal("authorId", viewerId)], p, viewerId);
-}
-async function teacherInbox(actor, p) {
-  if (!actor.roles.includes("teacher")) throw roleRequired("teacher");
-  const tp = await findOne(TABLES.teacherProfiles, [Query.equal("userId", actor.user.$id)]);
-  const topics = topicsForSubjects(tp?.subjects ?? []);
-  if (!topics.length) return { items: [], nextCursor: null, topics };
-  const page = await pageQuestions([Query.equal("topic", topics), Query.equal("status", "open"), Query.notEqual("authorId", actor.user.$id)], p, actor.user.$id);
-  return { ...page, topics };
-}
-async function getQuestionDetail(id, actor) {
-  const viewerId = actor.user.$id;
-  const q = await loadQuestion(id);
-  const blocked = await blockedEitherWay(viewerId);
-  if (blocked.has(q.authorId)) throw notFound("not_found", "This question could not be found.");
-  const rows = await listRows(TABLES.qaAnswers, [Query.equal("questionId", id), Query.isNull("removedAt"), Query.orderAsc("createdAt"), Query.limit(200)]);
-  const answers = rows.filter((r) => r.kind === "answer" && !blocked.has(r.authorId));
-  const clarByParent = new Map(rows.filter((r) => r.kind === "clarification" && r.parentAnswerId).map((r) => [r.parentAnswerId, r]));
-  const [refs, attachments] = await Promise.all([
-    authors([q.authorId, ...answers.map((a) => a.authorId)]),
-    Promise.all([q, ...answers].map((r) => resolveAttachments(r.attachmentFileIds ?? [])))
-  ]);
-  const [questionAttachments = [], ...answerAttachments] = attachments;
-  const viewer = { userId: viewerId, roles: actor.roles, blockedWithAuthor: false };
-  const accepted = q.acceptedAnswerId;
-  const outAnswers = answers.map((a, i) => {
-    const c = clarByParent.get(a.$id);
-    return {
-      id: a.$id,
-      questionId: id,
-      author: refs.get(a.authorId),
-      body: a.body,
-      accepted: a.$id === accepted,
-      isMine: a.authorId === viewerId,
-      clarification: c ? { id: c.$id, body: c.body, createdAt: c.createdAt } : null,
-      attachments: answerAttachments[i] ?? [],
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt
-    };
-  }).sort((x, y) => Number(y.accepted) - Number(x.accepted) || x.createdAt.localeCompare(y.createdAt));
-  const alreadyAnswered = answers.some((a) => a.authorId === viewerId);
-  const anyClarifiable = answers.some((a) => canClarify(q, { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: clarByParent.has(a.$id) }, viewer));
-  return {
-    question: toQuestion(q, refs.get(q.authorId), viewerId),
-    attachments: questionAttachments,
-    answers: outAnswers,
-    permissions: {
-      canAnswer: canAnswer(q, viewer, alreadyAnswered),
-      canEdit: canEditQuestion(q, viewer),
-      canClose: canCloseQuestion(q, viewer),
-      canAccept: q.authorId === viewerId && answers.length > 0,
-      canClarify: anyClarifiable,
-      canReport: q.authorId !== viewerId
-    }
-  };
-}
-async function acceptedAnswersOf(teacherId, limit2 = 3) {
-  const answers = await listRows(TABLES.qaAnswers, [Query.equal("authorId", teacherId), Query.equal("kind", "answer"), Query.isNull("removedAt"), Query.orderDesc("createdAt"), Query.limit(50)]);
-  if (!answers.length) return [];
-  const questions = await listRows(TABLES.qaQuestions, [Query.equal("$id", [...new Set(answers.map((a) => a.questionId))]), Query.isNull("removedAt"), Query.limit(50)]);
-  const byId = new Map(questions.map((q) => [q.$id, q]));
-  const out = [];
-  for (const a of answers) {
-    const q = byId.get(a.questionId);
-    if (!q || q.acceptedAnswerId !== a.$id) continue;
-    out.push({ answerId: a.$id, questionId: q.$id, topic: q.topic, questionTitle: q.title, excerpt: excerpt(a.body), acceptedAt: q.updatedAt });
-    if (out.length >= limit2) break;
-  }
-  return out;
-}
-async function createQuestion(actor, input, requestId2) {
-  if (!actor.roles.includes("student")) throw roleRequired("student");
-  await assertDailyLimit(TABLES.qaQuestions, actor.user.$id, QA_DAILY_QUESTION_LIMIT);
-  const fileIds = await assertQaAttachments(actor.user.$id, input.attachmentFileIds, QA_MAX_ATTACHMENTS);
-  const row = await createRow(TABLES.qaQuestions, {
-    authorId: actor.user.$id,
-    topic: input.topic,
-    title: input.title,
-    body: input.body,
-    status: "open",
-    answerCount: 0,
-    acceptedAnswerId: null,
-    lastActivityAt: nowIso2(),
-    removedAt: null,
-    removedBy: null,
-    attachmentFileIds: fileIds
-  });
-  await markAttached(fileIds);
-  await emitEvent({ eventType: "qa.question.created", aggregateType: "qa_question", aggregateId: row.$id, actorId: actor.user.$id, payload: { topic: input.topic }, requestId: requestId2 });
-  return (await toQuestions([row], actor.user.$id))[0];
-}
-async function updateQuestion(id, actor, patch) {
-  const q = await loadQuestion(id);
-  if (q.authorId !== actor.user.$id) throw forbidden("Only the person who asked can edit this question.");
-  if (!canEditQuestion(q, { userId: actor.user.$id, roles: actor.roles, blockedWithAuthor: false })) throw conflict("invalid_state", "Questions can only be edited before anyone answers.");
-  const { attachmentFileIds, ...fields } = patch;
-  const files = attachmentFileIds === void 0 ? null : await replaceAttachments(actor.user.$id, q.attachmentFileIds, attachmentFileIds);
-  const row = await updateRow(TABLES.qaQuestions, id, { ...fields, ...files ? { attachmentFileIds: files.ids } : {}, lastActivityAt: nowIso2() });
-  if (files) await files.commit();
-  return (await toQuestions([row], actor.user.$id))[0];
-}
-async function closeQuestion(id, actor, requestId2) {
-  const q = await loadQuestion(id);
-  if (q.authorId !== actor.user.$id) throw forbidden("Only the person who asked can close this question.");
-  if (q.status === "closed") throw conflict("invalid_state", "This question is already closed.");
-  const row = await updateRow(TABLES.qaQuestions, id, { status: "closed" });
-  await emitEvent({ eventType: "qa.question.closed", aggregateType: "qa_question", aggregateId: id, actorId: actor.user.$id, payload: { by: "author" }, requestId: requestId2 });
-  return (await toQuestions([row], actor.user.$id))[0];
-}
-async function createAnswer(questionId, actor, input, requestId2) {
-  const me = actor.user.$id;
-  if (!actor.roles.includes("teacher")) throw roleRequired("teacher");
-  const q = await loadQuestion(questionId);
-  const blocked = await blockedEitherWay(me);
-  if (blocked.has(q.authorId)) throw conflict("blocked", "You cannot interact with this person.");
-  if (q.authorId === me) throw conflict("invalid_state", "You cannot answer your own question.");
-  if (q.status === "closed") throw conflict("invalid_state", "This question is closed.");
-  await assertDailyLimit(TABLES.qaAnswers, me, QA_DAILY_ANSWER_LIMIT, [Query.equal("kind", "answer")]);
-  const fileIds = await assertQaAttachments(me, input.attachmentFileIds, QA_MAX_ATTACHMENTS);
-  try {
-    await createRow(TABLES.qaAnswers, {
-      questionId,
-      authorId: me,
-      kind: "answer",
-      parentAnswerId: null,
-      body: input.body,
-      removedAt: null,
-      removedBy: null,
-      attachmentFileIds: fileIds
-    }, answerRowId(questionId, me));
-  } catch (err) {
-    if (isConflict(err)) throw conflict("duplicate_request", "You already answered this question. Edit your answer instead.");
-    throw err;
-  }
-  await markAttached(fileIds);
-  await incrementColumn(TABLES.qaQuestions, questionId, "answerCount", 1);
-  await updateRow(TABLES.qaQuestions, questionId, { status: statusAfterAnswer(q.status), lastActivityAt: nowIso2() });
-  await notify({
-    userId: q.authorId,
-    type: "qa.answered",
-    title: "A teacher answered your question",
-    body: q.title,
-    href: `/qa/${questionId}`,
-    refType: "qa_question",
-    refId: questionId,
-    actorId: me,
-    dedupeKey: `qa.answered:${answerRowId(questionId, me)}`
-  });
-  await emitEvent({ eventType: "qa.answer.created", aggregateType: "qa_question", aggregateId: questionId, actorId: me, payload: { answerId: answerRowId(questionId, me) }, requestId: requestId2 });
-  return getQuestionDetail(questionId, actor);
-}
-async function updateAnswer(answerId, actor, input) {
-  const a = await loadAnswer(answerId);
-  const q = await loadQuestion(a.questionId);
-  if (a.authorId !== actor.user.$id) throw forbidden("Only the author can edit this answer.");
-  if (!canEditAnswer(q, { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: false }, { userId: actor.user.$id, roles: actor.roles, blockedWithAuthor: false })) {
-    throw conflict("invalid_state", "This question is closed.");
-  }
-  const files = input.attachmentFileIds === void 0 ? null : await replaceAttachments(actor.user.$id, a.attachmentFileIds, input.attachmentFileIds);
-  await updateRow(TABLES.qaAnswers, answerId, { body: input.body, ...files ? { attachmentFileIds: files.ids } : {} });
-  if (files) await files.commit();
-  return getQuestionDetail(q.$id, actor);
-}
-async function clarifyAnswer(answerId, actor, input, requestId2) {
-  const me = actor.user.$id;
-  const a = await loadAnswer(answerId);
-  const q = await loadQuestion(a.questionId);
-  if (q.authorId !== me) throw forbidden("Only the person who asked can follow up on an answer.");
-  const blocked = await blockedEitherWay(me);
-  const existing = await getRow(TABLES.qaAnswers, clarificationRowId(answerId));
-  const facts = { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: !!existing };
-  if (!canClarify(q, facts, { userId: me, roles: actor.roles, blockedWithAuthor: blocked.has(a.authorId) })) {
-    throw conflict("invalid_state", existing ? "You already followed up on this answer." : "You cannot follow up on this answer.");
-  }
-  try {
-    await createRow(TABLES.qaAnswers, { questionId: q.$id, authorId: me, kind: "clarification", parentAnswerId: answerId, body: input.body, removedAt: null, removedBy: null }, clarificationRowId(answerId));
-  } catch (err) {
-    if (isConflict(err)) throw conflict("duplicate_request", "You already followed up on this answer.");
-    throw err;
-  }
-  await updateRow(TABLES.qaQuestions, q.$id, { lastActivityAt: nowIso2() });
-  await notify({
-    userId: a.authorId,
-    type: "qa.clarified",
-    title: "Follow-up on your answer",
-    body: q.title,
-    href: `/qa/${q.$id}`,
-    refType: "qa_question",
-    refId: q.$id,
-    actorId: me,
-    dedupeKey: `qa.clarified:${answerId}`
-  });
-  await emitEvent({ eventType: "qa.clarification.created", aggregateType: "qa_question", aggregateId: q.$id, actorId: me, payload: { answerId }, requestId: requestId2 });
-  return getQuestionDetail(q.$id, actor);
-}
-async function acceptAnswer(answerId, actor, requestId2) {
-  const me = actor.user.$id;
-  const a = await loadAnswer(answerId);
-  const q = await loadQuestion(a.questionId);
-  if (!canAccept(q, { authorId: a.authorId, kind: a.kind, removedAt: a.removedAt, hasClarification: false }, { userId: me, roles: actor.roles, blockedWithAuthor: false })) {
-    throw forbidden("Only the person who asked can accept an answer.");
-  }
-  if (q.acceptedAnswerId !== answerId) {
-    await updateRow(TABLES.qaQuestions, q.$id, { acceptedAnswerId: answerId, lastActivityAt: nowIso2() });
-    await notify({
-      userId: a.authorId,
-      type: "qa.accepted",
-      title: "Your answer helped",
-      body: q.title,
-      href: `/qa/${q.$id}`,
-      refType: "qa_question",
-      refId: q.$id,
-      actorId: me,
-      dedupeKey: `qa.accepted:${answerId}`
-    });
-    await emitEvent({ eventType: "qa.answer.accepted", aggregateType: "qa_question", aggregateId: q.$id, actorId: me, payload: { answerId }, requestId: requestId2 });
-  }
-  return getQuestionDetail(q.$id, actor);
-}
-async function reportContent(actor, target, input) {
-  const row = target.type === "qa_question" ? await loadQuestion(target.id) : await getRow(TABLES.qaAnswers, target.id);
-  if (!row || row.removedAt) throw notFound("not_found", "This content could not be found.");
-  if (row.authorId === actor.user.$id) throw conflict("invalid_state", "You cannot report your own post.");
-  await createRow(TABLES.reports, {
-    reporterId: actor.user.$id,
-    targetUserId: row.authorId,
-    reason: input.reason,
-    details: input.details ?? "",
-    status: "open",
-    targetType: target.type,
-    targetId: target.id
-  });
-  return { reported: true };
-}
-async function removeContent(targetType, id, adminId) {
-  const now = nowIso2();
-  if (targetType === "qa_question") {
-    const q = await getRow(TABLES.qaQuestions, id);
-    if (q && !q.removedAt) {
-      await updateRow(TABLES.qaQuestions, id, { removedAt: now, removedBy: adminId, status: "closed", attachmentFileIds: [] });
-      await deleteUploads(q.attachmentFileIds ?? []);
-    }
-    return;
-  }
-  const a = await getRow(TABLES.qaAnswers, id);
-  if (!a || a.removedAt) return;
-  await updateRow(TABLES.qaAnswers, id, { removedAt: now, removedBy: adminId, attachmentFileIds: [] });
-  await deleteUploads(a.attachmentFileIds ?? []);
-  if (a.kind === "answer") {
-    const q = await getRow(TABLES.qaQuestions, a.questionId);
-    if (q) {
-      const answerCount = Math.max(0, (q.answerCount ?? 0) - 1);
-      await updateRow(TABLES.qaQuestions, q.$id, {
-        answerCount,
-        acceptedAnswerId: q.acceptedAnswerId === id ? null : q.acceptedAnswerId,
-        status: q.status === "closed" ? "closed" : answerCount > 0 ? "answered" : "open"
-      });
-    }
-  }
-}
-async function contentContext(targetType, id) {
-  if (!id || targetType !== "qa_question" && targetType !== "qa_answer") return { excerpt: null, href: null };
-  if (targetType === "qa_question") {
-    const q = await getRow(TABLES.qaQuestions, id);
-    return q ? { excerpt: excerpt(`${q.title} \u2014 ${q.body}`), href: q.removedAt ? null : `/qa/${q.$id}` } : { excerpt: null, href: null };
-  }
-  const a = await getRow(TABLES.qaAnswers, id);
-  return a ? { excerpt: excerpt(a.body), href: `/qa/${a.questionId}` } : { excerpt: null, href: null };
-}
-
-// src/services/admin.ts
-async function listReports(p) {
-  const q = [Query.orderDesc("createdAt"), Query.limit(p.limit + 1)];
-  if (p.status) q.push(Query.equal("status", p.status));
-  if (p.cursor) q.push(Query.cursorAfter(p.cursor));
-  const rows = await listRows(TABLES.reports, q);
-  const hasMore = rows.length > p.limit;
-  const page = hasMore ? rows.slice(0, p.limit) : rows;
-  const refs = await personRefs(page.flatMap((r) => [r.reporterId, r.targetUserId]));
-  const contexts = await Promise.all(page.map((r) => contentContext(r.targetType, r.targetId)));
-  const last = page[page.length - 1];
-  return { items: page.map((r, i) => toReportItem(r, refs.get(r.reporterId), refs.get(r.targetUserId), contexts[i])), nextCursor: hasMore && last ? last.$id : null };
-}
-async function resolveReport2(id, adminId, input, requestId2) {
-  const row = await getRow(TABLES.reports, id);
-  if (!row) throw notFound("not_found", "This report could not be found.");
-  if (row.status === "resolved") throw conflict("invalid_state", "This report is already resolved.");
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  if (input.action === "remove_content") {
-    if (row.targetType !== "qa_question" && row.targetType !== "qa_answer" || !row.targetId) throw conflict("invalid_state", "This report is not about a post.");
-    await removeContent(row.targetType, row.targetId, adminId);
-    await notify({
-      userId: row.targetUserId,
-      type: "system",
-      title: "A moderator removed one of your posts",
-      body: input.note?.trim() || "It did not meet our community guidelines.",
-      href: null,
-      refType: "report",
-      refId: row.$id
-    });
-  } else if (input.action === "warn") {
-    await notify({
-      userId: row.targetUserId,
-      type: "system",
-      title: "A moderator reviewed a report about your account",
-      body: input.note?.trim() || "Please keep interactions respectful. Repeated reports can lead to suspension.",
-      href: null,
-      refType: "report",
-      refId: row.$id
-    });
-  } else if (input.action === "suspend") {
-    await getUsers().updateStatus({ userId: row.targetUserId, status: false });
-    const active = await listRows(TABLES.learningRelations, [
-      Query.or([Query.equal("studentId", row.targetUserId), Query.equal("teacherId", row.targetUserId)]),
-      Query.equal("status", ["active", "paused"]),
-      Query.limit(100)
-    ]);
-    for (const rel of active) {
-      await updateRow(TABLES.learningRelations, rel.$id, { status: "ended", endedAt: now, endedBy: null, endReason: "Ended by moderation: the other member's account was suspended.", version: rel.version + 1 });
-      const other = rel.studentId === row.targetUserId ? rel.teacherId : rel.studentId;
-      await notify({ userId: other, type: "system", title: "A learning relation was ended by moderation", body: "The other member's account was suspended.", href: `/relations/${rel.$id}`, refType: "learning_relation", refId: rel.$id });
-      await emitEvent({ eventType: "relation.ended", aggregateType: "learning_relation", aggregateId: rel.$id, actorId: adminId, payload: { reason: "moderation" }, requestId: requestId2 });
-    }
-  }
-  const updated = await updateRow(TABLES.reports, id, { status: "resolved", resolution: input.action, resolvedBy: adminId, resolvedAt: now, resolutionNote: input.note ?? "" });
-  await audit({ actorId: adminId, action: `report.${input.action}`, resourceType: "report", resourceId: id, reason: input.note, requestId: requestId2 });
-  await emitEvent({ eventType: "report.resolved", aggregateType: "report", aggregateId: id, actorId: adminId, payload: { action: input.action, targetUserId: row.targetUserId }, requestId: requestId2 });
-  const refs = await personRefs([updated.reporterId, updated.targetUserId]);
-  return toReportItem(updated, refs.get(updated.reporterId), refs.get(updated.targetUserId), await contentContext(updated.targetType, updated.targetId));
-}
-
-// src/routes/admin.ts
-var adminRoutes = new Hono2();
-adminRoutes.get("/reports", async (c) => ok(c.get("requestId"), await listReports(readQuery(c, reportList))));
-adminRoutes.post("/reports/:id/resolve", async (c) => {
-  const body2 = await readJsonBody(c, resolveReport);
-  return ok(c.get("requestId"), await resolveReport2(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
-});
-
-// src/routes/connections.ts
-init_errors2();
-init_connections();
-
-// src/services/idempotency.ts
-var import_node_crypto5 = require("node:crypto");
-init_repo();
-init_rows();
-init_schema();
-init_errors2();
-var rowId = (userId, key) => (0, import_node_crypto5.createHash)("sha256").update(`${userId}:${key}`).digest("hex").slice(0, 32);
-var hashOf = (payload) => (0, import_node_crypto5.createHash)("sha256").update(JSON.stringify(payload ?? null)).digest("hex");
-async function withIdempotency(userId, key, payload, fn) {
-  if (!key) return fn();
-  const id = rowId(userId, key);
-  const requestHash = hashOf(payload);
-  const existing = await getRow(TABLES.idempotencyKeys, id);
-  if (existing) {
-    if (existing.requestHash !== requestHash) throw conflict("conflict", "This idempotency key was used with a different request.");
-    if (existing.status === "complete" && existing.resultJson) return JSON.parse(existing.resultJson);
-    throw conflict("request_in_progress", "This request is already being processed.");
-  }
-  try {
-    await createRow(TABLES.idempotencyKeys, { userId, key, status: "in_progress", requestHash, resultId: null, resultJson: null }, id);
-  } catch (err) {
-    if (isConflict(err)) throw conflict("request_in_progress", "This request is already being processed.");
-    throw err;
-  }
-  try {
-    const result = await fn();
-    await updateRow(TABLES.idempotencyKeys, id, { status: "complete", resultJson: JSON.stringify(result) });
-    return result;
-  } catch (err) {
-    await deleteRow(TABLES.idempotencyKeys, id);
-    throw err;
-  }
-}
-
-// src/routes/connections.ts
-init_safety();
-var connectionRoutes = new Hono2();
-connectionRoutes.get("/lookup", async (c) => {
-  const q = readQuery(c, lookup);
-  const found = await lookup2(q.handle, currentUser(c).$id);
-  if (!found) throw notFound("user_not_found", "No one with that handle.");
-  return ok(c.get("requestId"), found);
-});
-connectionRoutes.get("/contacts", async (c) => {
-  const q = readQuery(c, paged);
-  return ok(c.get("requestId"), await listContacts(currentUser(c).$id, q.limit, q.cursor));
-});
-connectionRoutes.get("/requests", async (c) => {
-  const q = readQuery(c, connectionList);
-  return ok(c.get("requestId"), await listRequests(currentUser(c).$id, q.direction, q.limit, q.cursor));
-});
-connectionRoutes.post("/requests", async (c) => {
-  const user = currentUser(c);
-  const body2 = await readJsonBody(c, createConnectionRequest);
-  return ok(c.get("requestId"), await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => createRequest(user, body2, "handle", c.get("requestId"))), 201);
-});
-connectionRoutes.post("/requests/:id/accept", async (c) => ok(c.get("requestId"), await accept(c.req.param("id"), currentUser(c), c.get("requestId"))));
-connectionRoutes.post("/requests/:id/decline", async (c) => ok(c.get("requestId"), await respond(c.req.param("id"), currentUser(c), "decline")));
-connectionRoutes.post("/requests/:id/cancel", async (c) => ok(c.get("requestId"), await respond(c.req.param("id"), currentUser(c), "cancel")));
-connectionRoutes.post("/blocks", async (c) => {
-  const body2 = await readJsonBody(c, blockInput);
-  await block(currentUser(c).$id, body2.userId);
-  return ok(c.get("requestId"), { blocked: true });
-});
-connectionRoutes.delete("/blocks/:userId", async (c) => {
-  await unblock(currentUser(c).$id, c.req.param("userId"));
-  return ok(c.get("requestId"), { blocked: false });
-});
-connectionRoutes.post("/reports", async (c) => {
-  const body2 = await readJsonBody(c, reportInput);
-  await report(currentUser(c).$id, body2);
-  return ok(c.get("requestId"), { reported: true });
-});
-
-// src/routes/conversations.ts
-init_errors2();
-init_messaging3();
-var conversationRoutes = new Hono2();
-conversationRoutes.get("/", async (c) => {
-  const q = readQuery(c, paged);
-  return ok(c.get("requestId"), await listConversations(currentUser(c).$id, q.limit, q.cursor));
-});
-conversationRoutes.get("/:id", async (c) => ok(c.get("requestId"), await getConversation(c.req.param("id"), currentUser(c).$id)));
-conversationRoutes.get("/:id/messages", async (c) => {
-  const q = readQuery(c, messageList);
-  return ok(c.get("requestId"), await listMessages(c.req.param("id"), currentUser(c).$id, q));
-});
-conversationRoutes.post("/:id/messages", async (c) => {
-  const body2 = await readJsonBody(c, sendMessage);
-  return ok(c.get("requestId"), await sendText(c.req.param("id"), currentUser(c).$id, body2.text, body2.clientMessageId, c.get("requestId")), 201);
-});
-conversationRoutes.post("/:id/read", async (c) => {
-  const body2 = await readJsonBody(c, markRead);
-  return ok(c.get("requestId"), await markRead3(c.req.param("id"), currentUser(c).$id, body2.sequence));
-});
-
-// src/routes/health.ts
-init_dist();
-init_client2();
-init_schema();
-init_errors2();
-
-// src/version.ts
-var API_VERSION = "0.1.0";
-
-// src/routes/health.ts
-var healthRoutes = new Hono2();
-var body = () => ({ ok: true, version: API_VERSION, uptimeSec: Math.round(process.uptime()) });
-healthRoutes.get("/healthz", (c) => ok(c.get("requestId"), body()));
-var readyCache = null;
-healthRoutes.get("/readyz", async (c) => {
-  if (!readyCache || Date.now() - readyCache.at > 1e4) {
-    const started = Date.now();
-    let good = false;
-    try {
-      await getTablesDB().listRows({ databaseId: getDatabaseId(), tableId: TABLES.profiles, queries: [Query.limit(1), Query.select(["$id"])] });
-      good = true;
-    } catch {
-      good = false;
-    }
-    readyCache = { at: Date.now(), ok: good, ms: Date.now() - started };
-  }
-  if (!readyCache.ok) throw serviceUnavailable("Database is not reachable.");
-  return ok(c.get("requestId"), { ...body(), checks: { tablesDb: { ok: true, latencyMs: readyCache.ms } } });
-});
-healthRoutes.get("/v1/version", (c) => ok(c.get("requestId"), { version: API_VERSION }));
-
-// src/routes/me.ts
-init_errors2();
-
-// src/services/account.ts
-init_dist();
-init_config();
-init_repo();
-init_client2();
-init_schema();
-init_errors2();
-init_events();
-var PROVIDERS = /* @__PURE__ */ new Set(["google", "notion"]);
-async function listIdentities(user) {
-  const res = await getUsers().listIdentities({ queries: [Query.equal("userId", user.$id)] });
-  const out = res.identities.filter((i) => PROVIDERS.has(i.provider)).map((i) => ({ id: i.$id, provider: i.provider, providerEmail: i.providerEmail || null, createdAt: i.$createdAt }));
-  if (user.passwordUpdate) out.unshift({ id: "email", provider: "email", providerEmail: user.email, createdAt: user.$createdAt });
-  return out;
-}
-async function unlinkIdentity(user, identityId) {
-  const all = await listIdentities(user);
-  if (all.length <= 1) throw conflict("invalid_state", "Keep at least one way to sign in. Set a password first.");
-  if (identityId === "email") throw conflict("invalid_state", "Passwords are managed from your account settings.");
-  await getUsers().deleteIdentity({ identityId });
-  await audit({ actorId: user.$id, action: "identity.unlinked", resourceType: "user", resourceId: user.$id });
-  return listIdentities(user);
-}
-async function exportData(userId) {
-  const by = (table, col) => listRows(table, [Query.equal(col, userId), Query.limit(500)]);
-  const [profile, roles, student, teacher, requestsS, requestsT, relationsS, relationsT, evidence, feedback, contacts, blocks, evidenceRevisions] = await Promise.all([
-    getRow(TABLES.profiles, userId),
-    by(TABLES.roleMemberships, "userId"),
-    by(TABLES.studentProfiles, "userId"),
-    by(TABLES.teacherProfiles, "userId"),
-    by(TABLES.learningRequests, "studentId"),
-    by(TABLES.learningRequests, "teacherId"),
-    by(TABLES.learningRelations, "studentId"),
-    by(TABLES.learningRelations, "teacherId"),
-    by(TABLES.evidenceItems, "authorId"),
-    by(TABLES.feedbackEntries, "authorId"),
-    by(TABLES.contacts, "userId"),
-    by(TABLES.blocks, "blockerId"),
-    by(TABLES.evidenceRevisions, "authorId")
-  ]);
-  const messages = await by(TABLES.messages, "senderId");
-  return { exportedAt: (/* @__PURE__ */ new Date()).toISOString(), profile, roles, studentProfile: student, teacherProfile: teacher, requests: [...requestsS, ...requestsT], relations: [...relationsS, ...relationsT], evidence, evidenceRevisions, feedback, messagesSent: messages, contacts, blocks };
-}
-async function deleteAvatarFile(fileId) {
-  if (!fileId) return;
-  const bucketId = getConfig().appwrite.avatarBucketId;
-  await getStorage().deleteFile({ bucketId, fileId }).catch(() => void 0);
-}
-async function deleteAccount(user, requestId2) {
-  const userId = user.$id;
-  const profile = await getRow(TABLES.profiles, userId);
-  await updateRow(TABLES.profiles, userId, { displayName: "Former member", handle: null, avatarFileId: null, email: `deleted+${userId}@invalid`, status: "deleted" });
-  await deleteAvatarFile(profile?.avatarFileId);
-  for (const t of [TABLES.studentProfiles, TABLES.teacherProfiles, TABLES.roleMemberships, TABLES.contacts, TABLES.blocks, TABLES.notifications]) {
-    const rows = await listRows(t, [Query.equal(t === TABLES.blocks ? "blockerId" : "userId", userId), Query.limit(500)]);
-    await Promise.all(rows.map((r) => deleteRow(t, r.$id)));
-  }
-  for (const col of ["studentId", "teacherId"]) {
-    const rels = await listRows(TABLES.learningRelations, [Query.equal(col, userId), Query.equal("status", ["active", "paused"]), Query.limit(200)]);
-    await Promise.all(rels.map((r) => updateRow(TABLES.learningRelations, r.$id, { status: "ended", endedAt: (/* @__PURE__ */ new Date()).toISOString(), endedBy: null, endReason: "The other member deleted their account." })));
-  }
-  const pend = await listRows(TABLES.learningRequests, [Query.equal("initiatorId", userId), Query.equal("status", "pending"), Query.limit(200)]);
-  await Promise.all(pend.map((r) => updateRow(TABLES.learningRequests, r.$id, { status: "cancelled", respondedAt: (/* @__PURE__ */ new Date()).toISOString() })));
-  await audit({ actorId: userId, action: "account.deleted", resourceType: "user", resourceId: userId, requestId: requestId2 });
-  evictUser(userId);
-  await getUsers().delete({ userId });
-}
-
-// src/routes/me.ts
-init_profiles();
-init_roles();
-var meRoutes = new Hono2();
-meRoutes.get("/", async (c) => ok(c.get("requestId"), await getMe(currentUser(c))));
-meRoutes.patch("/", async (c) => ok(c.get("requestId"), await updateMe2(currentUser(c), await readJsonBody(c, updateMe))));
-meRoutes.post("/age-gate", async (c) => {
-  const body2 = await readJsonBody(c, ageGate);
-  return ok(c.get("requestId"), await applyAgeGate(currentUser(c), body2.ageBand));
-});
-meRoutes.post("/roles", async (c) => {
-  const user = currentUser(c);
-  const body2 = await readJsonBody(c, selectRole);
-  await grantRole(user.$id, body2.role, body2.activate ?? true);
-  return ok(c.get("requestId"), await getMe(user));
-});
-meRoutes.post("/roles/active", async (c) => {
-  const user = currentUser(c);
-  const body2 = await readJsonBody(c, selectRole);
-  const roles = c.get("roles");
-  if (!roles.includes(body2.role)) await grantRole(user.$id, body2.role, true);
-  else await setActiveRole(user.$id, body2.role);
-  return ok(c.get("requestId"), await getMe(user));
-});
-meRoutes.get("/student-profile", async (c) => ok(c.get("requestId"), await getStudentProfile(currentUser(c).$id)));
-meRoutes.put("/student-profile", async (c) => ok(c.get("requestId"), await upsertStudentProfile(currentUser(c), await readJsonBody(c, updateStudentProfile))));
-meRoutes.get("/teacher-profile", async (c) => {
-  const user = currentUser(c);
-  return ok(c.get("requestId"), await getTeacherProfile(user.$id, user));
-});
-meRoutes.put("/teacher-profile", async (c) => ok(c.get("requestId"), await upsertTeacherProfile(currentUser(c), await readJsonBody(c, updateTeacherProfile))));
-meRoutes.get("/identities", async (c) => ok(c.get("requestId"), await listIdentities(currentUser(c))));
-meRoutes.delete("/identities/:id", async (c) => ok(c.get("requestId"), await unlinkIdentity(currentUser(c), c.req.param("id"))));
-meRoutes.get("/export", async (c) => ok(c.get("requestId"), await exportData(currentUser(c).$id)));
-meRoutes.delete("/", async (c) => {
-  const user = currentUser(c);
-  await withIdempotency(user.$id, idempotencyKeyOf(c), { delete: user.$id }, () => deleteAccount(user, c.get("requestId")));
-  return ok(c.get("requestId"), { deleted: true });
-});
-
-// src/routes/notifications.ts
-init_errors2();
-init_notifications2();
-var notificationRoutes = new Hono2();
-notificationRoutes.get("/", async (c) => {
-  const q = readQuery(c, notificationList);
-  return ok(c.get("requestId"), await listNotifications(currentUser(c).$id, q));
-});
-notificationRoutes.get("/summary", async (c) => ok(c.get("requestId"), { unread: await countUnread(currentUser(c).$id) }));
-notificationRoutes.post("/read", async (c) => {
-  const body2 = await readJsonBody(c, markNotificationsRead);
-  return ok(c.get("requestId"), await markRead2(currentUser(c).$id, body2));
-});
-
-// src/routes/qa.ts
-init_errors2();
-var actorOf = (c) => ({ user: currentUser(c), roles: c.get("roles") });
-var rid = (c) => c.get("requestId");
-var qaReadRoutes = new Hono2();
-qaReadRoutes.get("/topics", async (c) => ok(rid(c), await listTopics()));
-qaReadRoutes.get("/questions", async (c) => ok(rid(c), await listQuestions(currentUser(c).$id, readQuery(c, qaQuestionList))));
-qaReadRoutes.get("/questions/mine", async (c) => ok(rid(c), await listMyQuestions(currentUser(c).$id, readQuery(c, paged))));
-qaReadRoutes.get("/questions/:id", async (c) => ok(rid(c), await getQuestionDetail(c.req.param("id"), actorOf(c))));
-qaReadRoutes.get("/inbox", async (c) => ok(rid(c), await teacherInbox(actorOf(c), readQuery(c, paged))));
-qaReadRoutes.get("/teachers/:userId/accepted", async (c) => ok(rid(c), await acceptedAnswersOf(c.req.param("userId"))));
-var qaWriteRoutes = new Hono2();
-qaWriteRoutes.post("/questions", async (c) => {
-  const actor = actorOf(c);
-  const body2 = await readJsonBody(c, createQaQuestion);
-  return ok(rid(c), await withIdempotency(actor.user.$id, idempotencyKeyOf(c), body2, () => createQuestion(actor, body2, rid(c))), 201);
-});
-qaWriteRoutes.patch("/questions/:id", async (c) => ok(rid(c), await updateQuestion(c.req.param("id"), actorOf(c), await readJsonBody(c, updateQaQuestion))));
-qaWriteRoutes.post("/questions/:id/close", async (c) => ok(rid(c), await closeQuestion(c.req.param("id"), actorOf(c), rid(c))));
-qaWriteRoutes.post("/questions/:id/answers", async (c) => {
-  const actor = actorOf(c);
-  const body2 = await readJsonBody(c, qaAnswerBody);
-  const id = c.req.param("id");
-  return ok(rid(c), await withIdempotency(actor.user.$id, idempotencyKeyOf(c), { id, ...body2 }, () => createAnswer(id, actor, body2, rid(c))), 201);
-});
-qaWriteRoutes.post("/questions/:id/report", async (c) => ok(rid(c), await reportContent(actorOf(c), { type: "qa_question", id: c.req.param("id") }, await readJsonBody(c, qaReport)), 201));
-qaWriteRoutes.patch("/answers/:id", async (c) => ok(rid(c), await updateAnswer(c.req.param("id"), actorOf(c), await readJsonBody(c, qaAnswerBody))));
-qaWriteRoutes.post("/answers/:id/clarify", async (c) => ok(rid(c), await clarifyAnswer(c.req.param("id"), actorOf(c), await readJsonBody(c, qaBody), rid(c)), 201));
-qaWriteRoutes.post("/answers/:id/accept", async (c) => ok(rid(c), await acceptAnswer(c.req.param("id"), actorOf(c), rid(c))));
-qaWriteRoutes.post("/answers/:id/report", async (c) => ok(rid(c), await reportContent(actorOf(c), { type: "qa_answer", id: c.req.param("id") }, await readJsonBody(c, qaReport)), 201));
-
-// src/routes/relations.ts
-init_errors2();
-init_learning2();
-init_proof();
-var relationRoutes = new Hono2();
-relationRoutes.get("/", async (c) => {
-  const q = readQuery(c, relationList);
-  return ok(c.get("requestId"), await listRelations(currentUser(c).$id, q.role, q.status, q.limit, q.cursor));
-});
-relationRoutes.get("/:id", async (c) => ok(c.get("requestId"), await getRelation(c.req.param("id"), currentUser(c).$id)));
-relationRoutes.get("/:id/workspace", async (c) => ok(c.get("requestId"), await getWorkspace(c.req.param("id"), currentUser(c).$id)));
-relationRoutes.post("/:id/status", async (c) => {
-  const body2 = await readJsonBody(c, relationStatus);
-  return ok(c.get("requestId"), await updateRelationStatus(c.req.param("id"), currentUser(c).$id, body2, c.get("requestId")));
-});
-relationRoutes.post("/:id/goals", async (c) => {
-  const user = currentUser(c);
-  const rel = await requireRelationMember(c.req.param("id"), user.$id);
-  const body2 = await readJsonBody(c, createGoal);
-  return ok(c.get("requestId"), await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => createGoal2(rel, user.$id, body2, c.get("requestId"))), 201);
-});
-relationRoutes.patch("/:id/goals/:goalId", async (c) => ok(c.get("requestId"), await updateGoal2(c.req.param("id"), c.req.param("goalId"), currentUser(c).$id, await readJsonBody(c, updateGoal), c.get("requestId"))));
-relationRoutes.post("/:id/goals/:goalId/request-completion", async (c) => ok(c.get("requestId"), await requestGoalCompletion(c.req.param("id"), c.req.param("goalId"), currentUser(c).$id, c.get("requestId"))));
-relationRoutes.post("/:id/goals/:goalId/decline-completion", async (c) => {
-  const body2 = await readJsonBody(c, declineGoalCompletion);
-  return ok(c.get("requestId"), await declineGoalCompletion2(c.req.param("id"), c.req.param("goalId"), currentUser(c).$id, body2.note, c.get("requestId")));
-});
-relationRoutes.post("/:id/tasks", async (c) => {
-  const user = currentUser(c);
-  const rel = await requireRelationMember(c.req.param("id"), user.$id);
-  if (rel.teacherId !== user.$id) throw forbidden("Only the teacher assigns tasks.");
-  const body2 = await readJsonBody(c, createTask);
-  return ok(c.get("requestId"), await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => createTask2(rel.$id, user.$id, body2, c.get("requestId"))), 201);
-});
-relationRoutes.patch("/:id/tasks/:taskId", async (c) => ok(c.get("requestId"), await updateTask2(c.req.param("id"), c.req.param("taskId"), currentUser(c).$id, await readJsonBody(c, updateTask))));
-relationRoutes.get("/:id/evidence", async (c) => {
-  await requireRelationMember(c.req.param("id"), currentUser(c).$id);
-  const q = readQuery(c, paged);
-  return ok(c.get("requestId"), await listEvidence(c.req.param("id"), q.limit, q.cursor));
-});
-relationRoutes.post("/:id/evidence", async (c) => {
-  const user = currentUser(c);
-  const rel = await requireRelationMember(c.req.param("id"), user.$id);
-  if (rel.studentId !== user.$id) throw forbidden("Only the learner submits evidence.");
-  const body2 = await readJsonBody(c, createEvidence);
-  return ok(c.get("requestId"), await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => submitEvidence(rel, user.$id, body2, c.get("requestId"))), 201);
-});
-relationRoutes.get("/:id/evidence/:evidenceId", async (c) => {
-  await requireRelationMember(c.req.param("id"), currentUser(c).$id);
-  return ok(c.get("requestId"), await getEvidence(c.req.param("id"), c.req.param("evidenceId")));
-});
-relationRoutes.patch("/:id/evidence/:evidenceId", async (c) => {
-  const user = currentUser(c);
-  const rel = await requireRelationMember(c.req.param("id"), user.$id);
-  const body2 = await readJsonBody(c, reviseEvidence);
-  return ok(c.get("requestId"), await reviseEvidence2(rel, c.req.param("evidenceId"), user.$id, body2, c.get("requestId")));
-});
-relationRoutes.post("/:id/evidence/:evidenceId/feedback", async (c) => {
-  const user = currentUser(c);
-  const rel = await requireRelationMember(c.req.param("id"), user.$id);
-  if (rel.teacherId !== user.$id) throw forbidden("Only the teacher gives feedback.");
-  const body2 = await readJsonBody(c, createFeedback);
-  return ok(c.get("requestId"), await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => addFeedback(rel, c.req.param("evidenceId"), user.$id, body2, c.get("requestId"))), 201);
-});
-relationRoutes.get("/:id/proof", async (c) => {
-  await requireRelationMember(c.req.param("id"), currentUser(c).$id);
-  return ok(c.get("requestId"), await recomputeProof(c.req.param("id")));
-});
-
-// src/routes/requests.ts
-init_errors2();
-
-// src/services/matching.ts
-init_dist();
-init_repo();
-init_rows();
-init_schema();
-init_errors2();
-init_learning();
-init_events();
-init_notifications2();
-init_messaging3();
-init_profiles();
-init_safety();
-var OPEN = ["pending"];
-async function assertNoOpenPair(studentId, teacherId) {
-  const key = pairKey(studentId, teacherId);
-  const dup = await findOne(TABLES.learningRequests, [Query.equal("pairKey", key), Query.equal("status", OPEN)]);
-  if (dup) throw conflict("duplicate_request", "There is already an open request between you two.");
-  const open = await findOne(TABLES.learningRelations, [Query.equal("studentId", studentId), Query.equal("teacherId", teacherId), Query.equal("status", ["active", "paused"])]);
-  if (open?.status === "paused") throw conflict("duplicate_request", "You already have a paused learning relation together. Resume it instead.", { reason: "pair_relation_paused", relationId: open.$id });
-  if (open) throw conflict("duplicate_request", "You already have an active learning relation together.", { reason: "pair_relation_active", relationId: open.$id });
-}
-async function createLearningRequest2(student, input, requestId2) {
-  if (input.teacherId === student.$id) throw conflict("invalid_state", "You cannot send a request to yourself.");
-  const teacher = await findOne(TABLES.teacherProfiles, [Query.equal("userId", input.teacherId)]);
-  if (!teacher) throw notFound("user_not_found", "This teacher could not be found.");
-  if (!teacher.acceptingRequests) throw conflict("invalid_state", "This teacher is not accepting requests right now.");
-  await assertNotBlocked(student.$id, input.teacherId);
-  await assertNoOpenPair(student.$id, input.teacherId);
-  const row = await createRow(TABLES.learningRequests, {
-    kind: "learning_request",
-    studentId: student.$id,
-    teacherId: input.teacherId,
-    initiatorId: student.$id,
-    goalTitle: input.goalTitle,
-    message: input.message,
-    status: "pending",
-    relationId: null,
-    pairKey: pairKey(student.$id, input.teacherId),
-    respondedAt: null
-  });
-  await emitEvent({ eventType: "request.created", aggregateType: "learning_request", aggregateId: row.$id, actorId: student.$id, payload: { kind: row.kind }, requestId: requestId2 });
-  await notify({ userId: input.teacherId, type: "request.received", title: "New learning request", body: input.goalTitle, href: `/requests/${row.$id}`, refType: "learning_request", refId: row.$id, actorId: student.$id, dedupeKey: `request.received:${row.$id}` });
-  return hydrate(row, student.$id);
-}
-async function createTeacherInvitation2(teacher, input, requestId2) {
-  if (input.studentId === teacher.$id) throw conflict("invalid_state", "You cannot invite yourself.");
-  const target = await getRow(TABLES.profiles, input.studentId);
-  if (!target) throw notFound("user_not_found", "This learner could not be found.");
-  await assertNotBlocked(teacher.$id, input.studentId);
-  await assertNoOpenPair(input.studentId, teacher.$id);
-  const row = await createRow(TABLES.learningRequests, {
-    kind: "teacher_invitation",
-    studentId: input.studentId,
-    teacherId: teacher.$id,
-    initiatorId: teacher.$id,
-    goalTitle: input.goalTitle,
-    message: input.message,
-    status: "pending",
-    relationId: null,
-    pairKey: pairKey(input.studentId, teacher.$id),
-    respondedAt: null
-  });
-  await emitEvent({ eventType: "request.created", aggregateType: "learning_request", aggregateId: row.$id, actorId: teacher.$id, payload: { kind: row.kind }, requestId: requestId2 });
-  await notify({ userId: input.studentId, type: "request.received", title: "A teacher invited you to learn together", body: input.goalTitle, href: `/requests/${row.$id}`, refType: "learning_request", refId: row.$id, actorId: teacher.$id, dedupeKey: `request.received:${row.$id}` });
-  return hydrate(row, teacher.$id);
-}
-async function listRequests2(userId, p) {
-  const q = [Query.equal(p.role === "student" ? "studentId" : "teacherId", userId), Query.orderDesc("createdAt"), Query.limit(p.limit + 1)];
-  if (p.status) q.push(Query.equal("status", p.status));
-  if (p.cursor) q.push(Query.cursorAfter(p.cursor));
-  const rows = await listRows(TABLES.learningRequests, q);
-  const hasMore = rows.length > p.limit;
-  const page = hasMore ? rows.slice(0, p.limit) : rows;
-  const refs = await personRefs(page.map((r) => r.studentId === userId ? r.teacherId : r.studentId));
-  const items = page.map((r) => toLearningRequest(r, refs.get(r.studentId === userId ? r.teacherId : r.studentId)));
-  const last = page[page.length - 1];
-  return { items, nextCursor: hasMore && last ? last.$id : null };
-}
-async function getRequest(id, userId) {
-  const row = await getRow(TABLES.learningRequests, id);
-  if (!row || row.studentId !== userId && row.teacherId !== userId) throw notFound("not_found", "This request could not be found.");
-  return hydrate(row, userId);
-}
-async function hydrate(row, viewerId) {
-  const other = row.studentId === viewerId ? row.teacherId : row.studentId;
-  return toLearningRequest(row, (await personRefs([other])).get(other));
-}
-async function acceptRequest(id, actor, requestId2) {
-  const row = await getRow(TABLES.learningRequests, id);
-  if (!row) throw notFound("not_found", "This request could not be found.");
-  const responder = row.initiatorId === row.studentId ? row.teacherId : row.studentId;
-  if (actor.$id !== responder) throw forbidden("Only the person who received this request can accept it.");
-  if (row.status === "accepted" && row.relationId) return hydrate(row, actor.$id);
-  if (row.status !== "pending") throw conflict("invalid_state", "This request is no longer open.");
-  await assertNotBlocked(row.studentId, row.teacherId);
-  const conv = await getOrCreateConversation(row.studentId, row.teacherId, null);
-  let relation;
-  try {
-    relation = await createRow(TABLES.learningRelations, {
-      studentId: row.studentId,
-      teacherId: row.teacherId,
-      sourceRequestId: row.$id,
-      status: "active",
-      conversationId: conv.$id,
-      currentGoalId: null,
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      endedAt: null,
-      version: 1,
-      openTasks: 0,
-      evidenceCount: 0,
-      lastActivityAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  } catch (err) {
-    if (!isConflict(err)) throw err;
-    relation = await findOne(TABLES.learningRelations, [Query.equal("sourceRequestId", row.$id)]);
-  }
-  await updateRow(TABLES.conversations, conv.$id, { relationId: relation.$id });
-  const { createGoal: createGoal3, seedGoalId: seedGoalId2 } = await Promise.resolve().then(() => (init_learning2(), learning_exports));
-  await createGoal3(relation, actor.$id, { title: row.goalTitle }, requestId2, seedGoalId2(relation.$id));
-  const updated = await updateRow(TABLES.learningRequests, row.$id, { status: "accepted", relationId: relation.$id, respondedAt: (/* @__PURE__ */ new Date()).toISOString() });
-  await appendMessage({ conversationId: conv.$id, senderId: actor.$id, type: "system", payload: { type: "system", text: "Learning relation started." }, requestId: requestId2 });
-  if (row.message?.trim()) await appendMessage({ conversationId: conv.$id, senderId: row.initiatorId, type: "text", payload: { type: "text", text: row.message.trim() }, requestId: requestId2 });
-  await emitEvent({ eventType: "relation.created", aggregateType: "learning_relation", aggregateId: relation.$id, actorId: actor.$id, payload: { sourceRequestId: row.$id }, requestId: requestId2 });
-  await notify({ userId: row.initiatorId, type: "request.accepted", title: "Your request was accepted", body: row.goalTitle, href: `/relations/${relation.$id}`, refType: "learning_relation", refId: relation.$id, actorId: actor.$id, dedupeKey: `request.accepted:${row.$id}` });
-  return hydrate(updated, actor.$id);
-}
-async function respondRequest(id, actor, action, requestId2) {
-  const row = await getRow(TABLES.learningRequests, id);
-  if (!row) throw notFound("not_found", "This request could not be found.");
-  const responder = row.initiatorId === row.studentId ? row.teacherId : row.studentId;
-  if (action === "decline" && actor.$id !== responder) throw forbidden("Only the recipient can decline.");
-  if (action === "cancel" && actor.$id !== row.initiatorId) throw forbidden("Only the sender can cancel.");
-  if (row.status !== "pending") throw conflict("invalid_state", "This request is no longer open.");
-  const status = action === "decline" ? "declined" : "cancelled";
-  const updated = await updateRow(TABLES.learningRequests, row.$id, { status, respondedAt: (/* @__PURE__ */ new Date()).toISOString() });
-  await emitEvent({ eventType: `request.${status}`, aggregateType: "learning_request", aggregateId: row.$id, actorId: actor.$id, payload: {}, requestId: requestId2 });
-  if (status === "declined") await notify({ userId: row.initiatorId, type: "request.declined", title: "Your request was declined", body: row.goalTitle, href: `/requests/${row.$id}`, refType: "learning_request", refId: row.$id, actorId: actor.$id, dedupeKey: `request.declined:${row.$id}` });
-  return hydrate(updated, actor.$id);
-}
-
-// src/routes/requests.ts
-var requestRoutes = new Hono2();
-requestRoutes.get("/", async (c) => {
-  const q = readQuery(c, requestList);
-  return ok(c.get("requestId"), await listRequests2(currentUser(c).$id, q));
-});
-requestRoutes.post("/", async (c) => {
-  const user = currentUser(c);
-  if (!c.get("roles").includes("student")) throw roleRequired("student");
-  const body2 = await readJsonBody(c, createLearningRequest);
-  const result = await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => createLearningRequest2(user, body2, c.get("requestId")));
-  return ok(c.get("requestId"), result, 201);
-});
-requestRoutes.post("/invitations", async (c) => {
-  const user = currentUser(c);
-  if (!c.get("roles").includes("teacher")) throw roleRequired("teacher");
-  const body2 = await readJsonBody(c, createTeacherInvitation);
-  const result = await withIdempotency(user.$id, idempotencyKeyOf(c), body2, () => createTeacherInvitation2(user, body2, c.get("requestId")));
-  return ok(c.get("requestId"), result, 201);
-});
-requestRoutes.get("/:id", async (c) => ok(c.get("requestId"), await getRequest(c.req.param("id"), currentUser(c).$id)));
-requestRoutes.post("/:id/accept", async (c) => ok(c.get("requestId"), await acceptRequest(c.req.param("id"), currentUser(c), c.get("requestId"))));
-requestRoutes.post("/:id/decline", async (c) => ok(c.get("requestId"), await respondRequest(c.req.param("id"), currentUser(c), "decline", c.get("requestId"))));
-requestRoutes.post("/:id/cancel", async (c) => ok(c.get("requestId"), await respondRequest(c.req.param("id"), currentUser(c), "cancel", c.get("requestId"))));
-
-// src/routes/teachers.ts
-init_errors2();
-init_profile();
-init_profiles();
-var teacherRoutes = new Hono2();
-teacherRoutes.get("/", async (c) => {
-  const q = readQuery(c, teacherSearch);
-  const { rows, profiles, reviewed, nextCursor } = await searchTeachers(q);
-  const items = [];
-  for (const r of rows) {
-    const p = profiles.get(r.userId);
-    if (p) items.push(toTeacherProfile(p, r, false, { activeRelations: 0, evidenceReviewed: reviewed.get(r.userId) ?? 0, memberSince: p.createdAt }));
-  }
-  const body2 = { items, nextCursor };
-  return ok(c.get("requestId"), body2);
-});
-teacherRoutes.get("/:userId", async (c) => ok(c.get("requestId"), await getTeacherProfile(c.req.param("userId"), c.get("user"))));
-
-// src/routes/uploads.ts
-init_errors2();
-init_uploads();
-var uploadRoutes = new Hono2();
-uploadRoutes.post("/intents", async (c) => ok(c.get("requestId"), await createIntent(currentUser(c).$id, await readJsonBody(c, uploadIntent)), 201));
-uploadRoutes.post("/complete", async (c) => {
-  const body2 = await readJsonBody(c, uploadComplete);
-  return ok(c.get("requestId"), await completeIntent(currentUser(c).$id, body2.fileId));
-});
-
-// src/app.ts
-var BODY_LIMIT_BYTES = 256 * 1024;
-function createApp() {
-  const config = getConfig();
-  setLogLevel(config.logLevel);
-  const app2 = new Hono2();
-  app2.use("*", requestId);
-  app2.use("*", accessLog);
-  app2.use("*", secureHeaders({ contentSecurityPolicy: void 0, crossOriginResourcePolicy: "cross-origin", crossOriginEmbedderPolicy: false }));
-  app2.use("*", bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: () => {
-    throw payloadTooLarge(BODY_LIMIT_BYTES);
-  } }));
-  app2.use("*", corsMiddleware(config.corsOrigins, { allowPrivateNetworkOrigins: !config.isProduction }));
-  app2.use("*", rateLimit({ perMin: config.rateLimitPerMin }));
-  app2.route("/", healthRoutes);
-  const mount = (prefix, router, guards) => {
-    const guarded = new Hono2();
-    for (const r of router.routes) guarded.on([r.method], [r.path], ...guards, r.handler);
-    app2.route(prefix, guarded);
-  };
-  const authed = [requireAuth];
-  const social = [requireAuth, requireVerifiedEmail, rateLimit({ perMin: 30, keyPrefix: "social" })];
-  mount("/v1/me", meRoutes, authed);
-  mount("/v1/teachers", teacherRoutes, authed);
-  mount("/v1/requests", requestRoutes, social);
-  mount("/v1/relations", relationRoutes, authed);
-  mount("/v1/conversations", conversationRoutes, authed);
-  mount("/v1/connections", connectionRoutes, social);
-  mount("/v1/uploads", uploadRoutes, authed);
-  mount("/v1/notifications", notificationRoutes, authed);
-  mount("/v1/qa", qaReadRoutes, authed);
-  mount("/v1/qa", qaWriteRoutes, social);
-  mount("/v1/admin", adminRoutes, [requireAuth, requireAdmin]);
-  app2.notFound((c) => {
-    throw notFound("route_not_found", `No handler for ${c.req.method} ${c.req.path}`);
-  });
-  app2.onError((err, c) => toErrorResponse(err, { requestId: c.get("requestId") ?? "unknown", path: c.req.path }));
-  return app2;
-}
-
-// src/entry-appwrite.ts
-init_config();
-init_client2();
-init_log();
-var BODY_METHODS = /* @__PURE__ */ new Set(["POST", "PUT", "PATCH"]);
-var app = null;
+// src/entry-reminders.ts
 var activeKey = "";
 function adoptDynamicKey(headers) {
   const dyn = headers["x-appwrite-key"];
@@ -41176,30 +30853,18 @@ function adoptDynamicKey(headers) {
     resetConfigCache();
     resetClients();
   }
-  app ??= createApp();
 }
-function rawBody(req) {
-  const b = req.body;
-  if (typeof b === "string") return b;
-  if (b && typeof b === "object") return JSON.stringify(b);
-  return "";
-}
-function buildUrl(req) {
-  const q = req.queryString ? req.queryString.startsWith("?") ? req.queryString : `?${req.queryString}` : "";
-  return `http://appwrite.internal${req.path.startsWith("/") ? req.path : `/${req.path}`}${q}`;
-}
-var entry_appwrite_default = async ({ req, res }) => {
+var jsonHeaders = { "content-type": "application/json; charset=utf-8" };
+var entry_reminders_default = async ({ req, res }) => {
+  const started = Date.now();
   adoptDynamicKey(req.headers ?? {});
-  const method = req.method.toUpperCase();
-  const raw2 = BODY_METHODS.has(method) ? rawBody(req) : "";
-  const request = new Request(buildUrl(req), { method, headers: req.headers, body: raw2 || void 0 });
   try {
-    const response = await app.fetch(request);
-    const body2 = await response.text();
-    return res.send(body2, response.status, Object.fromEntries(response.headers.entries()));
+    setLogLevel(getConfig().logLevel);
+    const stats = await runTaskReminders();
+    return res.send(JSON.stringify({ ok: true, durationMs: Date.now() - started, stats }), 200, jsonHeaders);
   } catch (err) {
-    log("error", "function_adapter_failure", { method, message: err instanceof Error ? err.message : String(err) });
-    return res.send(JSON.stringify({ requestId: "unknown", data: null, error: { code: "internal", message: "Something went wrong. Try again shortly." } }), 500, { "content-type": "application/json; charset=utf-8" });
+    log("error", "reminders_function_failure", { message: err instanceof Error ? err.message : String(err) });
+    return res.send(JSON.stringify({ ok: false, error: "reminders_failed" }), 500, jsonHeaders);
   }
 };
 /*! Bundled license information:

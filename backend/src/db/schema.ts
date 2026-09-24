@@ -25,6 +25,7 @@ export const TABLES = {
   notifications: 'notifications',
   qaQuestions: 'qa_questions',
   qaAnswers: 'qa_answers',
+  evidenceRevisions: 'evidence_revisions',
 } as const;
 
 export type TableId = (typeof TABLES)[keyof typeof TABLES];

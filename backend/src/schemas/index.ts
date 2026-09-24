@@ -39,7 +39,10 @@ export const createTask = z.object({ title: trimmed(120), instructions: z.string
 export const updateTask = z.object({ title: trimmed(120).optional(), instructions: z.string().trim().max(4000).optional(), status: z.enum(['open', 'submitted', 'reviewed', 'done', 'dropped']).optional(), dueAt: z.string().datetime().nullable().optional() }).strict();
 
 export const createEvidence = z.object({ title: trimmed(120), body: z.string().trim().max(8000), taskId: z.string().max(36).nullable().optional(), goalId: z.string().max(36).nullable().optional(), attachmentFileIds: z.array(z.string().max(36)).max(5).optional() }).strict();
-export const createFeedback = z.object({ body: trimmed(4000), nextStep: z.string().trim().max(300).optional(), markTaskDone: z.boolean().optional() }).strict();
+export const createFeedback = z.object({ body: trimmed(4000), nextStep: z.string().trim().max(300).optional(), markTaskDone: z.boolean().optional(), outcome: z.enum(['approved', 'needs_revision']).optional() }).strict();
+export const reviseEvidence = z.object({ title: trimmed(120).optional(), body: z.string().trim().max(8000).optional(), attachmentFileIds: z.array(z.string().max(36)).max(5).optional() }).strict()
+  .refine((v) => v.title !== undefined || v.body !== undefined || v.attachmentFileIds !== undefined, { message: 'Change at least one field.' });
+export const declineGoalCompletion = z.object({ note: z.string().trim().max(300).optional() }).strict();
 export const paged = z.object({ cursor, limit });
 
 export const sendMessage = z.object({ clientMessageId: trimmed(64), text: trimmed(4000) }).strict();

@@ -22,13 +22,14 @@ export type LearningRelationRow = Stamped & {
   startedAt: string; endedAt: string | null; version: number;
   pausedBy?: string | null; pausedAt?: string | null; endedBy?: string | null; endReason?: string | null; openTasks: number; evidenceCount: number; lastActivityAt: string | null;
 };
-export type LearningGoalRow = Stamped & { relationId: string; title: string; description: string | null; status: string; createdBy: string };
+export type LearningGoalRow = Stamped & { relationId: string; title: string; description: string | null; status: string; createdBy: string; completionRequestedAt?: string | null };
 export type LearningTaskRow = Stamped & { relationId: string; goalId: string | null; title: string; instructions: string | null; status: string; assignedBy: string; dueAt: string | null };
 export type EvidenceItemRow = Stamped & {
   relationId: string; taskId: string | null; goalId: string | null; authorId: string; title: string; body: string | null;
   attachmentFileIds: string[] | null; status: string; version: number; submittedAt: string; reviewedAt: string | null;
 };
-export type FeedbackEntryRow = Stamped & { evidenceId: string; relationId: string; authorId: string; body: string | null; nextStep: string | null };
+export type FeedbackEntryRow = Stamped & { evidenceId: string; relationId: string; authorId: string; body: string | null; nextStep: string | null; outcome?: string | null };
+export type EvidenceRevisionRow = Stamped & { evidenceId: string; relationId: string; authorId: string; version: number; title: string; body: string | null; attachmentFileIds: string[] | null };
 export type ProofRecordRow = Stamped & {
   relationId: string; currentFocus: string | null; milestonesJson: string | null; tasksDone: number; evidenceSubmitted: number;
   feedbackReceived: number; revisions: number; recentChange: string | null; nextStep: string | null; computedAt: string;

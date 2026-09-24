@@ -10,6 +10,7 @@ const functions = [
   { name: 'node-learn-api', entry: 'src/entry-appwrite.ts' },
   { name: 'node-learn-purge-deleted', entry: 'src/entry-purge-deleted.ts' },
   { name: 'node-learn-healthcheck', entry: 'src/entry-healthcheck.ts' },
+  { name: 'node-learn-reminders', entry: 'src/entry-reminders.ts' },
 ];
 
 for (const fn of functions) {
